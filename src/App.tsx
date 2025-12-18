@@ -1,0 +1,369 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { useAuthStore } from './store/authStore';
+
+// Institution pages
+import Login from './pages/institution/Login';
+import Register from './pages/institution/Register';
+import Dashboard from './pages/institution/Dashboard';
+import Tests from './pages/institution/Tests';
+import TestDetail from './pages/institution/TestDetail';
+import Sessions from './pages/institution/Sessions';
+import SessionDetail from './pages/institution/SessionDetail';
+import StudentScores from './pages/institution/StudentScores';
+import Profile from './pages/institution/Profile';
+import AdminMinistries from './pages/institution/AdminMinistries';
+import MinistrySchools from './pages/institution/MinistrySchools';
+import Classes from './pages/institution/Classes';
+import Teachers from './pages/institution/Teachers';
+import Students from './pages/institution/Students';
+import StudentProfile from './pages/institution/StudentProfile';
+import ThemeSettings from './pages/institution/ThemeSettings';
+import CustomFields from './pages/institution/CustomFields';
+import ManualGrading from './pages/institution/ManualGrading';
+import GradeStudentTest from './pages/institution/GradeStudentTest';
+import Notifications from './pages/institution/Notifications';
+import Impersonation from './pages/institution/Impersonation';
+import ForgotPassword from './pages/institution/ForgotPassword';
+import ResetPassword from './pages/institution/ResetPassword';
+import AuditLogs from './pages/institution/AuditLogs';
+
+// Student pages
+import StudentTestPage from './pages/student/StudentTestPage';
+import StudentTestTaking from './pages/student/StudentTestTaking';
+import StudentTestResult from './pages/student/StudentTestResult';
+import StudentRegister from './pages/student/StudentRegister';
+import StudentLogin from './pages/student/StudentLogin';
+import StudentDashboard from './pages/student/StudentDashboard';
+
+// Parent pages
+import ParentLogin from './pages/parent/ParentLogin';
+import ParentDashboard from './pages/parent/ParentDashboard';
+import ParentStudentScores from './pages/parent/StudentScores';
+import ReportCard from './pages/parent/ReportCard';
+
+// Layout
+import InstitutionLayout from './components/layout/InstitutionLayout';
+import ParentLayout from './components/layout/ParentLayout';
+import StudentLayout from './components/layout/StudentLayout';
+
+function PrivateRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, account } = useAuthStore();
+  if (!isAuthenticated) {
+    // Redirect to appropriate login based on route
+    const isParentRoute = window.location.pathname.startsWith('/parent');
+    const isStudentRoute = window.location.pathname.startsWith('/student');
+    
+    if (isParentRoute) {
+      return <Navigate to="/parent/login" replace />;
+    } else if (isStudentRoute) {
+      return <Navigate to="/student/login" replace />;
+    }
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
+
+function App() {
+  return (
+    <>
+      <BrowserRouter>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          
+          {/* Student login */}
+          <Route path="/student/login" element={<StudentLogin />} />
+          
+          {/* Parent login */}
+          <Route path="/parent/login" element={<ParentLogin />} />
+
+          {/* Student authenticated routes - MUST come before /:slug */}
+          <Route
+            path="/student/dashboard"
+            element={
+              <PrivateRoute>
+                <StudentLayout>
+                  <StudentDashboard />
+                </StudentLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/student/test/:testId"
+            element={
+              <PrivateRoute>
+                <StudentLayout>
+                  <StudentTestTaking />
+                </StudentLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/student/test/:testId/result"
+            element={
+              <PrivateRoute>
+                <StudentLayout>
+                  <StudentTestResult />
+                </StudentLayout>
+              </PrivateRoute>
+            }
+          />
+
+          {/* Parent authenticated routes - MUST come before /:slug */}
+          <Route
+            path="/parent/dashboard"
+            element={
+              <PrivateRoute>
+                <ParentLayout>
+                  <ParentDashboard />
+                </ParentLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/parent/students/:studentId/scores"
+            element={
+              <PrivateRoute>
+                <ParentLayout>
+                  <ParentStudentScores />
+                </ParentLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/parent/students/:studentId/report-card"
+            element={
+              <PrivateRoute>
+                <ParentLayout>
+                  <ReportCard />
+                </ParentLayout>
+              </PrivateRoute>
+            }
+          />
+
+          {/* Student self-registration route - MUST come before /:slug */}
+          <Route path="/:slug/register" element={<StudentRegister />} />
+
+          {/* Student public routes (class-based access) - MUST come before /:slug */}
+          <Route path="/:slug/test/:testId" element={<StudentTestTaking />} />
+          <Route path="/:slug/test/:testId/result" element={<StudentTestResult />} />
+          
+          {/* Institution slug route - CATCH-ALL (must be last among slug routes) */}
+          <Route path="/:slug" element={<StudentTestPage />} />
+
+          {/* Institution protected routes */}
+          <Route
+            path="/dashboard"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <Dashboard />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/tests"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <Tests />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/tests/:id"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <TestDetail />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/tests/:testId/grade"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <ManualGrading />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/tests/:testId/grade/:studentTestId"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <GradeStudentTest />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/sessions"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <Sessions />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/sessions/:id"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <SessionDetail />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/scores"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <StudentScores />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <Profile />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/ministries"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <AdminMinistries />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/schools"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <MinistrySchools />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/classes"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <Classes />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/teachers"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <Teachers />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/students"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <Students />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/students/:id"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <StudentProfile />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/theme"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <ThemeSettings />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/custom-fields"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <CustomFields />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/notifications"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <Notifications />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/impersonation"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <Impersonation />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/audit-logs"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <AuditLogs />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </BrowserRouter>
+      <Toaster position="top-right" />
+    </>
+  );
+}
+
+export default App;
+

@@ -1,0 +1,7 @@
+questionText,questionType,options,correctAnswer,points
+"What is 2+2?",multiple_choice,"{""A"": ""3"", ""B"": ""4"", ""C"": ""5"", ""D"": ""6""}",B,1.0
+"What is the capital of France?",multiple_choice,"{""A"": ""London"", ""B"": ""Berlin"", ""C"": ""Paris"", ""D"": ""Madrid""}",C,1.0
+"The Earth is round.",true_false,,true,1.0
+"Water boils at 100 degrees Celsius.",true_false,,true,1.0
+"Explain the water cycle.",short_answer,,(any answer),2.0
+
