@@ -13,7 +13,10 @@ export default function Students() {
   const [classrooms, setClassrooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [assigning, setAssigning] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [bulkUploadClassroomId, setBulkUploadClassroomId] = useState<string>('');
+  const [bulkUploadSessionId, setBulkUploadSessionId] = useState<string>('');
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [showPromoteDialog, setShowPromoteDialog] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
@@ -109,17 +112,29 @@ export default function Students() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate that if one is selected, both must be selected
+    if ((bulkUploadClassroomId && !bulkUploadSessionId) || (!bulkUploadClassroomId && bulkUploadSessionId)) {
+      toast.error('Please select both class and session, or leave both empty to upload without assignment');
+      e.target.value = '';
+      return;
+    }
+
     setUploading(true);
     try {
-      const response = await studentAPI.bulkUpload(file);
+      const response = await studentAPI.bulkUpload(file, {
+        classroomId: bulkUploadClassroomId || undefined,
+        sessionId: bulkUploadSessionId || undefined,
+      });
       toast.success(
-        `Upload completed: ${response.data.successful} successful, ${response.data.failed} failed`
+        `Upload completed: ${response.data.successful} successful, ${response.data.failed} failed${bulkUploadClassroomId ? ' and assigned to class' : ''}`
       );
       if (response.data.errors && response.data.errors.length > 0) {
         console.error('Upload errors:', response.data.errors);
       }
       loadStudents();
       setShowBulkUpload(false);
+      setBulkUploadClassroomId('');
+      setBulkUploadSessionId('');
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to upload students');
     } finally {
@@ -149,45 +164,76 @@ export default function Students() {
   };
 
   const handleAssignStudent = async () => {
-    if (!assignForm.studentId || !assignForm.classroomId || !assignForm.sessionId) {
-      toast.error('Please select student, class, and session');
+    // Check if we're assigning multiple students or a single student
+    // If students are selected via checkboxes, use those; otherwise use the dropdown selection
+    const studentIdsToAssign = selectedStudents.length > 0 ? selectedStudents : 
+                                (assignForm.studentId ? [assignForm.studentId] : []);
+    
+    if (studentIdsToAssign.length === 0 || !assignForm.classroomId || !assignForm.sessionId) {
+      toast.error('Please select student(s), class, and session');
       return;
     }
 
-    // Check if student is already assigned to a different class
-    const student = students.find((s) => s.id === assignForm.studentId);
-    const currentAssignment = student?.classAssignments?.[0];
-    const isReassigning = currentAssignment && 
-      (currentAssignment.classroomId !== assignForm.classroomId || 
-       currentAssignment.sessionId !== assignForm.sessionId);
-
-    if (isReassigning) {
-      const currentClass = classrooms.find((c) => c.id === currentAssignment.classroomId);
-      const currentSession = sessions.find((s) => s.id === currentAssignment.sessionId);
-      const newClass = classrooms.find((c) => c.id === assignForm.classroomId);
-      const newSession = sessions.find((s) => s.id === assignForm.sessionId);
-
-      const confirmMessage = `This student is currently assigned to:\n` +
-        `Class: ${currentClass?.name || 'Unknown'}\n` +
-        `Session: ${currentSession?.name || 'Unknown'}\n\n` +
-        `You are about to reassign them to:\n` +
-        `Class: ${newClass?.name || 'Unknown'}\n` +
-        `Session: ${newSession?.name || 'Unknown'}\n\n` +
-        `This will automatically unassign them from their current class. Continue?`;
-
+    // For bulk assignment, show confirmation
+    if (studentIdsToAssign.length > 1) {
+      const selectedClass = classrooms.find((c) => c.id === assignForm.classroomId);
+      const selectedSession = sessions.find((s) => s.id === assignForm.sessionId);
+      const confirmMessage = `Assign ${studentIdsToAssign.length} students to:\n` +
+        `Class: ${selectedClass?.name || 'Unknown'}\n` +
+        `Session: ${selectedSession?.name || 'Unknown'}\n\n` +
+        `This will assign all selected students to the same class and session. Continue?`;
+      
       if (!window.confirm(confirmMessage)) {
         return;
       }
     }
 
+    setAssigning(true);
+    
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+
     try {
-      await studentAPI.assignToClass(assignForm);
-      toast.success(isReassigning ? 'Student reassigned successfully' : 'Student assigned to class successfully');
+      // Assign each student
+      for (const studentId of studentIdsToAssign) {
+        try {
+          await studentAPI.assignToClass({
+            studentId,
+            classroomId: assignForm.classroomId,
+            sessionId: assignForm.sessionId,
+          });
+          successCount++;
+        } catch (error: any) {
+          errorCount++;
+          const student = students.find((s) => s.id === studentId);
+          const studentName = student ? `${student.firstName} ${student.lastName}` : studentId;
+          errors.push(`${studentName}: ${error?.response?.data?.error || 'Failed to assign'}`);
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(
+          `✅ ${successCount} student(s) assigned successfully${errorCount > 0 ? `, ${errorCount} failed` : ''}`
+        );
+      }
+
+      if (errorCount > 0 && errors.length > 0) {
+        console.error('Assignment errors:', errors);
+        toast.error(
+          `❌ ${errorCount} student(s) failed to assign:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? '\n...(see console for more)' : ''}`,
+          { duration: 8000 }
+        );
+      }
+
       setShowAssignDialog(false);
       setAssignForm({ studentId: '', classroomId: '', sessionId: '' });
+      setSelectedStudents([]);
       loadStudents();
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to assign student');
+      toast.error(error?.response?.data?.error || 'Failed to assign students');
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -368,10 +414,20 @@ export default function Students() {
               {showBulkUpload ? '✕ Cancel' : '📤 Bulk Upload'}
             </button>
             <button
-              onClick={() => setShowAssignDialog(true)}
+              onClick={() => {
+                // If students are selected, use them for bulk assignment
+                if (selectedStudents.length > 0) {
+                  setAssignForm({ studentId: '', classroomId: '', sessionId: '' });
+                } else {
+                  // No students selected, allow single selection
+                  setAssignForm({ studentId: '', classroomId: '', sessionId: '' });
+                }
+                setShowAssignDialog(true);
+              }}
               className="btn-primary text-sm"
+              disabled={selectedStudents.length === 0 && students.length === 0}
             >
-              ➕ Assign to Class
+              ➕ Assign to Class {selectedStudents.length > 0 ? `(${selectedStudents.length} selected)` : ''}
             </button>
             {selectedStudents.length > 0 && (
               <button
@@ -391,6 +447,67 @@ export default function Students() {
         {showBulkUpload && (
           <div className="mb-6 p-6 bg-blue-50 border-2 border-blue-200 rounded-xl">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Bulk Upload Students</h3>
+            
+            {/* Class and Session Selection (Optional) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Assign to Session (Optional)
+                </label>
+                <select
+                  className="input-field w-full"
+                  value={bulkUploadSessionId}
+                  onChange={(e) => {
+                    setBulkUploadSessionId(e.target.value);
+                    // Clear classroom selection if session changes
+                    if (!e.target.value) {
+                      setBulkUploadClassroomId('');
+                    }
+                  }}
+                  disabled={uploading}
+                >
+                  <option value="">Select session (optional)</option>
+                  {sessions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Assign to Class (Optional)
+                </label>
+                <select
+                  className="input-field w-full"
+                  value={bulkUploadClassroomId}
+                  onChange={(e) => setBulkUploadClassroomId(e.target.value)}
+                  disabled={uploading || !bulkUploadSessionId}
+                >
+                  <option value="">
+                    {!bulkUploadSessionId ? 'Select session first' : 'Select class (optional)'}
+                  </option>
+                  {bulkUploadSessionId && classrooms.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {bulkUploadClassroomId && bulkUploadSessionId && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-800">
+                  ✅ Students will be automatically assigned to: <strong>
+                    {classrooms.find((c) => c.id === bulkUploadClassroomId)?.name}
+                  </strong> in session <strong>
+                    {sessions.find((s) => s.id === bulkUploadSessionId)?.name}
+                  </strong>
+                </p>
+              </div>
+            )}
+
             <div className="flex items-center space-x-4">
               <label className="btn-secondary cursor-pointer">
                 <input
@@ -404,6 +521,7 @@ export default function Students() {
               </label>
               <span className="text-sm text-gray-600">
                 Upload an Excel file with student data. Download the template for the correct format.
+                {bulkUploadClassroomId && bulkUploadSessionId && ' Students will be assigned to the selected class.'}
               </span>
             </div>
           </div>
@@ -604,6 +722,7 @@ export default function Students() {
 
       {/* Assign Dialog */}
       {showAssignDialog && (() => {
+        const isBulkAssignment = selectedStudents.length > 0;
         const selectedStudent = students.find((s) => s.id === assignForm.studentId);
         const currentAssignment = selectedStudent?.classAssignments?.[0];
         const currentClass = currentAssignment ? classrooms.find((c) => c.id === currentAssignment.classroomId) : null;
@@ -617,10 +736,44 @@ export default function Students() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
               <h2 className="text-2xl font-bold mb-4">
-                {currentAssignment ? 'Reassign Student to Class' : 'Assign Student to Class'}
+                {isBulkAssignment 
+                  ? `Assign ${selectedStudents.length} Student${selectedStudents.length > 1 ? 's' : ''} to Class`
+                  : (currentAssignment ? 'Reassign Student to Class' : 'Assign Student to Class')
+                }
               </h2>
               
-              {currentAssignment && (
+              {/* Show selected students list for bulk assignment */}
+              {isBulkAssignment && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm font-semibold text-green-800 mb-2">
+                    Selected Students ({selectedStudents.length}):
+                  </p>
+                  <div className="max-h-32 overflow-y-auto">
+                    <ul className="text-sm text-green-700 space-y-1">
+                      {selectedStudents.map((studentId) => {
+                        const student = students.find((s) => s.id === studentId);
+                        return student ? (
+                          <li key={studentId}>
+                            • {student.firstName} {student.lastName} ({student.username})
+                          </li>
+                        ) : null;
+                      })}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {/* Show selected student info if one is pre-selected (single assignment) */}
+              {!isBulkAssignment && assignForm.studentId && selectedStudent && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm font-semibold text-green-800 mb-1">Selected Student:</p>
+                  <p className="text-sm text-green-700">
+                    {selectedStudent.firstName} {selectedStudent.lastName} ({selectedStudent.username})
+                  </p>
+                </div>
+              )}
+              
+              {!isBulkAssignment && currentAssignment && (
                 <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -649,13 +802,17 @@ export default function Students() {
 
               <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <strong>Note:</strong> A student can only belong to one class at a time. 
-                  {currentAssignment ? ' Reassigning will automatically unassign from the current class.' : ' Assigning to a new class will automatically unassign from any previous class.'}
+                  <strong>Note:</strong> {isBulkAssignment 
+                    ? `All ${selectedStudents.length} selected students will be assigned to the same class and session. A student can only belong to one class at a time.`
+                    : 'A student can only belong to one class at a time. ' + 
+                      (currentAssignment ? 'Reassigning will automatically unassign from the current class.' : 'Assigning to a new class will automatically unassign from any previous class.')
+                  }
                 </p>
               </div>
 
               <div className="space-y-4">
-                {!assignForm.studentId && (
+                {/* Only show student dropdown for single assignment */}
+                {!isBulkAssignment && (
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Select Student
@@ -663,7 +820,15 @@ export default function Students() {
                     <select
                       className="input-field"
                       value={assignForm.studentId}
-                      onChange={(e) => setAssignForm({ ...assignForm, studentId: e.target.value })}
+                      onChange={(e) => {
+                        const studentId = e.target.value;
+                        const student = students.find((s) => s.id === studentId);
+                        setAssignForm({
+                          studentId,
+                          classroomId: student?.classAssignments?.[0]?.classroomId || '',
+                          sessionId: student?.classAssignments?.[0]?.sessionId || '',
+                        });
+                      }}
                     >
                       <option value="">Choose a student...</option>
                       {students.map((s) => (
@@ -706,7 +871,7 @@ export default function Students() {
                 </div>
               </div>
 
-              {isReassigning && (
+              {!isBulkAssignment && isReassigning && (
                 <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
                   <p className="text-sm text-orange-800">
                     ⚠️ <strong>Warning:</strong> You are about to reassign this student. 
@@ -716,8 +881,17 @@ export default function Students() {
               )}
 
               <div className="flex space-x-2 mt-6">
-                <button onClick={handleAssignStudent} className="btn-primary flex-1">
-                  {currentAssignment ? 'Reassign' : 'Assign'}
+                <button 
+                  onClick={handleAssignStudent} 
+                  disabled={assigning || (!isBulkAssignment && !assignForm.studentId) || !assignForm.classroomId || !assignForm.sessionId}
+                  className="btn-primary flex-1"
+                >
+                  {assigning 
+                    ? (isBulkAssignment ? `Assigning ${selectedStudents.length}...` : 'Assigning...')
+                    : (isBulkAssignment 
+                        ? `Assign ${selectedStudents.length} Student${selectedStudents.length > 1 ? 's' : ''}` 
+                        : (currentAssignment ? 'Reassign' : 'Assign'))
+                  }
                 </button>
                 <button
                   onClick={() => {
@@ -725,6 +899,7 @@ export default function Students() {
                     setAssignForm({ studentId: '', classroomId: '', sessionId: '' });
                   }}
                   className="btn-secondary flex-1"
+                  disabled={assigning}
                 >
                   Cancel
                 </button>

@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
-import { classroomAPI, teacherAPI } from '../../services/api';
+import { classroomAPI, teacherAPI, sessionAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import { Session } from '../../types';
 import toast from 'react-hot-toast';
+import { format } from 'date-fns';
 
 export default function Classes() {
   const { account } = useAuthStore();
   const [classes, setClasses] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -27,6 +30,7 @@ export default function Classes() {
     loadClasses();
     if (isSchool) {
       loadTeachers();
+      loadSessions();
     }
   }, [account?.role]);
 
@@ -49,6 +53,31 @@ export default function Classes() {
     } catch (error: any) {
       toast.error('Failed to load teachers');
     }
+  };
+
+  const loadSessions = async () => {
+    try {
+      const { data } = await sessionAPI.getAll();
+      setSessions(data);
+    } catch (error: any) {
+      console.error('Failed to load sessions:', error);
+      // Don't show error toast - sessions are optional for class creation
+    }
+  };
+
+  // Get active or scheduled sessions for dropdown
+  const getAvailableSessions = () => {
+    const now = new Date();
+    return sessions.filter((session) => {
+      if (!session.isActive || session.isArchived) return false;
+      const startDate = new Date(session.startDate);
+      const endDate = new Date(session.endDate);
+      // Active: current date is between start and end
+      const isActive = startDate <= now && endDate >= now;
+      // Scheduled: start date is in the future
+      const isScheduled = startDate > now;
+      return isActive || isScheduled;
+    });
   };
 
   const handleCreateClass = async (e: React.FormEvent) => {
@@ -114,13 +143,36 @@ export default function Classes() {
                 value={classForm.name}
                 onChange={(e) => setClassForm({ ...classForm, name: e.target.value })}
               />
-              <input
-                name="academicSession"
-                placeholder="Academic session (ex: 2025 Spring)"
-                className="input-field"
-                value={classForm.academicSession}
-                onChange={(e) => setClassForm({ ...classForm, academicSession: e.target.value })}
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Academic Session
+                </label>
+                <select
+                  name="academicSession"
+                  className="input-field"
+                  value={classForm.academicSession}
+                  onChange={(e) => setClassForm({ ...classForm, academicSession: e.target.value })}
+                >
+                  <option value="">Select a session (optional)</option>
+                  {getAvailableSessions().map((session) => {
+                    const startDate = new Date(session.startDate);
+                    const endDate = new Date(session.endDate);
+                    const now = new Date();
+                    const isActive = startDate <= now && endDate >= now;
+                    const isScheduled = startDate > now;
+                    const status = isActive ? 'Active' : isScheduled ? 'Scheduled' : '';
+                    const dateRange = `${format(startDate, 'MMM dd, yyyy')} - ${format(endDate, 'MMM dd, yyyy')}`;
+                    return (
+                      <option key={session.id} value={session.name}>
+                        {session.name} - {dateRange} {status ? `(${status})` : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Select an active or scheduled session for this class
+                </p>
+              </div>
               <textarea
                 name="description"
                 placeholder="Description"

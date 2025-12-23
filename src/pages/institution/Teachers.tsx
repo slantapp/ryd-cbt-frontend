@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { teacherAPI, impersonationAPI } from '../../services/api';
+import { teacherAPI, impersonationAPI, classroomAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -9,6 +9,7 @@ export default function Teachers() {
   const { account, setAuth } = useAuthStore();
   const navigate = useNavigate();
   const [teachers, setTeachers] = useState<any[]>([]);
+  const [classrooms, setClassrooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [impersonatingId, setImpersonatingId] = useState<string | null>(null);
@@ -16,6 +17,10 @@ export default function Teachers() {
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [assigningClassroomId, setAssigningClassroomId] = useState<string | null>(null);
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string>('');
+  const [assigning, setAssigning] = useState(false);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -47,9 +52,19 @@ export default function Teachers() {
   useEffect(() => {
     if (isSchool) {
       loadTeachers();
+      loadClassrooms();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSchool]);
+
+  const loadClassrooms = async () => {
+    try {
+      const { data } = await classroomAPI.list();
+      setClassrooms(data);
+    } catch (error: any) {
+      console.error('Failed to load classrooms:', error);
+    }
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,6 +177,73 @@ export default function Teachers() {
     }
   };
 
+  const handleToggleActive = async (teacher: any) => {
+    if (!window.confirm(`Are you sure you want to ${teacher.isActive ? 'deactivate' : 'activate'} ${teacher.name}?`)) {
+      return;
+    }
+
+    try {
+      await teacherAPI.update(teacher.id, { isActive: !teacher.isActive });
+      toast.success(`Teacher ${teacher.isActive ? 'deactivated' : 'activated'} successfully`);
+      loadTeachers();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || `Failed to ${teacher.isActive ? 'deactivate' : 'activate'} teacher`);
+    }
+  };
+
+  const handleAssignClass = async () => {
+    if (!selectedClassroomId || !assigningClassroomId) {
+      toast.error('Please select a class');
+      return;
+    }
+
+    setAssigning(true);
+    try {
+      await classroomAPI.assignTeacher({
+        classroomId: selectedClassroomId,
+        teacherId: assigningClassroomId,
+      });
+      toast.success('Teacher assigned to class successfully');
+      setAssigningClassroomId(null);
+      setSelectedClassroomId('');
+      loadTeachers();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to assign teacher to class');
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const handleRemoveClass = async (teacherId: string, classroomId: string) => {
+    if (!window.confirm('Are you sure you want to remove this teacher from the class?')) {
+      return;
+    }
+
+    try {
+      await classroomAPI.removeTeacher(classroomId, teacherId);
+      toast.success('Teacher removed from class successfully');
+      loadTeachers();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to remove teacher from class');
+    }
+  };
+
+  // Filter teachers based on search query
+  const filteredTeachers = teachers.filter((teacher) => {
+    if (!searchQuery.trim()) return true;
+    
+    const query = searchQuery.toLowerCase().trim();
+    const name = teacher.name?.toLowerCase() || '';
+    const email = teacher.email?.toLowerCase() || '';
+    const phone = teacher.phone?.toLowerCase() || '';
+    
+    return (
+      name.includes(query) ||
+      email.includes(query) ||
+      phone.includes(query)
+    );
+  });
+
   if (!isSchool) {
     return <p className="text-center text-gray-500">Only schools can manage teacher accounts.</p>;
   }
@@ -210,18 +292,45 @@ export default function Teachers() {
           </div>
         )}
         <form className="grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={handleCreate}>
-          {['name', 'email', 'phone', 'password'].map((field) => (
-            <input
-              key={field}
-              name={field}
-              type={field === 'password' ? 'password' : 'text'}
-              placeholder={field === 'phone' ? 'Phone (optional)' : field.charAt(0).toUpperCase() + field.slice(1)}
-              className="input-field"
-              required={field !== 'phone'}
-              value={(form as any)[field]}
-              onChange={(e) => setForm({ ...form, [field]: e.target.value })}
-            />
-          ))}
+          <input
+            name="teacher-name"
+            type="text"
+            placeholder="Name"
+            className="input-field"
+            required
+            autoComplete="off"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+          <input
+            name="teacher-email"
+            type="email"
+            placeholder="Email"
+            className="input-field"
+            required
+            autoComplete="off"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+          />
+          <input
+            name="teacher-phone"
+            type="tel"
+            placeholder="Phone (optional)"
+            className="input-field"
+            autoComplete="off"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+          />
+          <input
+            name="teacher-password"
+            type="password"
+            placeholder="Password"
+            className="input-field"
+            required
+            autoComplete="new-password"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+          />
           <button type="submit" disabled={creating} className="btn-primary col-span-full md:w-48">
             {creating ? 'Creating...' : 'Create teacher'}
           </button>
@@ -231,12 +340,35 @@ export default function Teachers() {
       <div className="card">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold">Teachers</h2>
-          <span className="text-sm text-gray-500">{teachers.length} total</span>
+          <span className="text-sm text-gray-500">
+            {searchQuery ? `${filteredTeachers.length} of ${teachers.length}` : `${teachers.length} total`}
+          </span>
+        </div>
+        
+        {/* Search Bar */}
+        <div className="mb-4">
+          <input
+            type="text"
+            placeholder="🔍 Search teachers by name, email, or phone..."
+            className="input-field w-full"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
         {loading ? (
           <p className="text-gray-500">Loading teachers...</p>
         ) : teachers.length === 0 ? (
           <p className="text-gray-500">No teachers yet.</p>
+        ) : filteredTeachers.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-500 mb-2">No teachers found matching "{searchQuery}"</p>
+            <button
+              onClick={() => setSearchQuery('')}
+              className="text-sm text-primary hover:text-primary-600"
+            >
+              Clear search
+            </button>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -251,7 +383,7 @@ export default function Teachers() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {teachers.map((teacher) => (
+                {filteredTeachers.map((teacher) => (
                   <tr key={teacher.id} className="hover:bg-gray-50">
                     {editingId === teacher.id ? (
                       <>
@@ -345,6 +477,17 @@ export default function Teachers() {
                           <p className="text-xs text-gray-500">{teacher.phone || 'No phone'}</p>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">{teacher.email}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              teacher.isActive
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}
+                          >
+                            {teacher.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
                           {teacher.parent ? (
                             <span>{teacher.parent.name} ({teacher.parent.role})</span>
@@ -383,13 +526,31 @@ export default function Teachers() {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 flex-wrap">
                             <button
                               onClick={() => handleEdit(teacher)}
                               className="px-3 py-1 text-xs font-semibold rounded bg-blue-600 text-white hover:bg-blue-700"
                               title="Edit teacher"
                             >
                               ✏️ Edit
+                            </button>
+                            <button
+                              onClick={() => setAssigningClassroomId(teacher.id)}
+                              className="px-3 py-1 text-xs font-semibold rounded bg-purple-600 text-white hover:bg-purple-700"
+                              title="Assign to class"
+                            >
+                              📚 Assign Class
+                            </button>
+                            <button
+                              onClick={() => handleToggleActive(teacher)}
+                              className={`px-3 py-1 text-xs font-semibold rounded text-white ${
+                                teacher.isActive
+                                  ? 'bg-red-600 hover:bg-red-700'
+                                  : 'bg-green-600 hover:bg-green-700'
+                              }`}
+                              title={teacher.isActive ? 'Deactivate teacher' : 'Activate teacher'}
+                            >
+                              {teacher.isActive ? '🚫 Deactivate' : '✅ Activate'}
                             </button>
                             <button
                               onClick={() => handleImpersonate(teacher.id)}
@@ -410,6 +571,105 @@ export default function Teachers() {
           </div>
         )}
       </div>
+
+      {/* Assign Class Modal */}
+      {assigningClassroomId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold mb-4">Assign Teacher to Class</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Select a class to assign to{' '}
+              <span className="font-semibold">
+                {teachers.find((t) => t.id === assigningClassroomId)?.name}
+              </span>
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Class
+              </label>
+              <select
+                className="input-field w-full"
+                value={selectedClassroomId}
+                onChange={(e) => setSelectedClassroomId(e.target.value)}
+              >
+                <option value="">Choose a class...</option>
+                {classrooms
+                  .filter((classroom) => {
+                    const teacher = teachers.find((t) => t.id === assigningClassroomId);
+                    // Filter out classes the teacher is already assigned to
+                    return !teacher?.assignedClasses?.some(
+                      (ac: any) => ac.classroom.id === classroom.id
+                    );
+                  })
+                  .map((classroom) => (
+                    <option key={classroom.id} value={classroom.id}>
+                      {classroom.name} {classroom.academicSession ? `(${classroom.academicSession})` : ''}
+                    </option>
+                  ))}
+              </select>
+              {classrooms.filter((classroom) => {
+                const teacher = teachers.find((t) => t.id === assigningClassroomId);
+                return !teacher?.assignedClasses?.some(
+                  (ac: any) => ac.classroom.id === classroom.id
+                );
+              }).length === 0 && (
+                <p className="text-sm text-gray-500 mt-2">
+                  All available classes are already assigned to this teacher
+                </p>
+              )}
+            </div>
+
+            {/* Show already assigned classes */}
+            {teachers
+              .find((t) => t.id === assigningClassroomId)
+              ?.assignedClasses?.length > 0 && (
+              <div className="mb-4">
+                <p className="text-sm font-medium text-gray-700 mb-2">Currently Assigned Classes:</p>
+                <div className="flex flex-wrap gap-2">
+                  {teachers
+                    .find((t) => t.id === assigningClassroomId)
+                    ?.assignedClasses.map((assignment: any) => (
+                      <div
+                        key={assignment.classroom.id}
+                        className="flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs"
+                      >
+                        <span>{assignment.classroom.name}</span>
+                        <button
+                          onClick={() => handleRemoveClass(assigningClassroomId, assignment.classroom.id)}
+                          className="text-blue-600 hover:text-blue-800 font-bold"
+                          title="Remove from class"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex space-x-3 pt-4">
+              <button
+                onClick={() => {
+                  setAssigningClassroomId(null);
+                  setSelectedClassroomId('');
+                }}
+                className="btn-secondary flex-1"
+                disabled={assigning}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAssignClass}
+                disabled={assigning || !selectedClassroomId}
+                className="btn-primary flex-1"
+              >
+                {assigning ? 'Assigning...' : 'Assign Class'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -95,6 +95,8 @@ export const authAPI = {
     api.post('/auth/forgot-password', { email }),
   resetPassword: (data: { token: string; newPassword: string }) =>
     api.post('/auth/reset-password', data),
+  resetPasswordFirstLogin: (data: { email: string; currentPassword: string; newPassword: string }) =>
+    api.post('/auth/reset-password-first-login', data),
 };
 
 // Institution
@@ -219,7 +221,7 @@ export const sessionAPI = {
 
 // Students
 export const studentAPI = {
-  getScores: (params?: { testId?: string; sessionId?: string }) =>
+  getScores: (params?: { testId?: string; sessionId?: string; classroomId?: string }) =>
     api.get('/students/scores', { params }),
   grantRetrial: (studentTestId: string) =>
     api.post('/students/grant-retrial', { studentTestId }),
@@ -234,9 +236,15 @@ export const studentAPI = {
     api.put(`/students/${id}`, data),
   getMyTests: () => api.get('/students/my-tests'),
   getTest: (testId: string) => api.get(`/students/test/${testId}`),
-  bulkUpload: (file: File) => {
+  bulkUpload: (file: File, options?: { classroomId?: string; sessionId?: string }) => {
     const formData = new FormData();
     formData.append('file', file);
+    if (options?.classroomId) {
+      formData.append('classroomId', options.classroomId);
+    }
+    if (options?.sessionId) {
+      formData.append('sessionId', options.sessionId);
+    }
     return api.post('/students/bulk-upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -333,7 +341,7 @@ export const teacherAPI = {
     api.post('/teachers', data),
   getAll: () => api.get('/teachers'),
   list: () => api.get('/teachers'),
-  update: (id: string, data: { name?: string; email?: string; phone?: string }) =>
+  update: (id: string, data: { name?: string; email?: string; phone?: string; isActive?: boolean }) =>
     api.put(`/teachers/${id}`, data),
   dashboard: () => api.get('/teachers/dashboard/me'),
   downloadTemplate: () => api.get('/teachers/template', { responseType: 'blob' }),

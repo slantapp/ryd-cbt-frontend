@@ -388,7 +388,14 @@ export default function SessionDetail() {
               <h2 className="text-xl font-semibold">Classes in Session</h2>
               {isSchool && (
                 <button
-                  onClick={() => setShowAddClassesDialog(true)}
+                  onClick={() => {
+                    // If no classes exist, redirect to classes page
+                    if (allClassrooms.length === 0) {
+                      navigate('/classes');
+                    } else {
+                      setShowAddClassesDialog(true);
+                    }
+                  }}
                   className="btn-primary text-sm"
                 >
                   + Add Classes
@@ -431,10 +438,17 @@ export default function SessionDetail() {
                 <p className="text-gray-500 mb-4">No classes assigned to this session</p>
                 {isSchool && (
                   <button
-                    onClick={() => setShowAddClassesDialog(true)}
+                    onClick={() => {
+                      // If no classes exist, redirect to classes page
+                      if (allClassrooms.length === 0) {
+                        navigate('/classes');
+                      } else {
+                        setShowAddClassesDialog(true);
+                      }
+                    }}
                     className="btn-primary"
                   >
-                    Add Classes
+                    {allClassrooms.length === 0 ? 'Create Classes' : 'Add Classes'}
                   </button>
                 )}
               </div>
@@ -476,9 +490,20 @@ export default function SessionDetail() {
               </p>
               <div className="border border-gray-300 rounded-lg p-4 max-h-96 overflow-y-auto">
                 {allClassrooms.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">
-                    No classes available. Please create classes first from the Classes page.
-                  </p>
+                  <div className="text-center py-8">
+                    <p className="text-gray-500 mb-4">
+                      No classes available. Please create classes first.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setShowAddClassesDialog(false);
+                        navigate('/classes');
+                      }}
+                      className="btn-primary"
+                    >
+                      Go to Classes Page
+                    </button>
+                  </div>
                 ) : (
                   <>
                     {allClassrooms

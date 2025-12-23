@@ -154,7 +154,7 @@ export default function Sessions() {
             <h1 className="text-4xl font-bold mb-2">Sessions</h1>
             <p className="text-primary-100 text-lg">Manage test sessions and schedules</p>
           </div>
-          {account?.role === 'SCHOOL' && (
+          {(account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN') && (
             <button 
               onClick={() => setShowForm(!showForm)} 
               className="bg-white text-primary hover:bg-primary-50 font-semibold py-2.5 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl"
@@ -184,7 +184,7 @@ export default function Sessions() {
       </div>
 
       {/* Create Form */}
-      {showForm && (
+      {showForm && (account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN') && (
         <div className="card border-2 border-primary-200 shadow-xl">
           <div className="flex items-center space-x-3 mb-6">
             <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">

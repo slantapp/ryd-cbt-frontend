@@ -1,24 +1,67 @@
 import { useEffect, useState } from 'react';
-import { studentAPI, gradingAPI } from '../../services/api';
+import { studentAPI, gradingAPI, sessionAPI, classroomAPI } from '../../services/api';
 import { StudentTest } from '../../types';
 import toast from 'react-hot-toast';
 
 export default function StudentScores() {
   const [scores, setScores] = useState<StudentTest[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [classrooms, setClassrooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'passed' | 'failed' | 'in_progress'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSessionId, setSelectedSessionId] = useState<string>('');
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string>('');
 
   useEffect(() => {
-    loadScores();
+    loadSessions();
+    loadClassrooms();
+    loadScores(); // Load scores on initial mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    // Reload scores when filters change
+    loadScores();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSessionId, selectedClassroomId]);
+
+  const loadSessions = async () => {
+    try {
+      const { data } = await sessionAPI.getAll();
+      setSessions(data || []);
+    } catch (error: any) {
+      console.error('Failed to load sessions:', error);
+      setSessions([]); // Set empty array on error
+    }
+  };
+
+  const loadClassrooms = async () => {
+    try {
+      const { data } = await classroomAPI.list();
+      setClassrooms(data || []);
+    } catch (error: any) {
+      console.error('Failed to load classrooms:', error);
+      setClassrooms([]); // Set empty array on error
+    }
+  };
 
   const loadScores = async () => {
     try {
-      const response = await studentAPI.getScores();
-      setScores(response.data);
+      setLoading(true);
+      const params: { sessionId?: string; classroomId?: string } = {};
+      if (selectedSessionId) {
+        params.sessionId = selectedSessionId;
+      }
+      if (selectedClassroomId) {
+        params.classroomId = selectedClassroomId;
+      }
+      const response = await studentAPI.getScores(Object.keys(params).length > 0 ? params : undefined);
+      setScores(response.data || []);
     } catch (error: any) {
-      toast.error('Failed to load scores');
+      console.error('Load scores error:', error);
+      toast.error(error?.response?.data?.error || 'Failed to load scores');
+      setScores([]); // Set empty array on error to prevent crashes
     } finally {
       setLoading(false);
     }
@@ -135,9 +178,70 @@ export default function StudentScores() {
       </div>
 
       {/* Search and Filters */}
-      {scores.length > 0 && (
-        <div className="space-y-4">
-          {/* Search Bar */}
+      <div className="space-y-4">
+        {/* Session and Class Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Filter by Session
+            </label>
+            <select
+              className="input-field w-full"
+              value={selectedSessionId}
+              onChange={(e) => {
+                setSelectedSessionId(e.target.value);
+                // Clear classroom filter when session changes
+                setSelectedClassroomId('');
+              }}
+            >
+              <option value="">All Sessions</option>
+              {sessions && sessions.length > 0 ? sessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              )) : null}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Filter by Class
+            </label>
+            <select
+              className="input-field w-full"
+              value={selectedClassroomId}
+              onChange={(e) => setSelectedClassroomId(e.target.value)}
+            >
+              <option value="">All Classes</option>
+              {classrooms && classrooms.length > 0 ? classrooms.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              )) : null}
+            </select>
+          </div>
+        </div>
+
+        {(selectedSessionId || selectedClassroomId) && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">
+              Filtering by: {selectedSessionId && sessions && `Session: ${sessions.find(s => s.id === selectedSessionId)?.name || 'Unknown'}`}
+              {selectedSessionId && selectedClassroomId && ' | '}
+              {selectedClassroomId && classrooms && `Class: ${classrooms.find(c => c.id === selectedClassroomId)?.name || 'Unknown'}`}
+            </span>
+            <button
+              onClick={() => {
+                setSelectedSessionId('');
+                setSelectedClassroomId('');
+              }}
+              className="text-sm text-primary hover:text-primary-600 font-semibold"
+            >
+              Clear Filters
+            </button>
+          </div>
+        )}
+
+        {/* Search Bar */}
+        {scores.length > 0 && (
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg
@@ -182,8 +286,10 @@ export default function StudentScores() {
               </button>
             )}
           </div>
+        )}
 
-          {/* Filters */}
+        {/* Status Filters */}
+        {scores.length > 0 && (
           <div className="flex flex-wrap gap-3">
             <button
               onClick={() => setFilter('all')}
@@ -226,8 +332,8 @@ export default function StudentScores() {
               In Progress ({inProgressCount})
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Results Count */}
       {scores.length > 0 && (searchQuery || filter !== 'all') && (

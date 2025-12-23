@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { impersonationAPI } from '../../services/api';
 import NotificationBell from '../NotificationBell';
+import PasswordResetModal from '../PasswordResetModal';
 import toast from 'react-hot-toast';
 
 interface InstitutionLayoutProps {
@@ -371,6 +372,18 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
       </nav>
 
       <main className="max-w-7xl mx-auto py-8 sm:px-6 lg:px-8">{children}</main>
+      
+      {/* Password Reset Modal - shows when teacher/student must reset password */}
+      {account?.mustResetPassword && (account.role === 'TEACHER' || account.role === 'STUDENT') && (
+        <PasswordResetModal
+          isOpen={true}
+          userEmail={account.email}
+          onClose={() => {
+            // Modal cannot be closed until password is reset
+            // This is handled by updating account in the modal after successful reset
+          }}
+        />
+      )}
     </div>
   );
 }

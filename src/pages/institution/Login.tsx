@@ -21,16 +21,10 @@ export default function Login() {
     try {
       const response = await authAPI.login({ email, password, role });
       
-      // Check if password reset is required
-      if (response.data?.requiresPasswordReset === true) {
-        setError('Password reset required. Please reset your password first.');
-        toast.error('Password reset required');
-        return;
-      }
-      
       // Extract token and institution from response
       const token = response.data?.token;
       const institution = response.data?.institution;
+      const requiresPasswordReset = response.data?.requiresPasswordReset === true;
       
       if (!token) {
         console.error('Login failed: No token in response', response.data);
@@ -46,8 +40,14 @@ export default function Login() {
         return;
       }
       
-      setAuth(token, institution);
-      toast.success('Login successful!');
+      // Set mustResetPassword flag in institution object
+      const institutionWithResetFlag = {
+        ...institution,
+        mustResetPassword: requiresPasswordReset || institution.mustResetPassword || false,
+      };
+      
+      setAuth(token, institutionWithResetFlag);
+      toast.success(requiresPasswordReset ? 'Login successful! Please reset your password.' : 'Login successful!');
       navigate('/dashboard');
     } catch (error: any) {
       console.error('Login error:', error);
