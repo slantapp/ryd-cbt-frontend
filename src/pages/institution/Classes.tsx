@@ -25,14 +25,20 @@ export default function Classes() {
 
   const isSchool = account?.role === 'SCHOOL';
   const isTeacher = account?.role === 'TEACHER';
+  const isSuperAdmin = account?.role === 'SUPER_ADMIN';
 
   useEffect(() => {
     loadClasses();
-    if (isSchool) {
-      loadTeachers();
-      loadSessions();
+    if (isSchool || isSuperAdmin) {
+      if (isSuperAdmin) {
+        // Super admin can view sessions for filtering
+        loadSessions();
+      } else {
+        loadTeachers();
+        loadSessions();
+      }
     }
-  }, [account?.role]);
+  }, [account?.role, isSuperAdmin]);
 
   const loadClasses = async () => {
     try {
@@ -124,12 +130,20 @@ export default function Classes() {
     }
   };
 
-  if (!isSchool && !isTeacher) {
-    return <p className="text-center text-gray-500">Classes are only visible to schools and teachers.</p>;
+  if (!isSchool && !isTeacher && !isSuperAdmin) {
+    return <p className="text-center text-gray-500">Classes are only visible to schools, teachers, and super admins.</p>;
   }
 
   return (
     <div className="space-y-8">
+      <div className="bg-gradient-to-r from-primary to-primary-600 rounded-2xl shadow-xl p-8 text-white">
+        <h1 className="text-4xl font-bold mb-2">
+          {isSuperAdmin ? 'All Classes' : 'Classes'}
+        </h1>
+        <p className="text-primary-100 text-lg">
+          {isSuperAdmin ? 'View all classes across all schools' : isTeacher ? 'View classes you are assigned to' : 'Manage classes and teacher assignments'}
+        </p>
+      </div>
       {isSchool && (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div className="card">

@@ -911,6 +911,22 @@ export default function TestDetail() {
                 </span>
               </p>
             </div>
+            {test.classrooms && test.classrooms.length > 0 && (
+              <div className="col-span-2">
+                <label className="text-sm text-gray-500">Assigned to Classes</label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {test.classrooms.map((tc: any) => (
+                    <span
+                      key={tc.classroom.id}
+                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
+                    >
+                      {tc.classroom.name}
+                      {tc.classroom.academicSession && ` (${tc.classroom.academicSession})`}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

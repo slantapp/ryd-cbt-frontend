@@ -30,14 +30,21 @@ export default function Sessions() {
     classroomId: '' as string | undefined,
   });
 
+  const isSuperAdmin = account?.role === 'SUPER_ADMIN';
+
   useEffect(() => {
     loadSessions();
     loadTests();
-    if (account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN') {
-      loadClassrooms();
-      loadArchivedSessions();
+    if (account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN' || isSuperAdmin) {
+      if (isSuperAdmin) {
+        // Super admin can view but not create, so skip loading classrooms and archived sessions for now
+        // They can still view all sessions
+      } else {
+        loadClassrooms();
+        loadArchivedSessions();
+      }
     }
-  }, [account?.role]);
+  }, [account?.role, isSuperAdmin]);
 
   const loadSessions = async () => {
     try {

@@ -17,6 +17,8 @@ export default function StudentRegister() {
     email: '',
     phone: '',
     dateOfBirth: '',
+    classroomId: '',
+    sessionId: '',
   });
 
   useEffect(() => {
@@ -35,7 +37,7 @@ export default function StudentRegister() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -54,6 +56,13 @@ export default function StudentRegister() {
 
     setLoading(true);
     try {
+      // Validate that if one is selected, both must be selected
+      if ((formData.classroomId && !formData.sessionId) || (!formData.classroomId && formData.sessionId)) {
+        toast.error('Please select both session and class, or leave both empty');
+        setLoading(false);
+        return;
+      }
+
       await publicAPI.registerStudent({
         schoolSlug: slug!,
         firstName: formData.firstName,
@@ -63,8 +72,10 @@ export default function StudentRegister() {
         email: formData.email || undefined,
         phone: formData.phone || undefined,
         dateOfBirth: formData.dateOfBirth || undefined,
+        classroomId: formData.classroomId || undefined,
+        sessionId: formData.sessionId || undefined,
       });
-      toast.success('Registration successful! Please wait for class assignment from your school.');
+      toast.success(formData.classroomId ? 'Registration successful! You have been assigned to your selected class.' : 'Registration successful! Please wait for class assignment from your school.');
       setFormData({
         firstName: '',
         lastName: '',
@@ -74,6 +85,8 @@ export default function StudentRegister() {
         email: '',
         phone: '',
         dateOfBirth: '',
+        classroomId: '',
+        sessionId: '',
       });
       // Optionally redirect after a delay
       setTimeout(() => {
@@ -186,6 +199,57 @@ export default function StudentRegister() {
               />
             </div>
 
+            {/* Class Selection */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-gray-700">Class Selection (Optional)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Session
+                  </label>
+                  <select
+                    name="sessionId"
+                    className="input-field"
+                    value={formData.sessionId}
+                    onChange={(e) => {
+                      setFormData({ ...formData, sessionId: e.target.value, classroomId: '' });
+                    }}
+                  >
+                    <option value="">Select session (optional)</option>
+                    {schoolInfo?.sessions?.map((s: any) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Class
+                  </label>
+                  <select
+                    name="classroomId"
+                    className="input-field"
+                    value={formData.classroomId}
+                    onChange={handleChange}
+                    disabled={!formData.sessionId}
+                  >
+                    <option value="">Select class (optional)</option>
+                    {formData.sessionId && schoolInfo?.sessions
+                      ?.find((s: any) => s.id === formData.sessionId)
+                      ?.classAssignments?.map((ca: any) => (
+                        <option key={ca.classroom.id} value={ca.classroom.id}>
+                          {ca.classroom.name}
+                        </option>
+                      ))}
+                  </select>
+                  {!formData.sessionId && (
+                    <p className="text-xs text-gray-500 mt-1">Please select a session first</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <details className="text-sm">
               <summary className="cursor-pointer text-gray-600 hover:text-gray-900 mb-2">
                 Additional Information (Optional)
@@ -241,7 +305,9 @@ export default function StudentRegister() {
             </button>
 
             <p className="text-center text-sm text-gray-500">
-              After registration, your school will assign you to a class.
+              {formData.classroomId 
+                ? 'You will be assigned to the selected class upon registration. This cannot be changed later.' 
+                : 'You can select a class during registration, or your school will assign you to a class later. Class selection cannot be changed after registration.'}
             </p>
           </form>
         </div>

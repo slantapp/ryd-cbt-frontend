@@ -16,6 +16,8 @@ export default function Tests() {
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [tempDueDate, setTempDueDate] = useState('');
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -34,6 +36,8 @@ export default function Tests() {
   });
   const navigate = useNavigate();
 
+  const isSuperAdmin = account?.role === 'SUPER_ADMIN';
+
   useEffect(() => {
     loadTests();
     loadCustomFields();
@@ -41,14 +45,14 @@ export default function Tests() {
       loadTeacherData();
     } else {
     loadSessions();
-      if (account && (account.role === 'SCHOOL' || account.role === 'TEACHER')) {
+      if (account && (account.role === 'SCHOOL' || account.role === 'TEACHER' || isSuperAdmin)) {
         loadClassrooms();
       }
-      if (account && account.role === 'SCHOOL') {
+      if (account && (account.role === 'SCHOOL' || isSuperAdmin)) {
         loadTeachers();
       }
     }
-  }, [account?.role]);
+  }, [account?.role, isSuperAdmin]);
 
   const loadTeacherData = async () => {
     try {
@@ -181,6 +185,16 @@ export default function Tests() {
   // Get available classrooms based on selected session and user role
   const getAvailableClassrooms = () => {
     return getAvailableClassroomsForSession(formData.sessionId);
+  };
+
+  const formatDueDate = (dateString: string): string => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleString();
+    } catch {
+      return dateString;
+    }
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -534,12 +548,29 @@ export default function Tests() {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Due Date
                 </label>
-                <input
-                  type="datetime-local"
-                  className="input-field"
-                  value={formData.dueDate}
-                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    className="input-field flex-1"
+                    placeholder="Click to select date and time"
+                    value={formatDueDate(formData.dueDate)}
+                    readOnly
+                    onClick={() => {
+                      setTempDueDate(formData.dueDate || '');
+                      setShowDatePicker(true);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTempDueDate(formData.dueDate || '');
+                      setShowDatePicker(true);
+                    }}
+                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-600 transition-colors"
+                  >
+                    📅
+                  </button>
+                </div>
                 <p className="text-xs text-gray-500 mt-1">
                   When should students complete this test by?
                 </p>
@@ -718,6 +749,52 @@ export default function Tests() {
               )}
             </Link>
           ))}
+        </div>
+      )}
+
+      {/* Date Picker Modal */}
+      {showDatePicker && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900">Select Due Date & Time</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Date & Time
+                </label>
+                <input
+                  type="datetime-local"
+                  className="input-field w-full"
+                  value={tempDueDate}
+                  onChange={(e) => setTempDueDate(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDatePicker(false);
+                    setTempDueDate('');
+                  }}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (tempDueDate) {
+                      setFormData({ ...formData, dueDate: tempDueDate });
+                    }
+                    setShowDatePicker(false);
+                  }}
+                  className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-600 transition-colors font-semibold"
+                >
+                  Okay
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

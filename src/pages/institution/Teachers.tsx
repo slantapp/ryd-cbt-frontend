@@ -1,18 +1,15 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { teacherAPI, impersonationAPI, classroomAPI } from '../../services/api';
+import { teacherAPI, classroomAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
 export default function Teachers() {
-  const { account, setAuth } = useAuthStore();
-  const navigate = useNavigate();
+  const { account } = useAuthStore();
   const [teachers, setTeachers] = useState<any[]>([]);
   const [classrooms, setClassrooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [impersonatingId, setImpersonatingId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -37,6 +34,10 @@ export default function Teachers() {
     return account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN';
   }, [account?.role]);
 
+  const isSuperAdmin = useMemo(() => {
+    return account?.role === 'SUPER_ADMIN';
+  }, [account?.role]);
+
   const loadTeachers = async () => {
     try {
       setLoading(true);
@@ -50,12 +51,14 @@ export default function Teachers() {
   };
 
   useEffect(() => {
-    if (isSchool) {
+    if (isSchool || isSuperAdmin) {
       loadTeachers();
-      loadClassrooms();
+      if (isSchool) {
+        loadClassrooms();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSchool]);
+  }, [isSchool, isSuperAdmin]);
 
   const loadClassrooms = async () => {
     try {
@@ -81,29 +84,6 @@ export default function Teachers() {
     }
   };
 
-  const handleImpersonate = async (id: string) => {
-    try {
-      setImpersonatingId(id);
-      const { data } = await impersonationAPI.start(id);
-      if (!data.token) {
-        toast.error('Impersonation failed: No authentication token received');
-        return;
-      }
-      
-      if (!data.account) {
-        toast.error('Impersonation failed: No account data received');
-        return;
-      }
-      
-      setAuth(data.token, data.account);
-      toast.success(`Now impersonating ${data.account.name}`);
-      navigate('/dashboard');
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Unable to impersonate');
-    } finally {
-      setImpersonatingId(null);
-    }
-  };
 
   const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -244,17 +224,20 @@ export default function Teachers() {
     );
   });
 
-  if (!isSchool) {
-    return <p className="text-center text-gray-500">Only schools can manage teacher accounts.</p>;
+  if (!isSchool && !isSuperAdmin) {
+    return <p className="text-center text-gray-500">Only schools and super admins can view teacher accounts.</p>;
   }
 
   return (
     <div className="space-y-8">
       <div className="bg-gradient-to-r from-primary to-primary-600 rounded-2xl shadow-xl p-8 text-white">
         <h1 className="text-4xl font-bold mb-2">Teachers</h1>
-        <p className="text-primary-100 text-lg">Manage teacher accounts and assignments</p>
+        <p className="text-primary-100 text-lg">
+          {isSuperAdmin ? 'View all teachers across all schools' : 'Manage teacher accounts and assignments'}
+        </p>
       </div>
 
+      {isSchool && (
       <div className="card">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold">Create Teacher</h2>
@@ -336,6 +319,7 @@ export default function Teachers() {
           </button>
         </form>
       </div>
+      )}
 
       <div className="card">
         <div className="flex justify-between items-center mb-4">
@@ -526,41 +510,37 @@ export default function Teachers() {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex gap-2 flex-wrap">
-                            <button
-                              onClick={() => handleEdit(teacher)}
-                              className="px-3 py-1 text-xs font-semibold rounded bg-blue-600 text-white hover:bg-blue-700"
-                              title="Edit teacher"
-                            >
-                              ✏️ Edit
-                            </button>
-                            <button
-                              onClick={() => setAssigningClassroomId(teacher.id)}
-                              className="px-3 py-1 text-xs font-semibold rounded bg-purple-600 text-white hover:bg-purple-700"
-                              title="Assign to class"
-                            >
-                              📚 Assign Class
-                            </button>
-                            <button
-                              onClick={() => handleToggleActive(teacher)}
-                              className={`px-3 py-1 text-xs font-semibold rounded text-white ${
-                                teacher.isActive
-                                  ? 'bg-red-600 hover:bg-red-700'
-                                  : 'bg-green-600 hover:bg-green-700'
-                              }`}
-                              title={teacher.isActive ? 'Deactivate teacher' : 'Activate teacher'}
-                            >
-                              {teacher.isActive ? '🚫 Deactivate' : '✅ Activate'}
-                            </button>
-                            <button
-                              onClick={() => handleImpersonate(teacher.id)}
-                              disabled={impersonatingId === teacher.id}
-                              className="px-3 py-1 text-xs font-semibold rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
-                              title="Impersonate teacher"
-                            >
-                              {impersonatingId === teacher.id ? 'Switching...' : '👤 Impersonate'}
-                            </button>
-                          </div>
+                          {isSchool ? (
+                            <div className="flex gap-2 flex-wrap">
+                              <button
+                                onClick={() => handleEdit(teacher)}
+                                className="px-3 py-1 text-xs font-semibold rounded bg-blue-600 text-white hover:bg-blue-700"
+                                title="Edit teacher"
+                              >
+                                ✏️ Edit
+                              </button>
+                              <button
+                                onClick={() => setAssigningClassroomId(teacher.id)}
+                                className="px-3 py-1 text-xs font-semibold rounded bg-purple-600 text-white hover:bg-purple-700"
+                                title="Assign to class"
+                              >
+                                📚 Assign Class
+                              </button>
+                              <button
+                                onClick={() => handleToggleActive(teacher)}
+                                className={`px-3 py-1 text-xs font-semibold rounded text-white ${
+                                  teacher.isActive
+                                    ? 'bg-red-600 hover:bg-red-700'
+                                    : 'bg-green-600 hover:bg-green-700'
+                                }`}
+                                title={teacher.isActive ? 'Deactivate teacher' : 'Activate teacher'}
+                              >
+                                {teacher.isActive ? '🚫 Deactivate' : '✅ Activate'}
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-500">View only</span>
+                          )}
                         </td>
                       </>
                     )}

@@ -19,7 +19,19 @@ export default function Students() {
   const [bulkUploadSessionId, setBulkUploadSessionId] = useState<string>('');
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [showPromoteDialog, setShowPromoteDialog] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [createFormData, setCreateFormData] = useState({
+    firstName: '',
+    lastName: '',
+    username: '',
+    email: '',
+    phone: '',
+    dateOfBirth: '',
+    password: '',
+    classroomId: '',
+    sessionId: '',
+  });
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [filters, setFilters] = useState({
     sessionId: '',
@@ -43,14 +55,32 @@ export default function Students() {
     return account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN';
   }, [account?.role]);
 
+  const isTeacher = useMemo(() => {
+    return account?.role === 'TEACHER';
+  }, [account?.role]);
+
+  const isSuperAdmin = useMemo(() => {
+    return account?.role === 'SUPER_ADMIN';
+  }, [account?.role]);
+
   useEffect(() => {
-    if (isSchool) {
+    if (isSchool || isTeacher || isSuperAdmin) {
       loadStudents();
-      loadSessions();
-      loadClassrooms();
-      loadSchoolInfo();
+      if (isSchool) {
+        loadSessions();
+        loadClassrooms();
+        loadSchoolInfo();
+      } else if (isTeacher) {
+        // Teachers can filter by sessions and classes they're assigned to
+        loadSessions();
+        loadClassrooms();
+      } else if (isSuperAdmin) {
+        // Super admins can view all sessions and classrooms for filtering
+        loadSessions();
+        loadClassrooms();
+      }
     }
-  }, [isSchool, filters]);
+  }, [isSchool, isTeacher, isSuperAdmin, filters]);
 
   const loadStudents = async () => {
     try {
@@ -105,6 +135,48 @@ export default function Students() {
       setSchoolInfo(data);
     } catch (error: any) {
       console.error('Failed to load school info');
+    }
+  };
+
+  const handleCreateStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const submitData: any = {
+        firstName: createFormData.firstName.trim(),
+        lastName: createFormData.lastName.trim(),
+        username: createFormData.username.trim(),
+      };
+      
+      if (createFormData.email) submitData.email = createFormData.email.trim();
+      if (createFormData.phone) submitData.phone = createFormData.phone.trim();
+      if (createFormData.dateOfBirth) submitData.dateOfBirth = createFormData.dateOfBirth;
+      if (createFormData.password) submitData.password = createFormData.password;
+      if (createFormData.classroomId) submitData.classroomId = createFormData.classroomId;
+      if (createFormData.sessionId) submitData.sessionId = createFormData.sessionId;
+      
+      // Validate that if one is selected, both must be selected
+      if ((createFormData.classroomId && !createFormData.sessionId) || (!createFormData.classroomId && createFormData.sessionId)) {
+        toast.error('Please select both class and session, or leave both empty');
+        return;
+      }
+
+      await studentAPI.create(submitData);
+      toast.success('Student created successfully');
+      setShowCreateForm(false);
+      setCreateFormData({
+        firstName: '',
+        lastName: '',
+        username: '',
+        email: '',
+        phone: '',
+        dateOfBirth: '',
+        password: '',
+        classroomId: '',
+        sessionId: '',
+      });
+      loadStudents();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to create student');
     }
   };
 
@@ -333,8 +405,8 @@ export default function Students() {
     toast.success('Registration URL copied to clipboard!');
   };
 
-  if (!isSchool) {
-    return <p className="text-center text-gray-500">Only schools can manage students.</p>;
+  if (!isSchool && !isTeacher && !isSuperAdmin) {
+    return <p className="text-center text-gray-500">Only schools, teachers, and super admins can view students.</p>;
   }
 
   const unassignedCount = students.filter((s) => !s.isAssigned).length;
@@ -347,8 +419,12 @@ export default function Students() {
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
         <div className="relative z-10">
-          <h1 className="text-4xl font-bold mb-2">Student Management</h1>
-          <p className="text-blue-100 text-lg">Manage students, assignments, and promotions</p>
+          <h1 className="text-4xl font-bold mb-2">
+            {isTeacher ? 'My Students' : isSuperAdmin ? 'All Students' : 'Student Management'}
+          </h1>
+          <p className="text-blue-100 text-lg">
+          {isTeacher ? 'View students from your assigned classes' : isSuperAdmin ? 'View all students across all schools' : 'Manage students, assignments, and promotions'}
+        </p>
         </div>
       </div>
 
@@ -374,8 +450,8 @@ export default function Students() {
         </div>
       </div>
 
-      {/* Registration URL */}
-      {schoolInfo?.uniqueSlug && (
+      {/* Registration URL - Only for Schools */}
+      {schoolInfo?.uniqueSlug && isSchool && (
         <div className="card bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200">
           <div className="flex items-center justify-between">
             <div>
@@ -401,50 +477,65 @@ export default function Students() {
       <div className="card">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div className="flex items-center space-x-2">
-            <button
-              onClick={handleDownloadTemplate}
-              className="btn-secondary text-sm"
-            >
-              📥 Download Template
-            </button>
-            <button
-              onClick={() => setShowBulkUpload(!showBulkUpload)}
-              className="btn-secondary text-sm"
-            >
-              {showBulkUpload ? '✕ Cancel' : '📤 Bulk Upload'}
-            </button>
-            <button
-              onClick={() => {
-                // If students are selected, use them for bulk assignment
-                if (selectedStudents.length > 0) {
-                  setAssignForm({ studentId: '', classroomId: '', sessionId: '' });
-                } else {
-                  // No students selected, allow single selection
-                  setAssignForm({ studentId: '', classroomId: '', sessionId: '' });
-                }
-                setShowAssignDialog(true);
-              }}
-              className="btn-primary text-sm"
-              disabled={selectedStudents.length === 0 && students.length === 0}
-            >
-              ➕ Assign to Class {selectedStudents.length > 0 ? `(${selectedStudents.length} selected)` : ''}
-            </button>
-            {selectedStudents.length > 0 && (
-              <button
-                onClick={() => {
-                  setPromoteForm({ ...promoteForm, studentIds: selectedStudents });
-                  setShowPromoteDialog(true);
-                }}
-                className="btn-primary text-sm bg-purple-600 hover:bg-purple-700"
-              >
-                🎓 Promote Selected ({selectedStudents.length})
-              </button>
+            {isSchool && (
+              <>
+                <button
+                  onClick={() => setShowCreateForm(!showCreateForm)}
+                  className="btn-primary text-sm"
+                >
+                  {showCreateForm ? '✕ Cancel' : '➕ Add Student'}
+                </button>
+                <button
+                  onClick={handleDownloadTemplate}
+                  className="btn-secondary text-sm"
+                >
+                  📥 Download Template
+                </button>
+                <button
+                  onClick={() => setShowBulkUpload(!showBulkUpload)}
+                  className="btn-secondary text-sm"
+                >
+                  {showBulkUpload ? '✕ Cancel' : '📤 Bulk Upload'}
+                </button>
+              </>
+            )}
+            {isSchool && (
+              <>
+                <button
+                  onClick={() => {
+                    // If students are selected, use them for bulk assignment
+                    if (selectedStudents.length > 0) {
+                      setAssignForm({ studentId: '', classroomId: '', sessionId: '' });
+                    } else {
+                      // No students selected, allow single selection
+                      setAssignForm({ studentId: '', classroomId: '', sessionId: '' });
+                    }
+                    setShowAssignDialog(true);
+                  }}
+                  className="btn-primary text-sm"
+                  disabled={selectedStudents.length === 0 && students.length === 0}
+                >
+                  ➕ Assign to Class {selectedStudents.length > 0 ? `(${selectedStudents.length} selected)` : ''}
+                </button>
+                {selectedStudents.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setPromoteForm({ ...promoteForm, studentIds: selectedStudents });
+                      setShowPromoteDialog(true);
+                    }}
+                    className="btn-primary text-sm bg-purple-600 hover:bg-purple-700"
+                  >
+                    🎓 Promote Selected ({selectedStudents.length})
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
 
-        {/* Bulk Upload Section */}
-        {showBulkUpload && (
+
+        {/* Bulk Upload Section - Only for Schools */}
+        {showBulkUpload && isSchool && (
           <div className="mb-6 p-6 bg-blue-50 border-2 border-blue-200 rounded-xl">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Bulk Upload Students</h3>
             
@@ -588,14 +679,16 @@ export default function Students() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4">
-                    <input
-                      type="checkbox"
-                      checked={selectedStudents.length === students.length && students.length > 0}
-                      onChange={handleSelectAll}
-                      className="w-4 h-4"
-                    />
-                  </th>
+                  {isSchool && (
+                    <th className="text-left py-3 px-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedStudents.length === students.length && students.length > 0}
+                        onChange={handleSelectAll}
+                        className="w-4 h-4"
+                      />
+                    </th>
+                  )}
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Name</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Username</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Email</th>
@@ -610,14 +703,16 @@ export default function Students() {
                     key={student.id}
                     className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                   >
-                    <td className="py-3 px-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedStudents.includes(student.id)}
-                        onChange={() => handleToggleSelect(student.id)}
-                        className="w-4 h-4"
-                      />
-                    </td>
+                    {isSchool && (
+                      <td className="py-3 px-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedStudents.includes(student.id)}
+                          onChange={() => handleToggleSelect(student.id)}
+                          className="w-4 h-4"
+                        />
+                      </td>
+                    )}
                     <td className="py-3 px-4">
                       <div className="flex items-center space-x-2">
                         <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
@@ -683,32 +778,36 @@ export default function Students() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                           </svg>
                         </button>
-                        <button
-                          onClick={() => {
-                            setAssignForm({
-                              studentId: student.id,
-                              classroomId: student.classAssignments?.[0]?.classroomId || '',
-                              sessionId: student.classAssignments?.[0]?.sessionId || '',
-                            });
-                            setShowAssignDialog(true);
-                          }}
-                          className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors"
-                          title={student.isAssigned ? "Reassign student to a different class" : "Assign student to a class"}
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </button>
-                        {student.isAssigned && (
-                          <button
-                            onClick={() => handleUnassignStudent(student.id)}
-                            className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Unassign student from current class"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          </button>
+                        {isSchool && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setAssignForm({
+                                  studentId: student.id,
+                                  classroomId: student.classAssignments?.[0]?.classroomId || '',
+                                  sessionId: student.classAssignments?.[0]?.sessionId || '',
+                                });
+                                setShowAssignDialog(true);
+                              }}
+                              className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors"
+                              title={student.isAssigned ? "Reassign student to a different class" : "Assign student to a class"}
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </button>
+                            {student.isAssigned && (
+                              <button
+                                onClick={() => handleUnassignStudent(student.id)}
+                                className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Unassign student from current class"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
@@ -720,8 +819,8 @@ export default function Students() {
         )}
       </div>
 
-      {/* Assign Dialog */}
-      {showAssignDialog && (() => {
+      {/* Assign Dialog - Only for Schools */}
+      {showAssignDialog && isSchool && (() => {
         const isBulkAssignment = selectedStudents.length > 0;
         const selectedStudent = students.find((s) => s.id === assignForm.studentId);
         const currentAssignment = selectedStudent?.classAssignments?.[0];
@@ -909,8 +1008,8 @@ export default function Students() {
         );
       })()}
 
-      {/* Promote Dialog */}
-      {showPromoteDialog && (
+      {/* Promote Dialog - Only for Schools */}
+      {showPromoteDialog && isSchool && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
             <h2 className="text-2xl font-bold mb-4">Promote Students</h2>
@@ -971,6 +1070,179 @@ export default function Students() {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Student Modal */}
+      {showCreateForm && isSchool && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900">Add New Student</h2>
+            <form onSubmit={handleCreateStudent} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    First Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field w-full"
+                    value={createFormData.firstName}
+                    onChange={(e) => setCreateFormData({ ...createFormData, firstName: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Last Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field w-full"
+                    value={createFormData.lastName}
+                    onChange={(e) => setCreateFormData({ ...createFormData, lastName: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Username <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field w-full"
+                    value={createFormData.username}
+                    onChange={(e) => setCreateFormData({ ...createFormData, username: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Password (optional - defaults to ChangeMe123!)
+                  </label>
+                  <input
+                    type="password"
+                    className="input-field w-full"
+                    value={createFormData.password}
+                    onChange={(e) => setCreateFormData({ ...createFormData, password: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Email (optional)
+                  </label>
+                  <input
+                    type="email"
+                    className="input-field w-full"
+                    value={createFormData.email}
+                    onChange={(e) => setCreateFormData({ ...createFormData, email: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Phone (optional)
+                  </label>
+                  <input
+                    type="tel"
+                    className="input-field w-full"
+                    value={createFormData.phone}
+                    onChange={(e) => setCreateFormData({ ...createFormData, phone: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Date of Birth (optional)
+                </label>
+                <input
+                  type="date"
+                  className="input-field w-full"
+                  value={createFormData.dateOfBirth}
+                  onChange={(e) => setCreateFormData({ ...createFormData, dateOfBirth: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Assign to Session (optional)
+                  </label>
+                  <select
+                    className="input-field w-full"
+                    value={createFormData.sessionId}
+                    onChange={(e) => {
+                      setCreateFormData({ ...createFormData, sessionId: e.target.value });
+                      // Clear classroom selection if session changes
+                      if (!e.target.value) {
+                        setCreateFormData((prev) => ({ ...prev, classroomId: '' }));
+                      }
+                    }}
+                  >
+                    <option value="">Select session (optional)</option>
+                    {sessions.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Assign to Class (optional)
+                  </label>
+                  <select
+                    className="input-field w-full"
+                    value={createFormData.classroomId}
+                    onChange={(e) => setCreateFormData({ ...createFormData, classroomId: e.target.value })}
+                    disabled={!createFormData.sessionId}
+                  >
+                    <option value="">Select class (optional)</option>
+                    {createFormData.sessionId && sessions
+                      .find((s) => s.id === createFormData.sessionId)
+                      ?.classAssignments?.map((ca: any) => (
+                        <option key={ca.classroom.id} value={ca.classroom.id}>
+                          {ca.classroom.name}
+                        </option>
+                      ))}
+                  </select>
+                  {!createFormData.sessionId && (
+                    <p className="text-xs text-gray-500 mt-1">Please select a session first</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex space-x-2 mt-6 pt-4 border-t border-gray-200">
+                <button
+                  type="submit"
+                  className="btn-primary flex-1"
+                >
+                  Create Student
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateForm(false);
+                    setCreateFormData({
+                      firstName: '',
+                      lastName: '',
+                      username: '',
+                      email: '',
+                      phone: '',
+                      dateOfBirth: '',
+                      password: '',
+                      classroomId: '',
+                      sessionId: '',
+                    });
+                  }}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

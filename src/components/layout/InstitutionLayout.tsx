@@ -32,7 +32,22 @@ const navConfig: NavItem[] = [
     icon: '⚙️',
     children: [
       { label: 'Ministries', path: '/ministries', roles: ['SUPER_ADMIN'], icon: '🏛️' },
+      { label: 'Super Admins', path: '/admin/super-admins', roles: ['SUPER_ADMIN'], icon: '👑' },
       { label: 'Impersonation', path: '/impersonation', roles: ['SUPER_ADMIN'], icon: '👤' },
+    ]
+  },
+  { 
+    label: 'School Management', 
+    path: '#', 
+    roles: ['SUPER_ADMIN'],
+    icon: '🏫',
+    children: [
+      { label: 'Tests', path: '/tests', roles: ['SUPER_ADMIN'], icon: '📝' },
+      { label: 'Sessions', path: '/sessions', roles: ['SUPER_ADMIN'], icon: '📅' },
+      { label: 'Classes', path: '/classes', roles: ['SUPER_ADMIN'], icon: '🎓' },
+      { label: 'Teachers', path: '/teachers', roles: ['SUPER_ADMIN'], icon: '👨‍🏫' },
+      { label: 'Students', path: '/students', roles: ['SUPER_ADMIN'], icon: '👥' },
+      { label: 'Scores', path: '/scores', roles: ['SUPER_ADMIN'], icon: '📊' },
     ]
   },
   { 
@@ -78,6 +93,7 @@ const navConfig: NavItem[] = [
     children: [
       { label: 'Tests', path: '/tests', roles: ['TEACHER'], icon: '📝' },
       { label: 'Classes', path: '/classes', roles: ['TEACHER'], icon: '🎓' },
+      { label: 'Students', path: '/students', roles: ['TEACHER'], icon: '👥' },
     ]
   },
   { 

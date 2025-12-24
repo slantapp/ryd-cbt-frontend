@@ -13,6 +13,7 @@ import SessionDetail from './pages/institution/SessionDetail';
 import StudentScores from './pages/institution/StudentScores';
 import Profile from './pages/institution/Profile';
 import AdminMinistries from './pages/institution/AdminMinistries';
+import AdminSuperAdmins from './pages/institution/AdminSuperAdmins';
 import MinistrySchools from './pages/institution/MinistrySchools';
 import Classes from './pages/institution/Classes';
 import Teachers from './pages/institution/Teachers';
@@ -252,6 +253,16 @@ function App() {
               <PrivateRoute>
                 <InstitutionLayout>
                   <AdminMinistries />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/super-admins"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <AdminSuperAdmins />
                 </InstitutionLayout>
               </PrivateRoute>
             }

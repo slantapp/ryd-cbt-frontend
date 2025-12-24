@@ -12,6 +12,7 @@ export default function StudentLogin() {
   const [loading, setLoading] = useState(false);
   const [requiresPasswordReset, setRequiresPasswordReset] = useState(false);
   const [resetData, setResetData] = useState<any>(null);
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
@@ -69,6 +70,10 @@ export default function StudentLogin() {
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentPassword) {
+      toast.error('Please enter your current password');
+      return;
+    }
     if (newPassword.length < 6) {
       toast.error('Password must be at least 6 characters');
       return;
@@ -76,15 +81,41 @@ export default function StudentLogin() {
 
     setLoading(true);
     try {
-      await authAPI.resetStudentPassword({
+      const response = await authAPI.resetStudentPassword({
         username: resetData.username,
+        currentPassword,
         newPassword,
       });
-      toast.success('Password reset successful! Please login again.');
-      setRequiresPasswordReset(false);
-      setResetData(null);
-      setNewPassword('');
-      setFormData({ username: '', password: '' });
+      
+      if (response.data.token && response.data.student) {
+        // Convert student object to account format for auth store (same format as handleLogin)
+        const studentAccount = {
+          id: response.data.student.id,
+          name: `${response.data.student.firstName} ${response.data.student.lastName}`,
+          email: response.data.student.email || response.data.student.username,
+          role: 'STUDENT' as const,
+          username: response.data.student.username,
+          firstName: response.data.student.firstName,
+          lastName: response.data.student.lastName,
+          institutionId: response.data.student.institutionId,
+          institution: response.data.student.institution,
+          createdAt: new Date().toISOString(),
+          status: 'ACTIVE' as const,
+          mustResetPassword: false,
+        };
+        
+        // Login immediately after password reset
+        setAuth(response.data.token, studentAccount as any);
+        toast.success('Password reset successful! Logging you in...');
+        navigate('/student/dashboard');
+      } else {
+        toast.success('Password reset successful! Please login again.');
+        setRequiresPasswordReset(false);
+        setResetData(null);
+        setCurrentPassword('');
+        setNewPassword('');
+        setFormData({ username: '', password: '' });
+      }
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Password reset failed');
     } finally {
@@ -155,8 +186,22 @@ export default function StudentLogin() {
             <form onSubmit={handlePasswordReset} className="space-y-6">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                 <p className="text-sm text-blue-800">
-                  You need to reset your password before you can login. Please create a new password.
+                  You need to reset your password before you can login. Please enter your current password and create a new password.
                 </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Current Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  className="input-field"
+                  placeholder="Enter your current password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                />
               </div>
 
               <div>
@@ -187,6 +232,7 @@ export default function StudentLogin() {
                 onClick={() => {
                   setRequiresPasswordReset(false);
                   setResetData(null);
+                  setCurrentPassword('');
                   setNewPassword('');
                 }}
                 className="w-full btn-secondary text-sm"

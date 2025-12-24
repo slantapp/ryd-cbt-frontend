@@ -89,7 +89,7 @@ export const authAPI = {
     api.post('/auth/login', data),
   studentLogin: (data: { username: string; password: string }) =>
     api.post('/auth/student/login', data),
-  resetStudentPassword: (data: { username: string; newPassword: string }) =>
+  resetStudentPassword: (data: { username: string; currentPassword: string; newPassword: string }) =>
     api.post('/auth/student/reset-password-first-login', data),
   forgotPassword: (email: string) =>
     api.post('/auth/forgot-password', { email }),
@@ -221,6 +221,8 @@ export const sessionAPI = {
 
 // Students
 export const studentAPI = {
+  create: (data: { firstName: string; lastName: string; username: string; email?: string; phone?: string; dateOfBirth?: string; password?: string; classroomId?: string; sessionId?: string }) =>
+    api.post('/students', data),
   getScores: (params?: { testId?: string; sessionId?: string; classroomId?: string }) =>
     api.get('/students/scores', { params }),
   grantRetrial: (studentTestId: string) =>
@@ -295,6 +297,8 @@ export const publicAPI = {
     email?: string;
     phone?: string;
     dateOfBirth?: string;
+    classroomId?: string;
+    sessionId?: string;
   }) => api.post('/public/register-student', data),
 };
 
@@ -310,6 +314,13 @@ export const adminAPI = {
     api.get('/admin/ministries', { params: status ? { status } : undefined }),
   reviewMinistry: (id: string, decision: 'APPROVED' | 'REJECTED') =>
     api.post(`/admin/ministries/${id}/review`, { decision }),
+  createSuperAdmin: (data: {
+    name: string;
+    email: string;
+    password: string;
+    phone?: string;
+  }) => api.post('/admin/super-admins', data),
+  getSuperAdmins: () => api.get('/admin/super-admins'),
   getStats: () => api.get('/admin/dashboard'),
 };
 
