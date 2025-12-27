@@ -195,7 +195,7 @@ export default function Dashboard() {
         {tests.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-500 mb-4">No tests yet. Create your first test!</p>
-            <Link to="/tests" className="btn-primary inline-block">
+            <Link to="/tests?create=true" className="btn-primary inline-block">
               Create Test
             </Link>
           </div>
@@ -663,7 +663,7 @@ export default function Dashboard() {
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Link
-              to="/tests"
+              to="/tests?create=true"
               className="p-4 border rounded-lg hover:border-primary hover:shadow-md transition-all flex items-center space-x-3"
             >
               <div className="p-2 bg-blue-100 rounded-lg">

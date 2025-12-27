@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { testAPI, sessionAPI, classroomAPI, teacherAPI, customFieldAPI } from '../../services/api';
 import { Test, Session, Classroom, Institution, TestCustomField } from '../../types';
 import { useAuthStore } from '../../store/authStore';
@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 
 export default function Tests() {
   const { account } = useAuthStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tests, setTests] = useState<Test[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
@@ -37,6 +38,24 @@ export default function Tests() {
   const navigate = useNavigate();
 
   const isSuperAdmin = account?.role === 'SUPER_ADMIN';
+
+  useEffect(() => {
+    // Check if we should show the form based on URL parameter
+    const createParam = searchParams.get('create');
+    if (createParam === 'true') {
+      setShowForm(true);
+      // Remove the query parameter from URL
+      searchParams.delete('create');
+      setSearchParams(searchParams, { replace: true });
+      // Scroll to form after a short delay to ensure it's rendered
+      setTimeout(() => {
+        const formElement = document.getElementById('test-create-form');
+        if (formElement) {
+          formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     loadTests();
@@ -324,7 +343,7 @@ export default function Tests() {
 
       {/* Create Form */}
       {showForm && (
-        <div className="card border-2 border-primary-200 shadow-xl">
+        <div id="test-create-form" className="card border-2 border-primary-200 shadow-xl">
           <div className="flex items-center space-x-3 mb-6">
             <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
               <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">

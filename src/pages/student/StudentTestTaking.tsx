@@ -40,11 +40,10 @@ export default function StudentTestTaking() {
 
   // Load saved session from localStorage - this runs first
   useEffect(() => {
-    const storageKey = slug && testId ? `test_session_${slug}_${testId}` : null;
+    const storageKey = testId ? (slug ? `test_session_${slug}_${testId}` : `test_session_${testId}`) : null;
     
     if (storageKey) {
       const savedSession = localStorage.getItem(storageKey);
-      let sessionRestored = false;
       
       if (savedSession) {
         try {
@@ -56,7 +55,6 @@ export default function StudentTestTaking() {
             // Handle non-timed tests (no duration)
             if (!testDuration || testDuration === 0) {
               // Non-timed test - always restore the session
-              console.log('Restoring in-progress session (non-timed test)');
               setStudentTestId(session.studentTestId);
               setStarted(true);
               setAnswers(session.answers || {});
@@ -64,7 +62,6 @@ export default function StudentTestTaking() {
               setTimeRemaining(null); // No timer for non-timed tests
               setFormData(session.formData || { name: '', email: '', phone: '', token: '' });
               setUseToken(session.useToken || false);
-              sessionRestored = true;
             } else {
               // Timed test - check if session is still valid
               const elapsed = Math.floor((Date.now() - session.startedAt) / 1000);
@@ -74,7 +71,6 @@ export default function StudentTestTaking() {
               // This prevents auto-submit immediately on page load
               if (remaining > 10) {
                 // Restore session immediately
-                console.log('Restoring in-progress session with', remaining, 'seconds remaining');
                 setStudentTestId(session.studentTestId);
                 setStarted(true);
                 setAnswers(session.answers || {});
@@ -83,10 +79,8 @@ export default function StudentTestTaking() {
                 setTimeRemaining(remaining);
                 setFormData(session.formData || { name: '', email: '', phone: '', token: '' });
                 setUseToken(session.useToken || false);
-                sessionRestored = true;
               } else {
                 // Session expired or about to expire, clear it
-                console.log('Session expired or about to expire (', remaining, 'seconds), clearing:', storageKey);
                 localStorage.removeItem(storageKey);
               }
             }
@@ -96,10 +90,11 @@ export default function StudentTestTaking() {
           localStorage.removeItem(storageKey);
         }
       }
-      
-      // Load test data (always load, but if session was restored, it will show the test interface)
-      loadTest();
     }
+    
+    // Always load test data
+    loadTest();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, testId]);
 
   useEffect(() => {
@@ -124,7 +119,7 @@ export default function StudentTestTaking() {
 
   // Save session to localStorage whenever it changes
   useEffect(() => {
-    const storageKey = slug && testId ? `test_session_${slug}_${testId}` : null;
+    const storageKey = testId ? (slug ? `test_session_${slug}_${testId}` : `test_session_${testId}`) : null;
     if (studentTestId && started && storageKey && test) {
       const testDuration = test?.duration ? test.duration * 60 : 0;
       
@@ -157,7 +152,7 @@ export default function StudentTestTaking() {
   }, [studentTestId, started, answers, currentQuestionIndex, timeRemaining, slug, testId, formData, useToken, test]);
 
   useEffect(() => {
-    const storageKey = slug && testId ? `test_session_${slug}_${testId}` : null;
+    const storageKey = testId ? (slug ? `test_session_${slug}_${testId}` : `test_session_${testId}`) : null;
     
     // Only run timer for timed tests
     if (started && storageKey && !submitting && !autoSubmitting && test?.isTimed && test?.duration) {
@@ -229,9 +224,7 @@ export default function StudentTestTaking() {
       // If student is authenticated, use authenticated endpoint
       if (isAuthenticated && account?.role === 'STUDENT') {
         try {
-          console.log('Loading test for authenticated student, testId:', testId);
           response = await studentAPI.getTest(testId);
-          console.log('Test loaded successfully:', response?.data?.title);
           if (!response?.data) {
             throw new Error('Invalid response from server');
           }
@@ -248,8 +241,8 @@ export default function StudentTestTaking() {
           
           // Check if there's an in-progress test that matches the current session
           const existingTest = response.data.studentTests?.[0];
-          const storageKey = slug && testId ? `test_session_${slug}_${testId}` : `test_session_${testId}`;
-          const savedSession = localStorage.getItem(storageKey);
+          const storageKey = testId ? (slug ? `test_session_${slug}_${testId}` : `test_session_${testId}`) : null;
+          const savedSession = storageKey ? localStorage.getItem(storageKey) : null;
           
           // Only restore if:
           // 1. There's an existing in-progress test
@@ -261,7 +254,6 @@ export default function StudentTestTaking() {
               
               // Verify the session matches this test attempt
               if (session.studentTestId === existingTest.id) {
-                console.log('Restoring in-progress test from backend:', existingTest.id);
                 setStudentTestId(existingTest.id);
                 setStarted(true);
                 
@@ -276,17 +268,12 @@ export default function StudentTestTaking() {
                 }
               } else {
                 // Session doesn't match - clear it and let user start fresh
-                console.log('Session mismatch - clearing old session');
-                localStorage.removeItem(storageKey);
+                if (storageKey) localStorage.removeItem(storageKey);
               }
             } catch (e) {
               console.error('Failed to parse saved session:', e);
-              localStorage.removeItem(storageKey);
+              if (storageKey) localStorage.removeItem(storageKey);
             }
-          } else if (existingTest && existingTest.status === 'in_progress' && !savedSession) {
-            // In-progress test exists but no local session - clear the stale backend test
-            console.log('In-progress test found but no local session - user may be retaking');
-            // Don't auto-restore, let user start fresh
           }
         } catch (error: any) {
           console.error('Failed to load test via authenticated endpoint:', error);
@@ -367,7 +354,7 @@ export default function StudentTestTaking() {
       setTimeRemaining(duration);
       
       // Save to localStorage with actual start timestamp
-      const storageKey = slug && testId ? `test_session_${slug}_${testId}` : null;
+      const storageKey = testId ? (slug ? `test_session_${slug}_${testId}` : `test_session_${testId}`) : null;
       
       if (storageKey) {
         const session = {
@@ -436,15 +423,17 @@ export default function StudentTestTaking() {
       const response = await publicAPI.submitTest({ studentTestId });
       
       // Clear localStorage on successful submit
-      if (slug && testId) {
-        const storageKey = `test_session_${slug}_${testId}`;
+      const storageKey = testId ? (slug ? `test_session_${slug}_${testId}` : `test_session_${testId}`) : null;
+      if (storageKey) {
         localStorage.removeItem(storageKey);
-        console.log('Test submitted successfully, cleared session:', storageKey);
       }
       
       toast.success('Test submitted successfully!');
       // Pass studentTestId in URL for result retrieval
-      navigate(`/${slug}/test/${testId}/result?studentTestId=${studentTestId}`, {
+      const resultUrl = slug 
+        ? `/${slug}/test/${testId}/result?studentTestId=${studentTestId}`
+        : `/student/test/${testId}/result?studentTestId=${studentTestId}`;
+      navigate(resultUrl, {
         state: { result: response.data.result, studentTest: response.data.studentTest },
       });
     } catch (error: any) {
@@ -457,12 +446,15 @@ export default function StudentTestTaking() {
   const handleCancelTest = () => {
     if (window.confirm('Are you sure you want to cancel this test? Your progress will be lost.')) {
       // Clear localStorage
-      if (slug && testId) {
-        const storageKey = `test_session_${slug}_${testId}`;
+      const storageKey = testId ? (slug ? `test_session_${slug}_${testId}` : `test_session_${testId}`) : null;
+      if (storageKey) {
         localStorage.removeItem(storageKey);
-        console.log('Cleared session:', storageKey);
       }
-      navigate(`/${slug}`);
+      if (slug) {
+        navigate(`/${slug}`);
+      } else {
+        navigate('/student/dashboard');
+      }
     }
   };
 
@@ -539,18 +531,54 @@ export default function StudentTestTaking() {
               </div>
             </div>
             <button
-              onClick={async () => {
+              onClick={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
                 try {
                   setLoading(true);
                   const response = await publicAPI.startTest({ testId: testId! });
-                  setStudentTestId(response.data.studentTest.id);
+                  
+                  // Handle both response structures: new test or in-progress test
+                  const studentTest = response.data?.studentTest;
+                  if (!studentTest) {
+                    throw new Error('Invalid response: studentTest not found');
+                  }
+                  
+                  setStudentTestId(studentTest.id);
                   setStarted(true);
                   const duration = test?.duration ? test.duration * 60 : null;
                   setTimeRemaining(duration);
-                  toast.success('Test started!');
+                  
+                  // Save to localStorage for authenticated students too
+                  const storageKey = testId ? (slug ? `test_session_${slug}_${testId}` : `test_session_${testId}`) : null;
+                  if (storageKey) {
+                    const session = {
+                      studentTestId: studentTest.id,
+                      answers: {},
+                      currentQuestionIndex: 0,
+                      timeRemaining: duration,
+                      startedAt: Date.now(),
+                      testDuration: duration,
+                    };
+                    localStorage.setItem(storageKey, JSON.stringify(session));
+                  }
+                  
+                  if (response.data?.message === 'Test already in progress') {
+                    toast.success('Resuming test in progress');
+                  } else {
+                    toast.success('Test started!');
+                  }
                 } catch (error: any) {
                   console.error('Start test error:', error);
-                  toast.error(error?.response?.data?.error || 'Failed to start test');
+                  const errorMsg = error?.response?.data?.error || error?.message || 'Failed to start test';
+                  
+                  if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+                    toast.error('Request timed out. Please check your connection and try again.');
+                  } else {
+                    toast.error(errorMsg);
+                  }
+                } finally {
                   setLoading(false);
                 }
               }}
