@@ -619,47 +619,60 @@ export default function Students() {
         )}
 
         {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <input
-            type="text"
-            placeholder="🔍 Search students..."
-            className="input-field"
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-          />
-          <select
-            className="input-field"
-            value={filters.sessionId}
-            onChange={(e) => setFilters({ ...filters, sessionId: e.target.value })}
-          >
-            <option value="">All Sessions</option>
-            {sessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <select
-            className="input-field"
-            value={filters.classroomId}
-            onChange={(e) => setFilters({ ...filters, classroomId: e.target.value })}
-          >
-            <option value="">All Classes</option>
-            {classrooms.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <select
-            className="input-field"
-            value={filters.isAssigned}
-            onChange={(e) => setFilters({ ...filters, isAssigned: e.target.value })}
-          >
-            <option value="">All Students</option>
-            <option value="true">Assigned Only</option>
-            <option value="false">Unassigned Only</option>
-          </select>
+        <div className="mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3">
+            <input
+              type="text"
+              placeholder="🔍 Search students..."
+              className="input-field"
+              value={filters.search}
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+            />
+            <select
+              className="input-field"
+              value={filters.sessionId}
+              onChange={(e) => setFilters({ ...filters, sessionId: e.target.value })}
+            >
+              <option value="">All Sessions</option>
+              {sessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <select
+              className="input-field"
+              value={filters.classroomId}
+              onChange={(e) => setFilters({ ...filters, classroomId: e.target.value })}
+            >
+              <option value="">All Classes</option>
+              {classrooms.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <select
+              className="input-field"
+              value={filters.isAssigned}
+              onChange={(e) => setFilters({ ...filters, isAssigned: e.target.value })}
+            >
+              <option value="">All Students</option>
+              <option value="true">Assigned Only</option>
+              <option value="false">Unassigned Only</option>
+            </select>
+          </div>
+          {(filters.search || filters.sessionId || filters.classroomId || filters.isAssigned) && (
+            <button
+              onClick={() => setFilters({ sessionId: '', classroomId: '', isAssigned: '', search: '' })}
+              className="text-sm text-primary hover:text-primary-600 font-medium flex items-center space-x-1"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span>Clear Filters</span>
+            </button>
+          )}
         </div>
 
         {/* Students Table */}

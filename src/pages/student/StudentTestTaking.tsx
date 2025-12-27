@@ -229,7 +229,9 @@ export default function StudentTestTaking() {
       // If student is authenticated, use authenticated endpoint
       if (isAuthenticated && account?.role === 'STUDENT') {
         try {
+          console.log('Loading test for authenticated student, testId:', testId);
           response = await studentAPI.getTest(testId);
+          console.log('Test loaded successfully:', response?.data?.title);
           if (!response?.data) {
             throw new Error('Invalid response from server');
           }
@@ -287,12 +289,16 @@ export default function StudentTestTaking() {
             // Don't auto-restore, let user start fresh
           }
         } catch (error: any) {
+          console.error('Failed to load test via authenticated endpoint:', error);
           // If authenticated endpoint fails, fall back to public
           if (!slug) {
-            toast.error('Failed to load test. Please ensure you are logged in.');
+            const errorMsg = error?.response?.data?.error || error?.message || 'Failed to load test';
+            console.error('No slug available, cannot fallback to public endpoint. Error:', errorMsg);
+            toast.error(errorMsg || 'Failed to load test. Please ensure you are logged in.');
             setLoading(false);
             return;
           }
+          console.log('Falling back to public endpoint, slug:', slug);
           response = await publicAPI.getTestForStudent(slug, testId);
           if (!response?.data) {
             throw new Error('Invalid response from server');
@@ -332,7 +338,12 @@ export default function StudentTestTaking() {
       }
     } catch (error: any) {
       console.error('Load test error:', error);
-      toast.error(error?.response?.data?.error || 'Failed to load test');
+      const errorMsg = error?.response?.data?.error || error?.message || 'Failed to load test';
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        toast.error('Request timed out. Please check your connection and try again.');
+      } else {
+        toast.error(errorMsg);
+      }
       // Set empty defaults on error
       setTest(null);
       setQuestions([]);
