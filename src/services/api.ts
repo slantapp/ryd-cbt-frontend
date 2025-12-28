@@ -239,6 +239,7 @@ export const studentAPI = {
     api.put(`/students/${id}`, data),
   getMyTests: () => api.get('/students/my-tests'),
   getTest: (testId: string) => api.get(`/students/test/${testId}`),
+  getTestReview: (testId: string) => api.get(`/students/test/${testId}/review`),
   bulkUpload: (file: File, options?: { classroomId?: string; sessionId?: string }) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -339,7 +340,7 @@ export const ministryAPI = {
 };
 
 export const classroomAPI = {
-  create: (data: { name: string; description?: string; academicSession?: string }) =>
+  create: (data: { name: string; description?: string; academicSession?: string; sessionId?: string }) =>
     api.post('/classrooms', data),
   list: () => api.get('/classrooms'),
   assignTeacher: (data: { classroomId: string; teacherId: string }) =>
@@ -359,6 +360,13 @@ export const teacherAPI = {
   downloadTemplate: () => api.get('/teachers/template', { responseType: 'blob' }),
   bulkUpload: (formData: FormData) => api.post('/teachers/bulk-upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  resetPassword: (data: { teacherId: string; newPassword: string; forceReset?: boolean }) =>
+    api.post('/students/admin/reset-password', {
+      userId: data.teacherId,
+      userType: 'teacher',
+      newPassword: data.newPassword,
+      forceReset: data.forceReset,
   }),
 };
 

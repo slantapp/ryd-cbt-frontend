@@ -29,6 +29,17 @@ export default function Teachers() {
     email: '',
     phone: '',
   });
+  const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
+  const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
+  const [resetPasswordData, setResetPasswordData] = useState({
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [resetPasswordResult, setResetPasswordResult] = useState<{
+    username: string;
+    password: string;
+  } | null>(null);
 
   const isSchool = useMemo(() => {
     return account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN';
@@ -510,37 +521,55 @@ export default function Teachers() {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          {isSchool ? (
-                            <div className="flex gap-2 flex-wrap">
+                          <div className="flex gap-2 flex-wrap items-center">
+                            {isSchool && (
+                              <>
+                                <button
+                                  onClick={() => handleEdit(teacher)}
+                                  className="px-3 py-1 text-xs font-semibold rounded bg-blue-600 text-white hover:bg-blue-700"
+                                  title="Edit teacher"
+                                >
+                                  ✏️ Edit
+                                </button>
+                                <button
+                                  onClick={() => setAssigningClassroomId(teacher.id)}
+                                  className="px-3 py-1 text-xs font-semibold rounded bg-purple-600 text-white hover:bg-purple-700"
+                                  title="Assign to class"
+                                >
+                                  📚 Assign Class
+                                </button>
+                                <button
+                                  onClick={() => handleToggleActive(teacher)}
+                                  className={`px-3 py-1 text-xs font-semibold rounded text-white ${
+                                    teacher.isActive
+                                      ? 'bg-red-600 hover:bg-red-700'
+                                      : 'bg-green-600 hover:bg-green-700'
+                                  }`}
+                                  title={teacher.isActive ? 'Deactivate teacher' : 'Activate teacher'}
+                                >
+                                  {teacher.isActive ? '🚫 Deactivate' : '✅ Activate'}
+                                </button>
+                              </>
+                            )}
+                            {(isSchool || isSuperAdmin) && (
                               <button
-                                onClick={() => handleEdit(teacher)}
-                                className="px-3 py-1 text-xs font-semibold rounded bg-blue-600 text-white hover:bg-blue-700"
-                                title="Edit teacher"
+                                onClick={() => {
+                                  setSelectedTeacher(teacher);
+                                  setResetPasswordData({ newPassword: '', confirmPassword: '' });
+                                  setShowResetPasswordDialog(true);
+                                }}
+                                className="p-2 text-orange-600 hover:text-orange-800 hover:bg-orange-50 rounded-lg transition-colors"
+                                title="Reset teacher password"
                               >
-                                ✏️ Edit
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                </svg>
                               </button>
-                              <button
-                                onClick={() => setAssigningClassroomId(teacher.id)}
-                                className="px-3 py-1 text-xs font-semibold rounded bg-purple-600 text-white hover:bg-purple-700"
-                                title="Assign to class"
-                              >
-                                📚 Assign Class
-                              </button>
-                              <button
-                                onClick={() => handleToggleActive(teacher)}
-                                className={`px-3 py-1 text-xs font-semibold rounded text-white ${
-                                  teacher.isActive
-                                    ? 'bg-red-600 hover:bg-red-700'
-                                    : 'bg-green-600 hover:bg-green-700'
-                                }`}
-                                title={teacher.isActive ? 'Deactivate teacher' : 'Activate teacher'}
-                              >
-                                {teacher.isActive ? '🚫 Deactivate' : '✅ Activate'}
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-500">View only</span>
-                          )}
+                            )}
+                            {!isSchool && !isSuperAdmin && (
+                              <span className="text-xs text-gray-500">View only</span>
+                            )}
+                          </div>
                         </td>
                       </>
                     )}
@@ -647,6 +676,192 @@ export default function Teachers() {
                 {assigning ? 'Assigning...' : 'Assign Class'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Dialog */}
+      {showResetPasswordDialog && selectedTeacher && !resetPasswordResult && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold mb-4">Reset Teacher Password</h2>
+            <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+              <p className="text-sm text-gray-700">
+                <strong>Teacher:</strong> {selectedTeacher.name}
+              </p>
+              <p className="text-sm text-gray-600 mt-1">
+                <strong>Email:</strong> {selectedTeacher.email}
+              </p>
+              {selectedTeacher.username && (
+                <p className="text-sm text-gray-600 mt-1">
+                  <strong>Username:</strong> {selectedTeacher.username}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  New Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  className="input-field w-full"
+                  value={resetPasswordData.newPassword}
+                  onChange={(e) => setResetPasswordData({ ...resetPasswordData, newPassword: e.target.value })}
+                  placeholder="Enter new password"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">Password must be at least 6 characters long</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Confirm Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  className="input-field w-full"
+                  value={resetPasswordData.confirmPassword}
+                  onChange={(e) => setResetPasswordData({ ...resetPasswordData, confirmPassword: e.target.value })}
+                  placeholder="Confirm new password"
+                  required
+                />
+              </div>
+
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-800">
+                  <strong>Note:</strong> The teacher's password will be reset immediately. The teacher will be required to reset their password on their first login. Please share the new password with the teacher directly.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex space-x-2 mt-6 pt-4 border-t border-gray-200">
+              <button
+                onClick={async () => {
+                  if (!selectedTeacher) {
+                    toast.error('No teacher selected');
+                    return;
+                  }
+
+                  if (!resetPasswordData.newPassword || !resetPasswordData.confirmPassword) {
+                    toast.error('Please enter and confirm the new password');
+                    return;
+                  }
+
+                  if (resetPasswordData.newPassword !== resetPasswordData.confirmPassword) {
+                    toast.error('Passwords do not match');
+                    return;
+                  }
+
+                  if (resetPasswordData.newPassword.length < 6) {
+                    toast.error('Password must be at least 6 characters long');
+                    return;
+                  }
+
+                  setResettingPassword(true);
+
+                  try {
+                    const response = await teacherAPI.resetPassword({
+                      teacherId: selectedTeacher.id,
+                      newPassword: resetPasswordData.newPassword,
+                      forceReset: true, // Always force reset on first login
+                    });
+                    toast.success('Password reset successfully');
+                    // Show the new password to admin so they can share it with teacher
+                    if (response.data.newPassword && response.data.username) {
+                      setResetPasswordResult({
+                        username: response.data.username,
+                        password: response.data.newPassword,
+                      });
+                    } else {
+                      setShowResetPasswordDialog(false);
+                      setResetPasswordData({ newPassword: '', confirmPassword: '' });
+                      setSelectedTeacher(null);
+                    }
+                  } catch (error: any) {
+                    toast.error(error?.response?.data?.error || 'Failed to reset password');
+                  } finally {
+                    setResettingPassword(false);
+                  }
+                }}
+                disabled={resettingPassword || !resetPasswordData.newPassword || !resetPasswordData.confirmPassword}
+                className="btn-primary flex-1"
+              >
+                {resettingPassword ? 'Resetting...' : 'Reset Password'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowResetPasswordDialog(false);
+                  setResetPasswordData({ newPassword: '', confirmPassword: '' });
+                  setSelectedTeacher(null);
+                }}
+                className="btn-secondary flex-1"
+                disabled={resettingPassword}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password Reset Result Dialog */}
+      {resetPasswordResult && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold mb-4">Password Reset Successful</h2>
+            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-gray-700 mb-3">
+                The teacher's password has been reset. Please share these credentials with the teacher:
+              </p>
+              <div className="space-y-2">
+                <div>
+                  <span className="text-sm font-semibold text-gray-700">Username:</span>
+                  <div className="mt-1 p-2 bg-white border border-gray-300 rounded font-mono text-sm flex items-center justify-between">
+                    <span>{resetPasswordResult.username}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(resetPasswordResult.username);
+                        toast.success('Username copied to clipboard');
+                      }}
+                      className="ml-2 text-blue-600 hover:text-blue-800 text-xs"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-sm font-semibold text-gray-700">New Password:</span>
+                  <div className="mt-1 p-2 bg-white border border-gray-300 rounded font-mono text-sm flex items-center justify-between">
+                    <span>{resetPasswordResult.password}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(resetPasswordResult.password);
+                        toast.success('Password copied to clipboard');
+                      }}
+                      className="ml-2 text-blue-600 hover:text-blue-800 text-xs"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-gray-600 mt-3">
+                <strong>Important:</strong> The teacher will be required to reset their password when they first log in.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setResetPasswordResult(null);
+                setShowResetPasswordDialog(false);
+                setResetPasswordData({ newPassword: '', confirmPassword: '' });
+                setSelectedTeacher(null);
+              }}
+              className="btn-primary w-full"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

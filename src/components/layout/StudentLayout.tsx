@@ -1,6 +1,8 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
+import { themeAPI } from '../../services/api';
+import { applyTheme } from '../../utils/themeUtils';
 
 interface StudentLayoutProps {
   children: React.ReactNode;
@@ -30,6 +32,25 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
   const isActive = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
+
+  // Load and apply theme
+  useEffect(() => {
+    const loadTheme = async () => {
+      try {
+        const { data } = await themeAPI.get();
+        if (data) {
+          applyTheme(data);
+        }
+      } catch (error) {
+        // Silently fail - use default theme
+        console.error('Failed to load theme:', error);
+      }
+    };
+
+    if (account) {
+      loadTheme();
+    }
+  }, [account]);
 
   return (
     <div className="min-h-screen bg-gray-50">

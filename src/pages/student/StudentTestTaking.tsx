@@ -22,6 +22,7 @@ export default function StudentTestTaking() {
   const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [flaggedQuestions, setFlaggedQuestions] = useState<Set<string>>(new Set());
   const [studentTestId, setStudentTestId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -58,6 +59,7 @@ export default function StudentTestTaking() {
               setStudentTestId(session.studentTestId);
               setStarted(true);
               setAnswers(session.answers || {});
+              setFlaggedQuestions(new Set(session.flaggedQuestions || []));
               setCurrentQuestionIndex(session.currentQuestionIndex || 0);
               setTimeRemaining(null); // No timer for non-timed tests
               setFormData(session.formData || { name: '', email: '', phone: '', token: '' });
@@ -74,6 +76,7 @@ export default function StudentTestTaking() {
                 setStudentTestId(session.studentTestId);
                 setStarted(true);
                 setAnswers(session.answers || {});
+                setFlaggedQuestions(new Set(session.flaggedQuestions || []));
                 setCurrentQuestionIndex(session.currentQuestionIndex || 0);
                 // Calculate remaining time based on actual elapsed time
                 setTimeRemaining(remaining);
@@ -140,6 +143,7 @@ export default function StudentTestTaking() {
       const session = {
         studentTestId,
         answers,
+        flaggedQuestions: Array.from(flaggedQuestions),
         currentQuestionIndex,
         timeRemaining,
         startedAt, // Always use the original start time
@@ -149,7 +153,7 @@ export default function StudentTestTaking() {
       };
       localStorage.setItem(storageKey, JSON.stringify(session));
     }
-  }, [studentTestId, started, answers, currentQuestionIndex, timeRemaining, slug, testId, formData, useToken, test]);
+  }, [studentTestId, started, answers, flaggedQuestions, currentQuestionIndex, timeRemaining, slug, testId, formData, useToken, test]);
 
   useEffect(() => {
     const storageKey = testId ? (slug ? `test_session_${slug}_${testId}` : `test_session_${testId}`) : null;
@@ -260,6 +264,9 @@ export default function StudentTestTaking() {
                 if (session.answers) {
                   setAnswers(session.answers);
                 }
+                if (session.flaggedQuestions) {
+                  setFlaggedQuestions(new Set(session.flaggedQuestions));
+                }
                 if (session.currentQuestionIndex !== undefined) {
                   setCurrentQuestionIndex(session.currentQuestionIndex);
                 }
@@ -360,6 +367,7 @@ export default function StudentTestTaking() {
         const session = {
           studentTestId: response.data.studentTest.id,
           answers: {},
+          flaggedQuestions: [],
           currentQuestionIndex: 0,
           timeRemaining: duration,
           startedAt: Date.now(), // Store actual start timestamp
@@ -478,6 +486,18 @@ export default function StudentTestTaking() {
     }
   };
 
+  const toggleFlag = (questionId: string) => {
+    setFlaggedQuestions((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(questionId)) {
+        newSet.delete(questionId);
+      } else {
+        newSet.add(questionId);
+      }
+      return newSet;
+    });
+  };
+
   const currentQuestion = questions[currentQuestionIndex];
   const answeredCount = Object.keys(answers).length;
   const progress = questions.length > 0 ? (answeredCount / questions.length) * 100 : 0;
@@ -556,6 +576,7 @@ export default function StudentTestTaking() {
                     const session = {
                       studentTestId: studentTest.id,
                       answers: {},
+                      flaggedQuestions: [],
                       currentQuestionIndex: 0,
                       timeRemaining: duration,
                       startedAt: Date.now(),
@@ -728,6 +749,7 @@ export default function StudentTestTaking() {
             {questions.map((q, index) => {
               const isActive = index === currentQuestionIndex;
               const isAnswered = Boolean(answers[q.id]);
+              const isFlagged = flaggedQuestions.has(q.id);
               const style = isActive
                 ? {
                     backgroundColor: brand.primaryColor,
@@ -743,10 +765,14 @@ export default function StudentTestTaking() {
                 <button
                   key={q.id}
                   onClick={() => goToQuestion(index)}
-                  className="w-10 h-10 rounded-lg font-medium transition-all"
+                  className="w-10 h-10 rounded-lg font-medium transition-all relative"
                   style={style}
+                  title={`Question ${index + 1}${isFlagged ? ' (Flagged)' : ''}${isAnswered ? ' (Answered)' : ''}`}
                 >
                   {index + 1}
+                  {isFlagged && (
+                    <span className="absolute -top-1 -right-1 text-yellow-500 text-xs">🚩</span>
+                  )}
                 </button>
               );
             })}
@@ -760,6 +786,10 @@ export default function StudentTestTaking() {
               <span className="w-3 h-3 bg-gray-100 rounded mr-1"></span>
               Not Answered
             </span>
+            <span className="flex items-center">
+              <span className="text-xs mr-1">🚩</span>
+              Flagged
+            </span>
           </div>
         </div>
 
@@ -771,9 +801,23 @@ export default function StudentTestTaking() {
                 <span className="text-sm font-medium text-primary">
                   Question {currentQuestionIndex + 1}
                 </span>
-                <span className="text-sm text-gray-500">
-                  {currentQuestion.points} point{currentQuestion.points !== 1 ? 's' : ''}
-                </span>
+                <div className="flex items-center space-x-4">
+                  <button
+                    onClick={() => toggleFlag(currentQuestion.id)}
+                    className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      flaggedQuestions.has(currentQuestion.id)
+                        ? 'bg-yellow-100 text-yellow-800 border-2 border-yellow-400'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-2 border-transparent'
+                    }`}
+                    title={flaggedQuestions.has(currentQuestion.id) ? 'Unflag this question' : 'Flag this question for review'}
+                  >
+                    <span>🚩</span>
+                    <span>{flaggedQuestions.has(currentQuestion.id) ? 'Flagged' : 'Flag'}</span>
+                  </button>
+                  <span className="text-sm text-gray-500">
+                    {currentQuestion.points} point{currentQuestion.points !== 1 ? 's' : ''}
+                  </span>
+                </div>
               </div>
               <h2 className="text-xl font-semibold text-gray-900 mb-6">
                 {currentQuestion.questionText}
@@ -885,13 +929,6 @@ export default function StudentTestTaking() {
               style={{ borderColor: brand.primaryColor, color: brand.primaryColor }}
             >
               ← Previous
-            </button>
-            <button
-              onClick={handleCancelTest}
-              className="font-medium py-2 px-4 rounded-lg text-white"
-              style={{ backgroundColor: '#dc2626' }}
-            >
-              Cancel Test
             </button>
           </div>
           <div className="text-sm text-gray-600">

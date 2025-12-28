@@ -143,75 +143,131 @@ export default function ThemeSettings() {
             ))}
             <div className="md:col-span-2">
               <label className="text-sm font-medium text-gray-600 mb-1 block">Logo</label>
-              <div className="flex items-center space-x-4">
-                {theme.logoUrl && (
-                  <img
-                    src={theme.logoUrl.startsWith('http') ? theme.logoUrl : `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${theme.logoUrl}`}
-                    alt="Logo"
-                    className="h-16 w-16 object-contain border border-gray-200 rounded"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                )}
-                <div className="flex-1">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoUpload}
-                    disabled={uploadingLogo}
-                    className="input-field"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    {uploadingLogo ? 'Uploading...' : 'Upload logo (max 5MB)'}
-                  </p>
+              {theme.logoUrl && !theme.logoUrl.startsWith('http') ? (
+                // Uploaded logo (path starts with /uploads)
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-4">
+                    <img
+                      src={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${theme.logoUrl}`}
+                      alt="Logo"
+                      className="h-16 w-16 object-contain border border-gray-200 rounded"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-700">Logo uploaded successfully</p>
+                      <button
+                        type="button"
+                        onClick={() => handleChange('logoUrl', '')}
+                        className="text-sm text-red-600 hover:text-red-700 mt-1"
+                      >
+                        Remove logo
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    To change the logo, remove it first, then upload a new one or enter a URL.
+                  </div>
                 </div>
-              </div>
-              <div className="mt-2">
-                <label className="text-xs text-gray-500">Or enter URL:</label>
-                <input
-                  type="url"
-                  className="input-field mt-1"
-                  placeholder="https://"
-                  value={theme.logoUrl || ''}
-                  onChange={(e) => handleChange('logoUrl', e.target.value)}
-                />
-              </div>
+              ) : (
+                // No logo uploaded, show upload and URL options
+                <div className="space-y-3">
+                  <div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      disabled={uploadingLogo}
+                      className="input-field"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {uploadingLogo ? 'Uploading...' : 'Upload logo (max 5MB)'}
+                    </p>
+                  </div>
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-2 bg-white text-gray-500">OR</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Enter logo URL:</label>
+                    <input
+                      type="url"
+                      className="input-field mt-1"
+                      placeholder="https://example.com/logo.png"
+                      value={theme.logoUrl || ''}
+                      onChange={(e) => handleChange('logoUrl', e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             <div className="md:col-span-2">
               <label className="text-sm font-medium text-gray-600 mb-1 block">Banner</label>
-              <div className="space-y-2">
-                {theme.bannerUrl && (
+              {theme.bannerUrl && !theme.bannerUrl.startsWith('http') ? (
+                // Uploaded banner (path starts with /uploads)
+                <div className="space-y-2">
                   <img
-                    src={theme.bannerUrl.startsWith('http') ? theme.bannerUrl : `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${theme.bannerUrl}`}
+                    src={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${theme.bannerUrl}`}
                     alt="Banner"
                     className="w-full h-32 object-cover border border-gray-200 rounded"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
                   />
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleBannerUpload}
-                  disabled={uploadingBanner}
-                  className="input-field"
-                />
-                <p className="text-xs text-gray-500">
-                  {uploadingBanner ? 'Uploading...' : 'Upload banner image (max 5MB)'}
-                </p>
-              </div>
-              <div className="mt-2">
-                <label className="text-xs text-gray-500">Or enter URL:</label>
-                <input
-                  type="url"
-                  className="input-field mt-1"
-                  placeholder="https://"
-                  value={theme.bannerUrl || ''}
-                  onChange={(e) => handleChange('bannerUrl', e.target.value)}
-                />
-              </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-gray-700">Banner uploaded successfully</p>
+                    <button
+                      type="button"
+                      onClick={() => handleChange('bannerUrl', '')}
+                      className="text-sm text-red-600 hover:text-red-700"
+                    >
+                      Remove banner
+                    </button>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    To change the banner, remove it first, then upload a new one or enter a URL.
+                  </div>
+                </div>
+              ) : (
+                // No banner uploaded, show upload and URL options
+                <div className="space-y-3">
+                  <div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleBannerUpload}
+                      disabled={uploadingBanner}
+                      className="input-field"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {uploadingBanner ? 'Uploading...' : 'Upload banner image (max 5MB)'}
+                    </p>
+                  </div>
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-2 bg-white text-gray-500">OR</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Enter banner URL:</label>
+                    <input
+                      type="url"
+                      className="input-field mt-1"
+                      placeholder="https://example.com/banner.png"
+                      value={theme.bannerUrl || ''}
+                      onChange={(e) => handleChange('bannerUrl', e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             <button type="submit" disabled={saving} className="btn-primary md:col-span-2 md:w-48">
               {saving ? 'Saving...' : 'Save theme'}

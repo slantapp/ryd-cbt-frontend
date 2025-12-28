@@ -32,7 +32,7 @@ export default function Tests() {
     scoreVisibility: false,
     requiresManualGrading: false,
     sessionId: '',
-    classroomId: '',
+    classroomIds: [] as string[],
     teacherId: '',
   });
   const navigate = useNavigate();
@@ -45,8 +45,15 @@ export default function Tests() {
     if (createParam === 'true') {
       setShowForm(true);
       // Remove the query parameter from URL
-      searchParams.delete('create');
-      setSearchParams(searchParams, { replace: true });
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('create');
+      setSearchParams(newSearchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  // Scroll to form when it becomes visible
+  useEffect(() => {
+    if (showForm) {
       // Scroll to form after a short delay to ensure it's rendered
       setTimeout(() => {
         const formElement = document.getElementById('test-create-form');
@@ -55,7 +62,7 @@ export default function Tests() {
         }
       }, 100);
     }
-  }, [searchParams, setSearchParams]);
+  }, [showForm]);
 
   useEffect(() => {
     loadTests();
@@ -96,7 +103,7 @@ export default function Tests() {
         setFormData(prev => ({
           ...prev,
           sessionId: firstSession.id,
-          classroomId: selectedClassroomId,
+          classroomIds: selectedClassroomId ? [selectedClassroomId] : [],
         }));
       }
       
@@ -111,7 +118,7 @@ export default function Tests() {
         if (!formData.sessionId && classrooms.length > 0) {
           setFormData(prev => ({
             ...prev,
-            classroomId: classrooms[0].id,
+            classroomIds: [classrooms[0].id],
           }));
         }
       } else {
@@ -224,8 +231,8 @@ export default function Tests() {
       return;
     }
 
-    if (!formData.classroomId) {
-      toast.error('Please select a classroom');
+    if (!formData.classroomIds || formData.classroomIds.length === 0) {
+      toast.error('Please select at least one classroom');
       return;
     }
 
@@ -276,7 +283,7 @@ export default function Tests() {
         scoreVisibility: false,
         requiresManualGrading: false,
         sessionId: '',
-        classroomId: '',
+        classroomIds: [],
         teacherId: '',
       });
       setCustomFieldValues({});
@@ -382,7 +389,7 @@ export default function Tests() {
                     setFormData({ 
                       ...formData, 
                       sessionId: sessionId,
-                      classroomId: autoSelectedClassroomId || ''
+                      classroomIds: autoSelectedClassroomId ? [autoSelectedClassroomId] : []
                     });
                   }}
                 required
@@ -422,40 +429,67 @@ export default function Tests() {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Class <span className="text-red-500">*</span>
+                  Classes <span className="text-red-500">*</span>
                   {account && account.role === 'TEACHER' && (
                     <span className="text-xs text-gray-500 ml-2">(Your assigned classes)</span>
                   )}
                 </label>
-                <select
-                  className="input-field"
-                  value={formData.classroomId}
-                  onChange={(e) => setFormData({ ...formData, classroomId: e.target.value })}
-                  required
-                  disabled={!formData.sessionId || getAvailableClassrooms().length === 0}
-                >
-                  <option value="">
-                    {!formData.sessionId 
-                      ? 'Select a session first' 
-                      : getAvailableClassrooms().length === 0 
-                      ? (account && account.role === 'TEACHER')
+                {!formData.sessionId ? (
+                  <div className="input-field bg-gray-50 cursor-not-allowed">
+                    Select a session first
+                  </div>
+                ) : getAvailableClassrooms().length === 0 ? (
+                  <div>
+                    <div className="input-field bg-gray-50 cursor-not-allowed">
+                      {(account && account.role === 'TEACHER')
                         ? 'No assigned classes available for this session'
-                        : 'No classes available'
-                      : 'Select a class'}
-                  </option>
-                  {getAvailableClassrooms().map((classroom) => (
-                    <option key={classroom.id} value={classroom.id}>
-                      {classroom.name}
-                      {classroom.academicSession && ` - ${classroom.academicSession}`}
-                    </option>
-                  ))}
-                </select>
-                {formData.sessionId && getAvailableClassrooms().length === 0 && (
-                  <p className="text-sm text-amber-600 mt-2">
-                    {(account && account.role === 'TEACHER')
-                      ? 'You are not assigned to any classes for this session. Please contact your school administrator.'
-                      : 'No classes available. Please create classes first.'}
-                  </p>
+                        : 'No classes available'}
+                    </div>
+                    <p className="text-sm text-amber-600 mt-2">
+                      {(account && account.role === 'TEACHER')
+                        ? 'You are not assigned to any classes for this session. Please contact your school administrator.'
+                        : 'No classes available. Please create classes first.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="border border-gray-300 rounded-lg p-4 max-h-60 overflow-y-auto bg-white">
+                    <div className="space-y-2">
+                      {getAvailableClassrooms().map((classroom) => (
+                        <label
+                          key={classroom.id}
+                          className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary mr-3"
+                            checked={formData.classroomIds.includes(classroom.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFormData({
+                                  ...formData,
+                                  classroomIds: [...formData.classroomIds, classroom.id],
+                                });
+                              } else {
+                                setFormData({
+                                  ...formData,
+                                  classroomIds: formData.classroomIds.filter(id => id !== classroom.id),
+                                });
+                              }
+                            }}
+                          />
+                          <span className="text-gray-900">
+                            {classroom.name}
+                            {classroom.academicSession && ` - ${classroom.academicSession}`}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    {formData.classroomIds.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-200">
+                        {formData.classroomIds.length} class{formData.classroomIds.length !== 1 ? 'es' : ''} selected
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -472,9 +506,7 @@ export default function Tests() {
                   <option value="">No specific teacher (School-owned test)</option>
                   {teachers
                     .filter((teacher) => {
-                      // Only show teachers assigned to the selected classroom
-                      if (!formData.classroomId) return true;
-                      // This would need to be enhanced with assignment data, but for now show all
+                      // For now show all teachers - can be enhanced later to filter by selected classrooms
                       return true;
                     })
                     .map((teacher) => (
@@ -484,7 +516,7 @@ export default function Tests() {
                     ))}
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
-                  Select a teacher to assign this test to. The teacher must be assigned to the selected class.
+                  Select a teacher to assign this test to. The teacher must be assigned to the selected classes.
                 </p>
               </div>
             )}
@@ -559,19 +591,19 @@ export default function Tests() {
                 )}
                 {!formData.isTimed && (
                   <p className="text-xs text-gray-500 mt-1">
-                    Students can complete this test anytime before the due date
+                    Students can complete this test at any time{formData.dueDate ? ' before the due date' : ''}
                   </p>
                 )}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Due Date
+                  Due Date (optional)
                 </label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     className="input-field flex-1"
-                    placeholder="Click to select date and time"
+                    placeholder="Click to select date and time (optional)"
                     value={formatDueDate(formData.dueDate)}
                     readOnly
                     onClick={() => {
@@ -591,7 +623,7 @@ export default function Tests() {
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  When should students complete this test by?
+                  Optional: Set a deadline for when students should complete this test
                 </p>
               </div>
             </div>
@@ -788,29 +820,40 @@ export default function Tests() {
                   onChange={(e) => setTempDueDate(e.target.value)}
                 />
               </div>
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+              <div className="flex justify-between gap-3 pt-4 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={() => {
+                    setFormData({ ...formData, dueDate: '' });
                     setShowDatePicker(false);
                     setTempDueDate('');
                   }}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  className="px-4 py-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
                 >
-                  Cancel
+                  Clear Date
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (tempDueDate) {
-                      setFormData({ ...formData, dueDate: tempDueDate });
-                    }
-                    setShowDatePicker(false);
-                  }}
-                  className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-600 transition-colors font-semibold"
-                >
-                  Okay
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDatePicker(false);
+                      setTempDueDate('');
+                    }}
+                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({ ...formData, dueDate: tempDueDate || '' });
+                      setShowDatePicker(false);
+                    }}
+                    className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-600 transition-colors font-semibold"
+                  >
+                    Set Date
+                  </button>
+                </div>
               </div>
             </div>
           </div>

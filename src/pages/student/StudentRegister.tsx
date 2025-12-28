@@ -75,7 +75,7 @@ export default function StudentRegister() {
         classroomId: formData.classroomId || undefined,
         sessionId: formData.sessionId || undefined,
       });
-      toast.success(formData.classroomId ? 'Registration successful! You have been assigned to your selected class.' : 'Registration successful! Please wait for class assignment from your school.');
+      toast.success(formData.classroomId ? 'Registration successful! You have been assigned to your selected class. Please log in to continue.' : 'Registration successful! Please wait for class assignment from your school. Please log in to continue.');
       setFormData({
         firstName: '',
         lastName: '',
@@ -88,9 +88,9 @@ export default function StudentRegister() {
         classroomId: '',
         sessionId: '',
       });
-      // Optionally redirect after a delay
+      // Redirect to login page after registration
       setTimeout(() => {
-        navigate(`/${slug}`);
+        navigate('/student/login');
       }, 2000);
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Registration failed');

@@ -9,6 +9,10 @@ export default function StudentDashboard() {
   const { account } = useAuthStore();
   const [tests, setTests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'total' | 'available' | 'completed'>('available');
+  const [filterSessionId, setFilterSessionId] = useState<string>('');
+  const [filterClassroomId, setFilterClassroomId] = useState<string>('');
+  const [sortByDueDate, setSortByDueDate] = useState<boolean>(true);
 
   useEffect(() => {
     if (account?.role === 'STUDENT') {
@@ -82,6 +86,44 @@ export default function StudentDashboard() {
     return `/student/test/${test.id}/result?studentTestId=${studentTest.id}`;
   };
 
+  const getReviewUrl = (test: any) => {
+    if (!test?.id) return '#';
+    return `/student/test/${test.id}/review`;
+  };
+
+  const getDueDateInfo = (test: any) => {
+    if (!test?.dueDate) return null;
+    
+    const dueDate = new Date(test.dueDate);
+    const now = new Date();
+    const diffMs = dueDate.getTime() - now.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+    const diffDays = diffHours / 24;
+    
+    const isPastDue = diffMs < 0;
+    const isUrgent = diffHours <= 24 && diffHours > 0;
+    const isVeryUrgent = diffHours <= 12 && diffHours > 0;
+    
+    let colorClass = 'text-gray-600';
+    if (isPastDue) {
+      colorClass = 'text-red-600 font-semibold';
+    } else if (isVeryUrgent) {
+      colorClass = 'text-red-600 font-semibold';
+    } else if (isUrgent) {
+      colorClass = 'text-orange-600 font-semibold';
+    }
+    
+    return {
+      date: dueDate,
+      formatted: format(dueDate, 'MMM dd, yyyy HH:mm'),
+      isPastDue,
+      isUrgent,
+      colorClass,
+      diffDays: Math.ceil(diffDays),
+      diffHours: Math.ceil(diffHours),
+    };
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -91,6 +133,67 @@ export default function StudentDashboard() {
         </div>
       </div>
     );
+  }
+
+  // Extract unique sessions and classrooms from tests
+  const sessionsMap = new Map<string, any>();
+  tests.forEach(t => {
+    (t.sessions || []).forEach((ts: any) => {
+      if (ts.session?.id && !sessionsMap.has(ts.session.id)) {
+        sessionsMap.set(ts.session.id, ts.session);
+      }
+    });
+  });
+  const sessions = Array.from(sessionsMap.values());
+
+  const classroomsMap = new Map<string, any>();
+  tests.forEach(t => {
+    (t.classrooms || []).forEach((tc: any) => {
+      if (tc.classroom?.id && !classroomsMap.has(tc.classroom.id)) {
+        classroomsMap.set(tc.classroom.id, tc.classroom);
+      }
+    });
+  });
+  const classrooms = Array.from(classroomsMap.values());
+
+  // Filter tests based on active tab
+  let filteredTests = Array.isArray(tests) ? tests.filter(t => t) : [];
+  
+  if (activeTab === 'available') {
+    filteredTests = filteredTests.filter(t => canTakeTest(t));
+  } else if (activeTab === 'completed') {
+    filteredTests = filteredTests.filter(t => {
+      const status = getTestStatus(t);
+      return status.status === 'completed';
+    });
+  }
+  // 'total' shows all tests
+
+  // Apply session filter
+  if (filterSessionId) {
+    filteredTests = filteredTests.filter(t => 
+      t.sessions?.some((ts: any) => ts.session?.id === filterSessionId)
+    );
+  }
+
+  // Apply classroom filter
+  if (filterClassroomId) {
+    filteredTests = filteredTests.filter(t => 
+      t.classrooms?.some((tc: any) => tc.classroom?.id === filterClassroomId)
+    );
+  }
+
+  // Sort by due date (closest to farthest) for available tests
+  if (activeTab === 'available' && sortByDueDate) {
+    filteredTests = [...filteredTests].sort((a, b) => {
+      const aDueDate = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+      const bDueDate = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+      // Sort: tests with due dates first (closest first), then tests without due dates
+      if (aDueDate === Infinity && bDueDate === Infinity) return 0;
+      if (aDueDate === Infinity) return 1;
+      if (bDueDate === Infinity) return -1;
+      return aDueDate - bDueDate;
+    });
   }
 
   const availableTests = Array.isArray(tests) ? tests.filter(t => t && canTakeTest(t)) : [];
@@ -114,28 +217,111 @@ export default function StudentDashboard() {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Clickable */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="card bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200">
+        <button
+          onClick={() => setActiveTab('total')}
+          className={`card bg-gradient-to-br from-blue-50 to-blue-100 border-2 transition-all hover:shadow-lg cursor-pointer ${
+            activeTab === 'total' ? 'border-blue-400 ring-2 ring-blue-300' : 'border-blue-200'
+          }`}
+        >
           <div className="text-3xl font-bold text-blue-600 mb-1">{tests.length}</div>
           <div className="text-sm text-gray-600">Total Tests</div>
-        </div>
-        <div className="card bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200">
+        </button>
+        <button
+          onClick={() => setActiveTab('available')}
+          className={`card bg-gradient-to-br from-green-50 to-green-100 border-2 transition-all hover:shadow-lg cursor-pointer ${
+            activeTab === 'available' ? 'border-green-400 ring-2 ring-green-300' : 'border-green-200'
+          }`}
+        >
           <div className="text-3xl font-bold text-green-600 mb-1">{availableTests.length}</div>
           <div className="text-sm text-gray-600">Available</div>
-        </div>
-        <div className="card bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200">
+        </button>
+        <button
+          onClick={() => setActiveTab('completed')}
+          className={`card bg-gradient-to-br from-purple-50 to-purple-100 border-2 transition-all hover:shadow-lg cursor-pointer ${
+            activeTab === 'completed' ? 'border-purple-400 ring-2 ring-purple-300' : 'border-purple-200'
+          }`}
+        >
           <div className="text-3xl font-bold text-purple-600 mb-1">{completedTests.length}</div>
           <div className="text-sm text-gray-600">Completed</div>
-        </div>
+        </button>
       </div>
 
-      {/* Available Tests */}
-      {availableTests.length > 0 && (
+      {/* Filters and Sort */}
+      {(sessions.length > 0 || classrooms.length > 0 || activeTab === 'available') && (
         <div className="card">
-          <h2 className="text-2xl font-bold mb-6">Available Tests</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {availableTests.map((test) => {
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-4">
+              {sessions.length > 0 && (
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Filter by Session
+                  </label>
+                  <select
+                    value={filterSessionId}
+                    onChange={(e) => setFilterSessionId(e.target.value)}
+                    className="input-field w-full"
+                  >
+                    <option value="">All Sessions</option>
+                    {sessions.map((session: any) => (
+                      <option key={session.id} value={session.id}>
+                        {session.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {classrooms.length > 0 && (
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Filter by Class
+                  </label>
+                  <select
+                    value={filterClassroomId}
+                    onChange={(e) => setFilterClassroomId(e.target.value)}
+                    className="input-field w-full"
+                  >
+                    <option value="">All Classes</option>
+                    {classrooms.map((classroom: any) => (
+                      <option key={classroom.id} value={classroom.id}>
+                        {classroom.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+            {activeTab === 'available' && (
+              <div className="flex items-center">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={sortByDueDate}
+                    onChange={(e) => setSortByDueDate(e.target.checked)}
+                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary mr-2"
+                  />
+                  <span className="text-sm font-semibold text-gray-700">
+                    Sort by Due Date (Closest First)
+                  </span>
+                </label>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tests Display */}
+      {filteredTests.length > 0 && (
+        <div className="card">
+          <h2 className="text-2xl font-bold mb-6">
+            {activeTab === 'total' && 'All Tests'}
+            {activeTab === 'available' && 'Available Tests'}
+            {activeTab === 'completed' && 'Completed Tests'}
+          </h2>
+          {activeTab === 'available' || activeTab === 'total' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredTests.map((test) => {
               const status = getTestStatus(test);
               const testUrl = getTestUrl(test);
               
@@ -176,6 +362,26 @@ export default function StudentDashboard() {
                         Passing: {test.passingScore}%
                       </div>
                     )}
+                    {(() => {
+                      const dueDateInfo = getDueDateInfo(test);
+                      if (!dueDateInfo) return null;
+                      return (
+                        <div className={`flex items-center text-sm ${dueDateInfo.colorClass}`}>
+                          <span className="mr-2">📅</span>
+                          Due: {dueDateInfo.formatted}
+                          {dueDateInfo.isPastDue && (
+                            <span className="ml-2 text-xs font-semibold">(Overdue)</span>
+                          )}
+                          {dueDateInfo.isUrgent && !dueDateInfo.isPastDue && (
+                            <span className="ml-2 text-xs font-semibold">
+                              ({dueDateInfo.diffHours <= 1 
+                                ? 'Less than 1 hour left' 
+                                : `${dueDateInfo.diffHours} hours left`})
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                   
                   {test.studentTests?.[0]?.status === 'in_progress' ? (
@@ -197,15 +403,9 @@ export default function StudentDashboard() {
               );
             })}
           </div>
-        </div>
-      )}
-
-      {/* Completed Tests */}
-      {completedTests.length > 0 && (
-        <div className="card">
-          <h2 className="text-2xl font-bold mb-6">Completed Tests</h2>
+        ) : (
           <div className="space-y-4">
-            {completedTests.map((test) => {
+            {filteredTests.map((test) => {
               const status = getTestStatus(test);
               const studentTest = test.studentTests?.[0];
               const testUrl = getTestUrl(test);
@@ -227,26 +427,72 @@ export default function StudentDashboard() {
                         </span>
                       )}
                     </div>
-                    {studentTest?.submittedAt && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        Submitted: {format(new Date(studentTest.submittedAt), 'MMM dd, yyyy HH:mm')}
-                      </p>
-                    )}
+                    <div className="flex items-center space-x-4 mt-1">
+                      {studentTest?.submittedAt && (
+                        <p className="text-sm text-gray-500">
+                          Submitted: {format(new Date(studentTest.submittedAt), 'MMM dd, yyyy HH:mm')}
+                        </p>
+                      )}
+                      {(() => {
+                        const dueDateInfo = getDueDateInfo(test);
+                        if (!dueDateInfo) return null;
+                        return (
+                          <p className={`text-sm ${dueDateInfo.colorClass}`}>
+                            Due: {dueDateInfo.formatted}
+                            {dueDateInfo.isPastDue && (
+                              <span className="ml-1 font-semibold">(Overdue)</span>
+                            )}
+                          </p>
+                        );
+                      })()}
+                    </div>
                   </div>
-                  <Link
-                    to={getResultUrl(test)}
-                    className="btn-secondary text-sm"
-                  >
-                    View Results
-                  </Link>
+                  <div className="flex items-center space-x-2">
+                    <Link
+                      to={getReviewUrl(test)}
+                      className="btn-primary text-sm"
+                    >
+                      Review Test
+                    </Link>
+                    <Link
+                      to={getResultUrl(test)}
+                      className="btn-secondary text-sm"
+                    >
+                      View Results
+                    </Link>
+                  </div>
                 </div>
               );
             })}
           </div>
+        )}
         </div>
       )}
 
       {/* Empty State */}
+      {filteredTests.length === 0 && tests.length > 0 && (
+        <div className="card text-center py-12">
+          <div className="text-6xl mb-4">🔍</div>
+          <p className="text-gray-600 text-lg mb-2">No tests found</p>
+          <p className="text-gray-500">
+            {filterSessionId || filterClassroomId
+              ? 'Try adjusting your filters to see more tests.'
+              : `No ${activeTab === 'available' ? 'available' : activeTab === 'completed' ? 'completed' : ''} tests at the moment.`}
+          </p>
+          {(filterSessionId || filterClassroomId) && (
+            <button
+              onClick={() => {
+                setFilterSessionId('');
+                setFilterClassroomId('');
+              }}
+              className="mt-4 btn-secondary"
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
+      )}
+
       {tests.length === 0 && (
         <div className="card text-center py-12">
           <div className="text-6xl mb-4">📝</div>

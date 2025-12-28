@@ -470,14 +470,14 @@ export default function TestDetail() {
           <h1 className="text-3xl font-bold text-gray-900 mt-2">{test.title}</h1>
         </div>
         <div className="flex space-x-2 flex-wrap gap-2">
-          {test && test.requiresManualGrading && (
+          {(test && test.requiresManualGrading) || (account && account.role === 'TEACHER' && test) ? (
             <Link
               to={`/tests/${id}/grade`}
               className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg"
             >
               Grade Tests
             </Link>
-          )}
+          ) : null}
           {test && !test.isPublished && !test.isArchived && (
             <button
               onClick={handlePublish}
@@ -696,13 +696,13 @@ export default function TestDetail() {
                 )}
                 {!testForm.isTimed && (
                   <p className="text-xs text-gray-500 mt-1">
-                    Students can complete this test anytime before the due date
+                    Students can complete this test at any time{testForm.dueDate ? ' before the due date' : ''}
                   </p>
                 )}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Due Date
+                  Due Date (optional)
                 </label>
                 <input
                   type="datetime-local"
@@ -710,6 +710,9 @@ export default function TestDetail() {
                   value={testForm.dueDate}
                   onChange={(e) => setTestForm({ ...testForm, dueDate: e.target.value })}
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Optional: Set a deadline for when students should complete this test
+                </p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -752,6 +755,32 @@ export default function TestDetail() {
                     className="mr-2"
                   />
                   <span className="text-sm">Active</span>
+                </label>
+              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <label className="flex items-start cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={testForm.scoreVisibility}
+                    onChange={(e) => setTestForm({ ...testForm, scoreVisibility: e.target.checked })}
+                    className="mr-3 w-5 h-5 text-primary focus:ring-primary rounded mt-1"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 block">Show scores to students after completion</span>
+                    <span className="text-xs text-gray-500">Students can see their scores immediately after submitting</span>
+                  </div>
+                </label>
+              <label className="flex items-start cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={testForm.requiresManualGrading}
+                    onChange={(e) => setTestForm({ ...testForm, requiresManualGrading: e.target.checked })}
+                    className="mr-3 w-5 h-5 text-primary focus:ring-primary rounded mt-1"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 block">Requires manual grading</span>
+                    <span className="text-xs text-gray-500">Enable for short answer questions that need manual review</span>
+                  </div>
                 </label>
               </div>
 

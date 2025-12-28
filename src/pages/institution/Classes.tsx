@@ -17,6 +17,7 @@ export default function Classes() {
     name: '',
     academicSession: '',
     description: '',
+    sessionId: '',
   });
   const [assignment, setAssignment] = useState({
     classroomId: '',
@@ -91,8 +92,8 @@ export default function Classes() {
     setCreating(true);
     try {
       await classroomAPI.create(classForm);
-      toast.success('Class created');
-      setClassForm({ name: '', academicSession: '', description: '' });
+      toast.success(classForm.sessionId ? 'Class created and assigned to session' : 'Class created');
+      setClassForm({ name: '', academicSession: '', description: '', sessionId: '' });
       loadClasses();
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to create class');
@@ -159,13 +160,20 @@ export default function Classes() {
               />
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Academic Session
+                  Assign to Session (Optional)
                 </label>
                 <select
-                  name="academicSession"
+                  name="sessionId"
                   className="input-field"
-                  value={classForm.academicSession}
-                  onChange={(e) => setClassForm({ ...classForm, academicSession: e.target.value })}
+                  value={classForm.sessionId}
+                  onChange={(e) => {
+                    const selectedSession = getAvailableSessions().find(s => s.id === e.target.value);
+                    setClassForm({ 
+                      ...classForm, 
+                      sessionId: e.target.value,
+                      academicSession: selectedSession ? selectedSession.name : '',
+                    });
+                  }}
                 >
                   <option value="">Select a session (optional)</option>
                   {getAvailableSessions().map((session) => {
@@ -177,14 +185,14 @@ export default function Classes() {
                     const status = isActive ? 'Active' : isScheduled ? 'Scheduled' : '';
                     const dateRange = `${format(startDate, 'MMM dd, yyyy')} - ${format(endDate, 'MMM dd, yyyy')}`;
                     return (
-                      <option key={session.id} value={session.name}>
+                      <option key={session.id} value={session.id}>
                         {session.name} - {dateRange} {status ? `(${status})` : ''}
                       </option>
                     );
                   })}
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
-                  Select an active or scheduled session for this class
+                  Select an active or scheduled session to assign this class to
                 </p>
               </div>
               <textarea

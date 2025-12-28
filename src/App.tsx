@@ -33,6 +33,7 @@ import AuditLogs from './pages/institution/AuditLogs';
 import StudentTestPage from './pages/student/StudentTestPage';
 import StudentTestTaking from './pages/student/StudentTestTaking';
 import StudentTestResult from './pages/student/StudentTestResult';
+import StudentTestReview from './pages/student/StudentTestReview';
 import StudentRegister from './pages/student/StudentRegister';
 import StudentLogin from './pages/student/StudentLogin';
 import StudentDashboard from './pages/student/StudentDashboard';
@@ -109,6 +110,16 @@ function App() {
               <PrivateRoute>
                 <StudentLayout>
                   <StudentTestResult />
+                </StudentLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/student/test/:testId/review"
+            element={
+              <PrivateRoute>
+                <StudentLayout>
+                  <StudentTestReview />
                 </StudentLayout>
               </PrivateRoute>
             }

@@ -20,7 +20,19 @@ export default function Students() {
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [showPromoteDialog, setShowPromoteDialog] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [resetPasswordData, setResetPasswordData] = useState({
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [resetPasswordResult, setResetPasswordResult] = useState<{
+    username: string;
+    password: string;
+  } | null>(null);
+  const [showUploadErrors, setShowUploadErrors] = useState(false);
+  const [uploadErrors, setUploadErrors] = useState<Array<{ row: number; message: string; record?: any }>>([]);
   const [createFormData, setCreateFormData] = useState({
     firstName: '',
     lastName: '',
@@ -50,6 +62,7 @@ export default function Students() {
     targetSessionId: '',
   });
   const [schoolInfo, setSchoolInfo] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'all' | 'unassigned'>('all');
 
   const isSchool = useMemo(() => {
     return account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN';
@@ -67,9 +80,9 @@ export default function Students() {
     if (isSchool || isTeacher || isSuperAdmin) {
       loadStudents();
       if (isSchool) {
-        loadSessions();
-        loadClassrooms();
-        loadSchoolInfo();
+      loadSessions();
+      loadClassrooms();
+      loadSchoolInfo();
       } else if (isTeacher) {
         // Teachers can filter by sessions and classes they're assigned to
         loadSessions();
@@ -80,7 +93,7 @@ export default function Students() {
         loadClassrooms();
       }
     }
-  }, [isSchool, isTeacher, isSuperAdmin, filters]);
+  }, [isSchool, isTeacher, isSuperAdmin, filters, activeTab]);
 
   const loadStudents = async () => {
     try {
@@ -88,7 +101,12 @@ export default function Students() {
       const params: any = {};
       if (filters.sessionId) params.sessionId = filters.sessionId;
       if (filters.classroomId) params.classroomId = filters.classroomId;
-      if (filters.isAssigned !== '') params.isAssigned = filters.isAssigned === 'true';
+      // If on unassigned tab, always filter to unassigned
+      if (activeTab === 'unassigned') {
+        params.isAssigned = false;
+      } else if (filters.isAssigned !== '') {
+        params.isAssigned = filters.isAssigned === 'true';
+      }
       
       const { data } = await studentAPI.getAll(params);
       let filtered = data;
@@ -201,7 +219,19 @@ export default function Students() {
         `Upload completed: ${response.data.successful} successful, ${response.data.failed} failed${bulkUploadClassroomId ? ' and assigned to class' : ''}`
       );
       if (response.data.errors && response.data.errors.length > 0) {
-        console.error('Upload errors:', response.data.errors);
+        // Handle both string format (backward compatibility) and object format
+        const formattedErrors = response.data.errors.map((error: any) => {
+          if (typeof error === 'string') {
+            // Extract row number from string format like "Row 2: error message"
+            const rowMatch = error.match(/Row (\d+):/);
+            const row = rowMatch ? parseInt(rowMatch[1]) : 0;
+            const message = error.replace(/^Row \d+:\s*/, '');
+            return { row, message };
+          }
+          return error;
+        });
+        setUploadErrors(formattedErrors);
+        setShowUploadErrors(true);
       }
       loadStudents();
       setShowBulkUpload(false);
@@ -254,7 +284,7 @@ export default function Students() {
         `Class: ${selectedClass?.name || 'Unknown'}\n` +
         `Session: ${selectedSession?.name || 'Unknown'}\n\n` +
         `This will assign all selected students to the same class and session. Continue?`;
-      
+
       if (!window.confirm(confirmMessage)) {
         return;
       }
@@ -336,6 +366,54 @@ export default function Students() {
       loadStudents();
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to unassign student');
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!selectedStudent) {
+      toast.error('No student selected');
+      return;
+    }
+
+    if (!resetPasswordData.newPassword || !resetPasswordData.confirmPassword) {
+      toast.error('Please enter and confirm the new password');
+      return;
+    }
+
+    if (resetPasswordData.newPassword !== resetPasswordData.confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    if (resetPasswordData.newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters long');
+      return;
+    }
+
+    setResettingPassword(true);
+
+    try {
+      const response = await studentAPI.resetPassword({
+        studentId: selectedStudent.id,
+        newPassword: resetPasswordData.newPassword,
+        forceReset: true, // Always force reset on first login
+      });
+      toast.success('Password reset successfully');
+      // Show the new password to admin so they can share it with student
+      if (response.data.newPassword && response.data.username) {
+        setResetPasswordResult({
+          username: response.data.username,
+          password: response.data.newPassword,
+        });
+      } else {
+        setShowResetPasswordDialog(false);
+        setResetPasswordData({ newPassword: '', confirmPassword: '' });
+        setSelectedStudent(null);
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to reset password');
+    } finally {
+      setResettingPassword(false);
     }
   };
 
@@ -485,23 +563,23 @@ export default function Students() {
                 >
                   {showCreateForm ? '✕ Cancel' : '➕ Add Student'}
                 </button>
-                <button
-                  onClick={handleDownloadTemplate}
-                  className="btn-secondary text-sm"
-                >
-                  📥 Download Template
-                </button>
-                <button
-                  onClick={() => setShowBulkUpload(!showBulkUpload)}
-                  className="btn-secondary text-sm"
-                >
-                  {showBulkUpload ? '✕ Cancel' : '📤 Bulk Upload'}
-                </button>
+            <button
+              onClick={handleDownloadTemplate}
+              className="btn-secondary text-sm"
+            >
+              📥 Download Template
+            </button>
+            <button
+              onClick={() => setShowBulkUpload(!showBulkUpload)}
+              className="btn-secondary text-sm"
+            >
+              {showBulkUpload ? '✕ Cancel' : '📤 Bulk Upload'}
+            </button>
               </>
             )}
             {isSchool && (
               <>
-                <button
+            <button
                   onClick={() => {
                     // If students are selected, use them for bulk assignment
                     if (selectedStudents.length > 0) {
@@ -512,21 +590,21 @@ export default function Students() {
                     }
                     setShowAssignDialog(true);
                   }}
-                  className="btn-primary text-sm"
+              className="btn-primary text-sm"
                   disabled={selectedStudents.length === 0 && students.length === 0}
-                >
+            >
                   ➕ Assign to Class {selectedStudents.length > 0 ? `(${selectedStudents.length} selected)` : ''}
-                </button>
-                {selectedStudents.length > 0 && (
-                  <button
-                    onClick={() => {
-                      setPromoteForm({ ...promoteForm, studentIds: selectedStudents });
-                      setShowPromoteDialog(true);
-                    }}
-                    className="btn-primary text-sm bg-purple-600 hover:bg-purple-700"
-                  >
-                    🎓 Promote Selected ({selectedStudents.length})
-                  </button>
+            </button>
+            {selectedStudents.length > 0 && (
+              <button
+                onClick={() => {
+                  setPromoteForm({ ...promoteForm, studentIds: selectedStudents });
+                  setShowPromoteDialog(true);
+                }}
+                className="btn-primary text-sm bg-purple-600 hover:bg-purple-700"
+              >
+                🎓 Promote Selected ({selectedStudents.length})
+              </button>
                 )}
               </>
             )}
@@ -613,6 +691,7 @@ export default function Students() {
               <span className="text-sm text-gray-600">
                 Upload an Excel file with student data. Download the template for the correct format.
                 {bulkUploadClassroomId && bulkUploadSessionId && ' Students will be assigned to the selected class.'}
+                {' '}You can also specify "Class Name" and "Session Name" columns in the Excel file to assign students individually.
               </span>
             </div>
           </div>
@@ -621,50 +700,55 @@ export default function Students() {
         {/* Filters */}
         <div className="mb-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3">
-            <input
-              type="text"
-              placeholder="🔍 Search students..."
-              className="input-field"
-              value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            />
-            <select
-              className="input-field"
-              value={filters.sessionId}
-              onChange={(e) => setFilters({ ...filters, sessionId: e.target.value })}
-            >
-              <option value="">All Sessions</option>
-              {sessions.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            <select
-              className="input-field"
-              value={filters.classroomId}
-              onChange={(e) => setFilters({ ...filters, classroomId: e.target.value })}
-            >
-              <option value="">All Classes</option>
-              {classrooms.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <select
-              className="input-field"
-              value={filters.isAssigned}
-              onChange={(e) => setFilters({ ...filters, isAssigned: e.target.value })}
-            >
-              <option value="">All Students</option>
-              <option value="true">Assigned Only</option>
-              <option value="false">Unassigned Only</option>
-            </select>
+          <input
+            type="text"
+            placeholder="🔍 Search students..."
+            className="input-field"
+            value={filters.search}
+            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+          />
+          <select
+            className="input-field"
+            value={filters.sessionId}
+            onChange={(e) => setFilters({ ...filters, sessionId: e.target.value })}
+          >
+            <option value="">All Sessions</option>
+            {sessions.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <select
+            className="input-field"
+            value={filters.classroomId}
+            onChange={(e) => setFilters({ ...filters, classroomId: e.target.value })}
+          >
+            <option value="">All Classes</option>
+            {classrooms.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+            {activeTab !== 'unassigned' && (
+          <select
+            className="input-field"
+            value={filters.isAssigned}
+            onChange={(e) => setFilters({ ...filters, isAssigned: e.target.value })}
+          >
+            <option value="">All Students</option>
+            <option value="true">Assigned Only</option>
+            <option value="false">Unassigned Only</option>
+          </select>
+            )}
           </div>
-          {(filters.search || filters.sessionId || filters.classroomId || filters.isAssigned) && (
+          {(filters.search || filters.sessionId || filters.classroomId || (activeTab !== 'unassigned' && filters.isAssigned)) && (
             <button
-              onClick={() => setFilters({ sessionId: '', classroomId: '', isAssigned: '', search: '' })}
+              onClick={() => {
+                const newFilters = { sessionId: '', classroomId: '', search: '', isAssigned: activeTab === 'unassigned' ? 'false' : '' };
+                setFilters(newFilters);
+              }}
               className="text-sm text-primary hover:text-primary-600 font-medium flex items-center space-x-1"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -684,8 +768,14 @@ export default function Students() {
         ) : students.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-6xl mb-4">👥</div>
-            <p className="text-gray-600 text-lg mb-2">No students found</p>
-            <p className="text-gray-500">Upload students or share the registration URL to get started</p>
+            <p className="text-gray-600 text-lg mb-2">
+              {activeTab === 'unassigned' ? 'No unassigned students' : 'No students found'}
+            </p>
+            <p className="text-gray-500">
+              {activeTab === 'unassigned' 
+                ? 'All students are currently assigned to classes' 
+                : 'Upload students or share the registration URL to get started'}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -693,14 +783,14 @@ export default function Students() {
               <thead>
                 <tr className="border-b border-gray-200">
                   {isSchool && (
-                    <th className="text-left py-3 px-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedStudents.length === students.length && students.length > 0}
-                        onChange={handleSelectAll}
-                        className="w-4 h-4"
-                      />
-                    </th>
+                  <th className="text-left py-3 px-4">
+                    <input
+                      type="checkbox"
+                      checked={selectedStudents.length === students.length && students.length > 0}
+                      onChange={handleSelectAll}
+                      className="w-4 h-4"
+                    />
+                  </th>
                   )}
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Name</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Username</th>
@@ -717,14 +807,14 @@ export default function Students() {
                     className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                   >
                     {isSchool && (
-                      <td className="py-3 px-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedStudents.includes(student.id)}
-                          onChange={() => handleToggleSelect(student.id)}
-                          className="w-4 h-4"
-                        />
-                      </td>
+                    <td className="py-3 px-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedStudents.includes(student.id)}
+                        onChange={() => handleToggleSelect(student.id)}
+                        className="w-4 h-4"
+                      />
+                    </td>
                     )}
                     <td className="py-3 px-4">
                       <div className="flex items-center space-x-2">
@@ -793,34 +883,49 @@ export default function Students() {
                         </button>
                         {isSchool && (
                           <>
-                            <button
-                              onClick={() => {
-                                setAssignForm({
-                                  studentId: student.id,
-                                  classroomId: student.classAssignments?.[0]?.classroomId || '',
-                                  sessionId: student.classAssignments?.[0]?.sessionId || '',
-                                });
-                                setShowAssignDialog(true);
-                              }}
-                              className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors"
-                              title={student.isAssigned ? "Reassign student to a different class" : "Assign student to a class"}
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            </button>
-                            {student.isAssigned && (
-                              <button
-                                onClick={() => handleUnassignStudent(student.id)}
-                                className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Unassign student from current class"
-                              >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <button
+                          onClick={() => {
+                            setAssignForm({
+                              studentId: student.id,
+                              classroomId: student.classAssignments?.[0]?.classroomId || '',
+                              sessionId: student.classAssignments?.[0]?.sessionId || '',
+                            });
+                            setShowAssignDialog(true);
+                          }}
+                          className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors"
+                          title={student.isAssigned ? "Reassign student to a different class" : "Assign student to a class"}
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </button>
+                        {student.isAssigned && (
+                          <button
+                            onClick={() => handleUnassignStudent(student.id)}
+                            className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Unassign student from current class"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                               </button>
                             )}
                           </>
+                        )}
+                        {isSuperAdmin && (
+                          <button
+                            onClick={() => {
+                              setSelectedStudent(student);
+                              setResetPasswordData({ newPassword: '', confirmPassword: '' });
+                              setShowResetPasswordDialog(true);
+                            }}
+                            className="p-2 text-orange-600 hover:text-orange-800 hover:bg-orange-50 rounded-lg transition-colors"
+                            title="Reset student password"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                            </svg>
+                          </button>
                         )}
                       </div>
                     </td>
@@ -1130,6 +1235,7 @@ export default function Students() {
                     value={createFormData.username}
                     onChange={(e) => setCreateFormData({ ...createFormData, username: e.target.value })}
                     required
+                    autoComplete="off"
                   />
                 </div>
                 <div>
@@ -1141,6 +1247,7 @@ export default function Students() {
                     className="input-field w-full"
                     value={createFormData.password}
                     onChange={(e) => setCreateFormData({ ...createFormData, password: e.target.value })}
+                    autoComplete="new-password"
                   />
                 </div>
               </div>
@@ -1256,6 +1363,244 @@ export default function Students() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Password Reset Result Dialog */}
+      {resetPasswordResult && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold mb-4">Password Reset Successful</h2>
+            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-gray-700 mb-3">
+                The student's password has been reset. Please share these credentials with the student:
+              </p>
+              <div className="space-y-2">
+                <div>
+                  <span className="text-sm font-semibold text-gray-700">Username:</span>
+                  <div className="mt-1 p-2 bg-white border border-gray-300 rounded font-mono text-sm flex items-center justify-between">
+                    <span>{resetPasswordResult.username}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(resetPasswordResult.username);
+                        toast.success('Username copied to clipboard');
+                      }}
+                      className="ml-2 text-blue-600 hover:text-blue-800 text-xs"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-sm font-semibold text-gray-700">New Password:</span>
+                  <div className="mt-1 p-2 bg-white border border-gray-300 rounded font-mono text-sm flex items-center justify-between">
+                    <span>{resetPasswordResult.password}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(resetPasswordResult.password);
+                        toast.success('Password copied to clipboard');
+                      }}
+                      className="ml-2 text-blue-600 hover:text-blue-800 text-xs"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-gray-600 mt-3">
+                <strong>Important:</strong> The student will be required to reset their password when they first log in.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setResetPasswordResult(null);
+                setShowResetPasswordDialog(false);
+                setResetPasswordData({ newPassword: '', confirmPassword: '' });
+                setSelectedStudent(null);
+              }}
+              className="btn-primary w-full"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Dialog - Only for Super Admin */}
+      {showResetPasswordDialog && isSuperAdmin && selectedStudent && !resetPasswordResult && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold mb-4">Reset Student Password</h2>
+            <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+              <p className="text-sm text-gray-700">
+                <strong>Student:</strong> {selectedStudent.firstName} {selectedStudent.lastName}
+              </p>
+              <p className="text-sm text-gray-600 mt-1">
+                <strong>Username:</strong> {selectedStudent.username}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  New Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  className="input-field w-full"
+                  value={resetPasswordData.newPassword}
+                  onChange={(e) => setResetPasswordData({ ...resetPasswordData, newPassword: e.target.value })}
+                  placeholder="Enter new password"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">Password must be at least 6 characters long</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Confirm Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  className="input-field w-full"
+                  value={resetPasswordData.confirmPassword}
+                  onChange={(e) => setResetPasswordData({ ...resetPasswordData, confirmPassword: e.target.value })}
+                  placeholder="Confirm new password"
+                  required
+                />
+              </div>
+
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-800">
+                  <strong>Note:</strong> The student's password will be reset immediately. The student will be required to reset their password on their first login. Please share the new password with the student directly.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex space-x-2 mt-6 pt-4 border-t border-gray-200">
+              <button
+                onClick={handleResetPassword}
+                disabled={resettingPassword || !resetPasswordData.newPassword || !resetPasswordData.confirmPassword}
+                className="btn-primary flex-1"
+              >
+                {resettingPassword ? 'Resetting...' : 'Reset Password'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowResetPasswordDialog(false);
+                  setResetPasswordData({ newPassword: '', confirmPassword: '' });
+                  setSelectedStudent(null);
+                }}
+                className="btn-secondary flex-1"
+                disabled={resettingPassword}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Errors Dialog */}
+      {showUploadErrors && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">Upload Error Report</h2>
+              <button
+                onClick={() => {
+                  setShowUploadErrors(false);
+                  setUploadErrors([]);
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-800 font-semibold">
+                {uploadErrors.length} record(s) failed to upload. Please review the errors below.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {uploadErrors.map((error, index) => (
+                <div key={index} className="border border-red-200 rounded-lg p-4 bg-red-50">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <h3 className="font-semibold text-red-900">Row {error.row}</h3>
+                      <p className="text-red-700 mt-1">{error.message}</p>
+                    </div>
+                  </div>
+                  {error.record && (
+                    <div className="mt-3 pt-3 border-t border-red-200">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Record Data:</p>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                        {error.record.firstName !== undefined && (
+                          <div>
+                            <span className="font-medium">First Name:</span> {error.record.firstName || '(empty)'}
+                          </div>
+                        )}
+                        {error.record.lastName !== undefined && (
+                          <div>
+                            <span className="font-medium">Last Name:</span> {error.record.lastName || '(empty)'}
+                          </div>
+                        )}
+                        {error.record.username !== undefined && (
+                          <div>
+                            <span className="font-medium">Username:</span> {error.record.username || '(empty)'}
+                          </div>
+                        )}
+                        {error.record.email !== undefined && (
+                          <div>
+                            <span className="font-medium">Email:</span> {error.record.email || '(empty)'}
+                          </div>
+                        )}
+                        {error.record.phone !== undefined && (
+                          <div>
+                            <span className="font-medium">Phone:</span> {error.record.phone || '(empty)'}
+                          </div>
+                        )}
+                        {error.record.classroomId !== undefined && (
+                          <div>
+                            <span className="font-medium">Classroom ID:</span> {error.record.classroomId || '(empty)'}
+                          </div>
+                        )}
+                        {error.record.sessionId !== undefined && (
+                          <div>
+                            <span className="font-medium">Session ID:</span> {error.record.sessionId || '(empty)'}
+                          </div>
+                        )}
+                        {error.record.className !== undefined && (
+                          <div>
+                            <span className="font-medium">Class Name:</span> {error.record.className || '(empty)'}
+                          </div>
+                        )}
+                        {error.record.sessionName !== undefined && (
+                          <div>
+                            <span className="font-medium">Session Name:</span> {error.record.sessionName || '(empty)'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => {
+                  setShowUploadErrors(false);
+                  setUploadErrors([]);
+                }}
+                className="btn-primary"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

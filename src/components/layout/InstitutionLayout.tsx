@@ -1,9 +1,10 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
-import { impersonationAPI } from '../../services/api';
+import { impersonationAPI, themeAPI } from '../../services/api';
 import NotificationBell from '../NotificationBell';
 import PasswordResetModal from '../PasswordResetModal';
+import { applyTheme } from '../../utils/themeUtils';
 import toast from 'react-hot-toast';
 
 interface InstitutionLayoutProps {
@@ -33,7 +34,6 @@ const navConfig: NavItem[] = [
     children: [
       { label: 'Ministries', path: '/ministries', roles: ['SUPER_ADMIN'], icon: '🏛️' },
       { label: 'Super Admins', path: '/admin/super-admins', roles: ['SUPER_ADMIN'], icon: '👑' },
-      { label: 'Impersonation', path: '/impersonation', roles: ['SUPER_ADMIN'], icon: '👤' },
     ]
   },
   { 
@@ -57,7 +57,6 @@ const navConfig: NavItem[] = [
     icon: '🏢',
     children: [
       { label: 'Schools', path: '/schools', roles: ['MINISTRY'], icon: '🏫' },
-      { label: 'Impersonation', path: '/impersonation', roles: ['MINISTRY'], icon: '👤' },
     ]
   },
   { 
@@ -86,21 +85,28 @@ const navConfig: NavItem[] = [
     ]
   },
   { 
-    label: 'Teaching', 
-    path: '#', 
+    label: 'Tests', 
+    path: '/tests', 
     roles: ['TEACHER'],
-    icon: '📖',
-    children: [
-      { label: 'Tests', path: '/tests', roles: ['TEACHER'], icon: '📝' },
-      { label: 'Classes', path: '/classes', roles: ['TEACHER'], icon: '🎓' },
-      { label: 'Students', path: '/students', roles: ['TEACHER'], icon: '👥' },
-    ]
+    icon: '📝'
   },
   { 
-    label: 'Profile', 
-    path: '/profile', 
-    roles: ['SUPER_ADMIN', 'MINISTRY', 'SCHOOL', 'TEACHER'],
-    icon: '👤'
+    label: 'Classes', 
+    path: '/classes', 
+    roles: ['TEACHER'],
+    icon: '🎓'
+  },
+  { 
+    label: 'Students', 
+    path: '/students', 
+    roles: ['TEACHER'],
+    icon: '👥'
+  },
+  { 
+    label: 'Scores', 
+    path: '/scores', 
+    roles: ['TEACHER'],
+    icon: '📊'
   },
   { 
     label: 'Audit Logs', 
@@ -117,7 +123,9 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
   const [stopping, setStopping] = useState(false);
   const [openDropdowns, setOpenDropdowns] = useState<Set<string>>(new Set());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
 
   const handleLogout = () => {
     logout();
@@ -148,6 +156,26 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
 
   const visibleNav = navConfig.filter((item) => item.roles.includes(account?.role || 'SCHOOL'));
 
+  // Load and apply theme
+  useEffect(() => {
+    const loadTheme = async () => {
+      try {
+        // SUPER_ADMIN without school context will get default theme from backend
+        const { data } = await themeAPI.get();
+        if (data) {
+          applyTheme(data);
+        }
+      } catch (error) {
+        // Silently fail - use default theme
+        console.error('Failed to load theme:', error);
+      }
+    };
+
+    if (account) {
+      loadTheme();
+    }
+  }, [account]);
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -161,6 +189,11 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
           });
         }
       });
+      
+      // Close user menu when clicking outside
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -328,9 +361,50 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
             </div>
             <div className="flex items-center space-x-4">
               <NotificationBell />
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold text-gray-900">{account?.name}</p>
-                <p className="text-xs text-gray-500 capitalize">{account?.role?.toLowerCase().replace('_', ' ')}</p>
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="hidden sm:flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-100 transition-all"
+                >
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-gray-900">{account?.name}</p>
+                    <p className="text-xs text-gray-500 capitalize">{account?.role?.toLowerCase().replace('_', ' ')}</p>
+                  </div>
+                  <svg
+                    className={`w-4 h-4 text-gray-500 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {userMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
+                    <Link
+                      to="/profile"
+                      onClick={() => setUserMenuOpen(false)}
+                      className={`flex items-center px-4 py-2 text-sm transition-colors ${
+                        isActive('/profile')
+                          ? 'text-primary bg-primary-50 font-semibold'
+                          : 'text-gray-700 hover:text-primary hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="mr-3">⚙️</span>
+                      Account Settings
+                    </Link>
+                    <button
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="mr-3">🚪</span>
+                      Logout
+                    </button>
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -344,12 +418,6 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
                   )}
                 </svg>
               </button>
-              <button
-                onClick={handleLogout}
-                className="hidden sm:block text-sm font-medium text-gray-700 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition-all"
-              >
-                Logout
-              </button>
             </div>
           </div>
         </div>
@@ -357,13 +425,26 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
           <div className="lg:hidden bg-white border-t border-gray-200">
             <div className="px-2 pt-2 pb-3 space-y-1">
               {visibleNav.map((item) => renderNavItem(item, true))}
+              <Link
+                to="/profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center px-4 py-3 text-sm font-medium border-t border-gray-200 ${
+                  isActive('/profile')
+                    ? 'text-primary bg-primary-50 font-semibold'
+                    : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <span className="mr-3">⚙️</span>
+                Account Settings
+              </Link>
               <button
                 onClick={() => {
                   handleLogout();
                   setMobileMenuOpen(false);
                 }}
-                className="w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 border-t border-gray-200"
+                className="w-full text-left flex items-center px-4 py-3 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 border-t border-gray-200"
               >
+                <span className="mr-3">🚪</span>
                 Logout
               </button>
             </div>
