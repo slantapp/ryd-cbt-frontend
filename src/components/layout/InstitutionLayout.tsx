@@ -83,7 +83,7 @@ const navConfig: NavItem[] = [
       { label: 'Custom Fields', path: '/custom-fields', roles: ['SCHOOL'], icon: '📋' },
       { label: 'Test Groups', path: '/test-groups', roles: ['SCHOOL'], icon: '📑' },
       { label: 'Subjects', path: '/subjects', roles: ['SCHOOL'], icon: '📚' },
-      { label: 'Grading Schemes', path: '/grading-schemes', roles: ['SCHOOL'], icon: '📊' },
+      { label: 'Grading Schemes', path: '/grading-schemes', roles: ['SCHOOL', 'TEACHER'], icon: '📊' },
       { label: 'Impersonation', path: '/impersonation', roles: ['SCHOOL'], icon: '👤' },
     ]
   },
@@ -110,6 +110,12 @@ const navConfig: NavItem[] = [
     path: '/scores', 
     roles: ['TEACHER'],
     icon: '📊'
+  },
+  { 
+    label: 'Grading Schemes', 
+    path: '/grading-schemes', 
+    roles: ['TEACHER'],
+    icon: '📈'
   },
   { 
     label: 'Audit Logs', 

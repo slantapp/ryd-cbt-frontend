@@ -727,18 +727,32 @@ export default function Tests() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="flex items-center cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={formData.scoreVisibility}
-                    onChange={(e) => setFormData({ ...formData, scoreVisibility: e.target.checked })}
-                    className="mr-3 w-5 h-5 text-primary focus:ring-primary rounded"
-                  />
-                  <div>
-                    <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 block">Show scores to students after completion</span>
-                    <span className="text-xs text-gray-500">Students can see their scores immediately after submitting</span>
-                  </div>
-                </label>
+                <label className="text-sm font-medium text-gray-700 block mb-2">Score Visibility</label>
+                <span className="text-xs text-gray-500 block mb-2">Control when students can see their scores</span>
+                <div className="flex space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, scoreVisibility: true })}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      formData.scoreVisibility
+                        ? 'bg-green-600 text-white hover:bg-green-700'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    Show Scores
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, scoreVisibility: false })}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      !formData.scoreVisibility
+                        ? 'bg-red-600 text-white hover:bg-red-700'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    Hide Scores
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="flex items-center cursor-pointer group">

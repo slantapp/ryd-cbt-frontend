@@ -5,11 +5,13 @@ import { useAuthStore } from '../../store/authStore';
 import { ThemeConfig } from '../../types';
 
 interface TestResult {
-  score: number;
-  totalPoints: number;
-  percentage: string;
+  score: number | null;
+  totalPoints: number | null;
+  percentage: string | null;
   isPassed: boolean | null;
   timeSpent: number;
+  scoreVisible?: boolean;
+  message?: string;
 }
 
 interface StudentTest {
@@ -79,16 +81,8 @@ export default function StudentTestResult() {
   useEffect(() => {
     const loadResult = async () => {
       try {
-        // First try to get from location state
-        if (location?.state?.result && location?.state?.studentTest) {
-          console.log('Loading result from location state:', location.state);
-          setResult(location.state.result);
-          setStudentTest(location.state.studentTest);
-          setLoading(false);
-          return;
-        }
-
-        // If not in state, try to get from localStorage or URL params
+        // Always fetch from API to get latest score visibility status
+        // Don't use cached location.state as it may have outdated visibility
         let studentTestId: string | null = null;
 
         // Try to get from URL query params first (most reliable)
@@ -96,6 +90,12 @@ export default function StudentTestResult() {
         if (urlParams.get('studentTestId')) {
           studentTestId = urlParams.get('studentTestId');
           console.log('Found studentTestId from URL:', studentTestId);
+        }
+
+        // Try to get from location.state as fallback (for studentTestId only, not the result data)
+        if (!studentTestId && location?.state?.studentTest?.id) {
+          studentTestId = location.state.studentTest.id;
+          console.log('Found studentTestId from location.state:', studentTestId);
         }
 
         // Try to get from localStorage as fallback
@@ -131,24 +131,29 @@ export default function StudentTestResult() {
               });
               
               if (data?.result && data?.studentTest) {
-                // Check if score is visible
-                if (data.result.scoreVisible === false) {
-                  // Score not released yet
+                // Check if score is visible - use scoreVisible flag from API
+                const isScoreVisible = data.result.scoreVisible !== false;
+                
+                if (!isScoreVisible) {
+                  // Score not released yet - set all score fields to null
                   setResult({
-                    score: 0,
-                    totalPoints: 0,
-                    percentage: '0',
+                    score: null,
+                    totalPoints: null,
+                    percentage: null,
                     isPassed: null,
                     timeSpent: data.result.timeSpent || 0,
-                  } as any);
+                    scoreVisible: false,
+                    message: data.result.message || 'Your score will be available after your teacher reviews and releases it.',
+                  });
                   setStudentTest(data.studentTest);
-                } else if (data.result.score !== undefined && data.result.totalPoints !== undefined && data.result.percentage !== undefined) {
-                  // Score is visible
-                  setResult(data.result);
+                } else {
+                  // Score is visible - use the actual result data
+                  setResult({
+                    ...data.result,
+                    scoreVisible: true,
+                  });
                   setStudentTest(data.studentTest);
                   console.log('Successfully set result and studentTest');
-                } else {
-                  console.error('Result missing required fields:', data.result);
                 }
               } else {
                 console.error('Invalid response structure. Expected result and studentTest.');
@@ -274,7 +279,7 @@ export default function StudentTestResult() {
             {/* Score Display */}
             <div className="text-center mb-8">
               <div className="inline-block">
-                {result.percentage !== null && result.score !== null && result.totalPoints !== null ? (
+                {result.scoreVisible !== false && result.percentage !== null && result.score !== null && result.totalPoints !== null ? (
                   <>
                     <div
                       className={`text-6xl font-bold mb-2 ${
@@ -292,15 +297,21 @@ export default function StudentTestResult() {
                     </div>
                   </>
                 ) : (
-                  <div className="text-xl font-semibold text-gray-600">
-                    Score not available yet
+                  <div className="text-center">
+                    <div className="text-6xl mb-4">📊</div>
+                    <div className="text-xl font-semibold text-gray-700 mb-2">
+                      Score Not Available Yet
+                    </div>
+                    <div className="text-sm text-gray-600 max-w-md mx-auto">
+                      {result.message || 'Your score will be available after your teacher reviews and releases it.'}
+                    </div>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Status Badge */}
-            {result.isPassed !== null && result.score !== null && (
+            {/* Status Badge - Only show if score is visible */}
+            {result.scoreVisible !== false && result.isPassed !== null && result.score !== null && (
               <div className="text-center mb-8">
                 <span
                   className={`inline-block px-6 py-3 rounded-full text-lg font-semibold ${
@@ -314,8 +325,8 @@ export default function StudentTestResult() {
               </div>
             )}
 
-            {/* Passing Score Info */}
-            {studentTest.test.passingScore && result.score !== null && result.totalPoints !== null && (
+            {/* Passing Score Info - Only show if score is visible */}
+            {result.scoreVisible !== false && studentTest.test.passingScore && result.score !== null && result.totalPoints !== null && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                 <p className="text-sm text-blue-800">
                   <span className="font-semibold">Passing Score:</span> {studentTest.test.passingScore}%
@@ -340,7 +351,7 @@ export default function StudentTestResult() {
               </div>
               <div className="bg-gray-50 rounded-lg p-4 text-center">
                 <div className="text-2xl font-bold text-gray-900">
-                  {result.totalPoints.toFixed(0)}
+                  {result.totalPoints !== null ? result.totalPoints.toFixed(0) : 'N/A'}
                 </div>
                 <div className="text-sm text-gray-600 mt-1">Total Points</div>
               </div>

@@ -340,7 +340,7 @@ export default function Profile() {
               </code>
             </div>
             <p className="text-sm text-gray-600">
-              Share this URL with your students to access your test portal.
+              Share this URL with your students and teachers to access the school login page.
             </p>
             </div>
           ) : account?.role === 'TEACHER' ? (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { gradingSchemeAPI, subjectAPI, testGroupAPI, sessionAPI, classroomAPI } from '../../services/api';
+import { gradingSchemeAPI, subjectAPI, testGroupAPI, sessionAPI, teacherAPI } from '../../services/api';
+import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 
 interface GradingScheme {
@@ -31,6 +32,7 @@ interface SessionClass {
 }
 
 export default function GradingSchemes() {
+  const { account } = useAuthStore();
   const [gradingSchemes, setGradingSchemes] = useState<GradingScheme[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [testGroups, setTestGroups] = useState<any[]>([]);
@@ -43,6 +45,12 @@ export default function GradingSchemes() {
     sessionClassId: '',
     weights: [] as Array<{ testGroupId: string; weight: number }>,
   });
+  const [bulkFormData, setBulkFormData] = useState({
+    subjectIds: [] as string[],
+    sessionClassIds: [] as string[],
+    weights: [] as Array<{ testGroupId: string; weight: number }>,
+  });
+  const [isBulkMode, setIsBulkMode] = useState(false);
   const [totalWeight, setTotalWeight] = useState(0);
 
   useEffect(() => {
@@ -51,13 +59,14 @@ export default function GradingSchemes() {
 
   useEffect(() => {
     // Calculate total weight whenever weights change
-    const total = formData.weights.reduce((sum, w) => sum + (w.weight || 0), 0);
+    const weights = isBulkMode ? bulkFormData.weights : formData.weights;
+    const total = weights.reduce((sum, w) => sum + (w.weight || 0), 0);
     setTotalWeight(total);
-  }, [formData.weights]);
+  }, [formData.weights, bulkFormData.weights, isBulkMode]);
 
   useEffect(() => {
-    // Initialize weights when subject is selected and test groups are loaded
-    if (formData.subjectId && testGroups.length > 0 && !editingId) {
+    // Initialize weights when subject is selected and test groups are loaded (single mode)
+    if (!isBulkMode && formData.subjectId && testGroups.length > 0 && !editingId) {
       const activeTestGroups = testGroups.filter(tg => tg.isActive);
       const existingWeightIds = new Set(formData.weights.map(w => w.testGroupId));
       const missingTestGroups = activeTestGroups.filter(tg => !existingWeightIds.has(tg.id));
@@ -72,7 +81,24 @@ export default function GradingSchemes() {
         }));
       }
     }
-  }, [formData.subjectId, testGroups, editingId]);
+    
+    // Initialize weights for bulk mode when test groups are loaded
+    if (isBulkMode && testGroups.length > 0 && !editingId) {
+      const activeTestGroups = testGroups.filter(tg => tg.isActive);
+      const existingWeightIds = new Set(bulkFormData.weights.map(w => w.testGroupId));
+      const missingTestGroups = activeTestGroups.filter(tg => !existingWeightIds.has(tg.id));
+      
+      if (missingTestGroups.length > 0) {
+        setBulkFormData(prev => ({
+          ...prev,
+          weights: [
+            ...prev.weights,
+            ...missingTestGroups.map(tg => ({ testGroupId: tg.id, weight: 0 }))
+          ],
+        }));
+      }
+    }
+  }, [formData.subjectId, testGroups, editingId, isBulkMode]);
 
   const loadData = async () => {
     try {
@@ -119,21 +145,56 @@ export default function GradingSchemes() {
 
   const loadSessionClasses = async () => {
     try {
-      // Load sessions with their class assignments
-      const sessionsResponse = await sessionAPI.getAll();
-      const sessions = sessionsResponse.data || [];
+      let sessions: any[] = [];
+      let assignedClassroomIds: string[] = [];
+
+      // If teacher, get their assignments and filter sessions
+      if (account?.role === 'TEACHER') {
+        const teacherResponse = await teacherAPI.dashboard();
+        const teacherData = teacherResponse.data;
+        
+        // Get assigned classroom IDs
+        if (teacherData?.assignments && Array.isArray(teacherData.assignments)) {
+          assignedClassroomIds = teacherData.assignments
+            .map((a: any) => a.classroom?.id || a.classroomId)
+            .filter((id: string) => id);
+        }
+        
+        // Get sessions from teacher dashboard (already filtered)
+        if (teacherData?.sessions && Array.isArray(teacherData.sessions)) {
+          sessions = teacherData.sessions;
+        }
+      } else {
+        // For non-teachers, load all sessions
+        const sessionsResponse = await sessionAPI.getAll();
+        sessions = sessionsResponse.data || [];
+      }
       
       // Flatten session-class combinations
       const sessionClassList: SessionClass[] = [];
       sessions.forEach((session: any) => {
         if (session.classAssignments && Array.isArray(session.classAssignments)) {
           session.classAssignments.forEach((ca: any) => {
+            const classroomId = ca.classroomId || ca.classroom?.id;
+            
+            // Skip if no classroom ID
+            if (!classroomId) {
+              return;
+            }
+            
+            // If teacher, only include session classes for assigned classrooms
+            if (account?.role === 'TEACHER') {
+              if (!assignedClassroomIds.includes(classroomId)) {
+                return; // Skip this session class
+              }
+            }
+            
             sessionClassList.push({
               id: ca.id,
               sessionId: session.id,
-              classroomId: ca.classroomId,
+              classroomId: classroomId,
               session: { id: session.id, name: session.name },
-              classroom: ca.classroom || { id: ca.classroomId, name: ca.classroom?.name || 'Unknown' },
+              classroom: ca.classroom || { id: classroomId, name: ca.classroom?.name || 'Unknown' },
             });
           });
         }
@@ -141,7 +202,7 @@ export default function GradingSchemes() {
       
       setSessionClasses(sessionClassList);
     } catch (error: any) {
-      console.error('Failed to load session classes');
+      console.error('Failed to load session classes:', error);
       toast.error('Failed to load session-class combinations');
     }
   };
@@ -200,52 +261,100 @@ export default function GradingSchemes() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.subjectId) {
-      toast.error('Please select a subject');
-      return;
-    }
-
-    if (!formData.sessionClassId) {
-      toast.error('Please select a class-session combination');
-      return;
-    }
-
-    // Filter out test groups with 0 weight
-    const nonZeroWeights = formData.weights.filter(w => w.weight > 0);
-
-    if (nonZeroWeights.length === 0) {
-      toast.error('At least one test group must have a weight greater than 0');
-      return;
-    }
-
-    // Validate total weight is 100%
-    const total = nonZeroWeights.reduce((sum, w) => sum + w.weight, 0);
-    if (Math.abs(total - 100) > 0.01) {
-      toast.error(`Total weight must equal 100%. Current total: ${total.toFixed(2)}%`);
-      return;
-    }
-
-    try {
-      if (editingId) {
-        await gradingSchemeAPI.update(editingId, {
-          weights: nonZeroWeights,
-        });
-        toast.success('Grading scheme updated successfully');
-      } else {
-        await gradingSchemeAPI.create({
-          subjectId: formData.subjectId,
-          sessionClassId: formData.sessionClassId,
-          weights: nonZeroWeights,
-        });
-        toast.success('Grading scheme created successfully');
+    if (isBulkMode) {
+      // Bulk mode validation
+      if (bulkFormData.subjectIds.length === 0) {
+        toast.error('Please select at least one subject');
+        return;
       }
-      
-      setShowForm(false);
-      setEditingId(null);
-      setFormData({ subjectId: '', sessionClassId: '', weights: [] });
-      loadGradingSchemes();
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to save grading scheme');
+
+      if (bulkFormData.sessionClassIds.length === 0) {
+        toast.error('Please select at least one class-session combination');
+        return;
+      }
+
+      // Filter out test groups with 0 weight
+      const nonZeroWeights = bulkFormData.weights.filter(w => w.weight > 0);
+
+      if (nonZeroWeights.length === 0) {
+        toast.error('At least one test group must have a weight greater than 0');
+        return;
+      }
+
+      // Validate total weight is 100%
+      const total = nonZeroWeights.reduce((sum, w) => sum + w.weight, 0);
+      if (Math.abs(total - 100) > 0.01) {
+        toast.error(`Total weight must equal 100%. Current total: ${total.toFixed(2)}%`);
+        return;
+      }
+
+      try {
+        const response = await gradingSchemeAPI.bulkCreate({
+          subjectIds: bulkFormData.subjectIds,
+          sessionClassIds: bulkFormData.sessionClassIds,
+          weights: nonZeroWeights,
+        });
+        
+        const { created, skipped } = response.data;
+        toast.success(
+          `Created ${created.length} grading scheme(s)${skipped > 0 ? `, ${skipped} already existed` : ''}`
+        );
+        
+        setShowForm(false);
+        setBulkFormData({ subjectIds: [], sessionClassIds: [], weights: [] });
+        loadGradingSchemes();
+      } catch (error: any) {
+        toast.error(error?.response?.data?.error || 'Failed to create grading schemes');
+      }
+    } else {
+      // Single mode validation
+      if (!formData.subjectId) {
+        toast.error('Please select a subject');
+        return;
+      }
+
+      if (!formData.sessionClassId) {
+        toast.error('Please select a class-session combination');
+        return;
+      }
+
+      // Filter out test groups with 0 weight
+      const nonZeroWeights = formData.weights.filter(w => w.weight > 0);
+
+      if (nonZeroWeights.length === 0) {
+        toast.error('At least one test group must have a weight greater than 0');
+        return;
+      }
+
+      // Validate total weight is 100%
+      const total = nonZeroWeights.reduce((sum, w) => sum + w.weight, 0);
+      if (Math.abs(total - 100) > 0.01) {
+        toast.error(`Total weight must equal 100%. Current total: ${total.toFixed(2)}%`);
+        return;
+      }
+
+      try {
+        if (editingId) {
+          await gradingSchemeAPI.update(editingId, {
+            weights: nonZeroWeights,
+          });
+          toast.success('Grading scheme updated successfully');
+        } else {
+          await gradingSchemeAPI.create({
+            subjectId: formData.subjectId,
+            sessionClassId: formData.sessionClassId,
+            weights: nonZeroWeights,
+          });
+          toast.success('Grading scheme created successfully');
+        }
+        
+        setShowForm(false);
+        setEditingId(null);
+        setFormData({ subjectId: '', sessionClassId: '', weights: [] });
+        loadGradingSchemes();
+      } catch (error: any) {
+        toast.error(error?.response?.data?.error || 'Failed to save grading scheme');
+      }
     }
   };
 
@@ -288,7 +397,41 @@ export default function GradingSchemes() {
   const handleCancel = () => {
     setShowForm(false);
     setEditingId(null);
+    setIsBulkMode(false);
     setFormData({ subjectId: '', sessionClassId: '', weights: [] });
+    setBulkFormData({ subjectIds: [], sessionClassIds: [], weights: [] });
+  };
+
+  const handleBulkWeightChange = (testGroupId: string, value: string) => {
+    // Allow empty string for typing, but store 0 for empty/invalid values
+    let numValue: number;
+    if (value === '' || value === '.') {
+      numValue = 0;
+    } else {
+      const parsed = parseFloat(value);
+      numValue = isNaN(parsed) ? 0 : parsed;
+    }
+    
+    const clampedValue = Math.max(0, Math.min(100, numValue));
+    
+    // Ensure weight entry exists for this test group
+    const existingIndex = bulkFormData.weights.findIndex(w => w.testGroupId === testGroupId);
+    
+    if (existingIndex >= 0) {
+      // Update existing weight
+      setBulkFormData({
+        ...bulkFormData,
+        weights: bulkFormData.weights.map((w, idx) =>
+          idx === existingIndex ? { ...w, weight: clampedValue } : w
+        ),
+      });
+    } else {
+      // Add new weight entry
+      setBulkFormData({
+        ...bulkFormData,
+        weights: [...bulkFormData.weights, { testGroupId, weight: clampedValue }],
+      });
+    }
   };
 
   const getSessionClassName = (sessionClassId: string) => {
@@ -326,64 +469,232 @@ export default function GradingSchemes() {
       {/* Create/Edit Form */}
       {showForm && (
         <div className="card">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
-            {editingId ? 'Edit Grading Scheme' : 'Create Grading Scheme'}
-          </h2>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Subject <span className="text-red-500">*</span>
-                </label>
-                <select
-                  className="input-field"
-                  value={formData.subjectId}
-                  onChange={(e) => {
-                    setFormData({ 
-                      ...formData, 
-                      subjectId: e.target.value, 
-                      sessionClassId: '', 
-                      weights: [] 
-                    });
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">
+              {editingId ? 'Edit Grading Scheme' : 'Create Grading Scheme'}
+            </h2>
+            {!editingId && (
+              <div className="flex items-center space-x-4">
+                <span className="text-sm text-gray-600">Mode:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsBulkMode(false);
+                    setFormData({ subjectId: '', sessionClassId: '', weights: [] });
+                    setBulkFormData({ subjectIds: [], sessionClassIds: [], weights: [] });
                   }}
-                  required
-                  disabled={!!editingId}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    !isBulkMode
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
                 >
-                  <option value="">Select Subject</option>
-                  {subjects.filter(s => s.isActive).map((subject) => (
-                    <option key={subject.id} value={subject.id}>
-                      {subject.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Class-Session <span className="text-red-500">*</span>
-                </label>
-                <select
-                  className="input-field"
-                  value={formData.sessionClassId}
-                  onChange={(e) => setFormData({ ...formData, sessionClassId: e.target.value })}
-                  required
-                  disabled={!!editingId}
+                  Single
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsBulkMode(true);
+                    setFormData({ subjectId: '', sessionClassId: '', weights: [] });
+                    setBulkFormData({ subjectIds: [], sessionClassIds: [], weights: [] });
+                  }}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isBulkMode
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
                 >
-                  <option value="">Select Class-Session</option>
-                  {sessionClasses.map((sc) => (
-                    <option key={sc.id} value={sc.id}>
-                      {sc.classroom.name} - {sc.session.name}
-                    </option>
-                  ))}
-                </select>
+                  Bulk
+                </button>
               </div>
-            </div>
+            )}
+          </div>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {isBulkMode ? (
+              // Bulk Mode Form
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Subjects <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className="input-field"
+                    value=""
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      if (selectedId && !bulkFormData.subjectIds.includes(selectedId)) {
+                        setBulkFormData({ 
+                          ...bulkFormData, 
+                          subjectIds: [...bulkFormData.subjectIds, selectedId] 
+                        });
+                        e.target.value = ''; // Reset dropdown
+                      }
+                    }}
+                  >
+                    <option value="">Select a subject to add...</option>
+                    {subjects.filter(s => s.isActive && !bulkFormData.subjectIds.includes(s.id)).map((subject) => (
+                      <option key={subject.id} value={subject.id}>
+                        {subject.name}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  {/* Selected Subjects Display */}
+                  {bulkFormData.subjectIds.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs text-gray-600 font-medium">Selected Subjects:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {bulkFormData.subjectIds.map((subjectId) => {
+                          const subject = subjects.find(s => s.id === subjectId);
+                          if (!subject) return null;
+                          return (
+                            <span
+                              key={subjectId}
+                              className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
+                            >
+                              {subject.name}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBulkFormData({
+                                    ...bulkFormData,
+                                    subjectIds: bulkFormData.subjectIds.filter(id => id !== subjectId)
+                                  });
+                                }}
+                                className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-blue-200 focus:outline-none"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
-            {formData.subjectId && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Class-Sessions <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className="input-field"
+                    value=""
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      if (selectedId && !bulkFormData.sessionClassIds.includes(selectedId)) {
+                        setBulkFormData({ 
+                          ...bulkFormData, 
+                          sessionClassIds: [...bulkFormData.sessionClassIds, selectedId] 
+                        });
+                        e.target.value = ''; // Reset dropdown
+                      }
+                    }}
+                  >
+                    <option value="">Select a class-session to add...</option>
+                    {sessionClasses.filter(sc => !bulkFormData.sessionClassIds.includes(sc.id)).map((sc) => (
+                      <option key={sc.id} value={sc.id}>
+                        {sc.classroom.name} - {sc.session.name}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  {/* Selected Class-Sessions Display */}
+                  {bulkFormData.sessionClassIds.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs text-gray-600 font-medium">Selected Class-Sessions:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {bulkFormData.sessionClassIds.map((sessionClassId) => {
+                          const sc = sessionClasses.find(s => s.id === sessionClassId);
+                          if (!sc) return null;
+                          return (
+                            <span
+                              key={sessionClassId}
+                              className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800"
+                            >
+                              {sc.classroom.name} - {sc.session.name}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBulkFormData({
+                                    ...bulkFormData,
+                                    sessionClassIds: bulkFormData.sessionClassIds.filter(id => id !== sessionClassId)
+                                  });
+                                }}
+                                className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-green-200 focus:outline-none"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              // Single Mode Form
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Subject <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className="input-field"
+                    value={formData.subjectId}
+                    onChange={(e) => {
+                      setFormData({ 
+                        ...formData, 
+                        subjectId: e.target.value, 
+                        sessionClassId: '', 
+                        weights: [] 
+                      });
+                    }}
+                    required
+                    disabled={!!editingId}
+                  >
+                    <option value="">Select Subject</option>
+                    {subjects.filter(s => s.isActive).map((subject) => (
+                      <option key={subject.id} value={subject.id}>
+                        {subject.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Class-Session <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className="input-field"
+                    value={formData.sessionClassId}
+                    onChange={(e) => setFormData({ ...formData, sessionClassId: e.target.value })}
+                    required
+                    disabled={!!editingId}
+                  >
+                    <option value="">Select Class-Session</option>
+                    {sessionClasses.map((sc) => (
+                      <option key={sc.id} value={sc.id}>
+                        {sc.classroom.name} - {sc.session.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {((!isBulkMode && formData.subjectId) || (isBulkMode && (bulkFormData.subjectIds.length > 0 || bulkFormData.sessionClassIds.length > 0))) && (
               <div className="border-t border-gray-200 pt-6">
                 <div className="flex justify-between items-center mb-4">
                   <label className="block text-sm font-medium text-gray-700">
                     Test Group Weights <span className="text-red-500">*</span>
+                    {isBulkMode && (
+                      <span className="text-xs text-gray-500 ml-2">
+                        (Applied to all selected combinations)
+                      </span>
+                    )}
                   </label>
                   <div className={`text-sm font-semibold ${Math.abs(totalWeight - 100) < 0.01 ? 'text-green-600' : 'text-red-600'}`}>
                     Total: {totalWeight.toFixed(2)}% {Math.abs(totalWeight - 100) < 0.01 && '✓'}
@@ -391,7 +702,8 @@ export default function GradingSchemes() {
                 </div>
                 <div className="space-y-3">
                   {testGroups.filter(tg => tg.isActive).map((tg) => {
-                    const weightEntry = formData.weights.find(w => w.testGroupId === tg.id);
+                    const weights = isBulkMode ? bulkFormData.weights : formData.weights;
+                    const weightEntry = weights.find(w => w.testGroupId === tg.id);
                     const weight = weightEntry?.weight ?? 0;
                     // Show empty string when 0 to allow easy typing, otherwise show the value
                     const displayValue = weight === 0 ? '' : (weight % 1 === 0 ? weight.toString() : weight.toFixed(2));
@@ -410,17 +722,28 @@ export default function GradingSchemes() {
                             value={displayValue}
                             onChange={(e) => {
                               const inputValue = e.target.value;
-                              // Allow typing (including empty string and partial numbers like "2" or "2.")
-                              handleWeightChange(tg.id, inputValue);
+                              if (isBulkMode) {
+                                handleBulkWeightChange(tg.id, inputValue);
+                              } else {
+                                handleWeightChange(tg.id, inputValue);
+                              }
                             }}
                             onBlur={(e) => {
                               // On blur, ensure we have a valid number (default to 0 if empty)
                               const value = e.target.value.trim();
                               if (value === '' || value === '.' || isNaN(parseFloat(value))) {
-                                handleWeightChange(tg.id, '0');
+                                if (isBulkMode) {
+                                  handleBulkWeightChange(tg.id, '0');
+                                } else {
+                                  handleWeightChange(tg.id, '0');
+                                }
                               } else {
                                 // Re-validate and clamp the value
-                                handleWeightChange(tg.id, value);
+                                if (isBulkMode) {
+                                  handleBulkWeightChange(tg.id, value);
+                                } else {
+                                  handleWeightChange(tg.id, value);
+                                }
                               }
                             }}
                             placeholder="0"
@@ -434,6 +757,12 @@ export default function GradingSchemes() {
                 {Math.abs(totalWeight - 100) > 0.01 && (
                   <p className="mt-3 text-sm text-red-600">
                     Total weight must equal 100%. Current: {totalWeight.toFixed(2)}%
+                  </p>
+                )}
+                {isBulkMode && bulkFormData.subjectIds.length > 0 && bulkFormData.sessionClassIds.length > 0 && (
+                  <p className="mt-3 text-sm text-blue-600">
+                    This will create {bulkFormData.subjectIds.length * bulkFormData.sessionClassIds.length} grading scheme(s) 
+                    for all combinations of selected subjects and class-sessions.
                   </p>
                 )}
               </div>

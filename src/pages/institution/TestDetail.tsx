@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { testAPI, questionAPI, sessionAPI, classroomAPI, teacherAPI, customFieldAPI } from '../../services/api';
+import { testAPI, questionAPI, sessionAPI, classroomAPI, teacherAPI, customFieldAPI, gradingAPI } from '../../services/api';
 import { Test, Question, Session, Classroom, Institution, TestCustomField } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
@@ -17,6 +17,7 @@ export default function TestDetail() {
   const [customFields, setCustomFields] = useState<TestCustomField[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [hasPublishedScores, setHasPublishedScores] = useState(false);
   const [showQuestionForm, setShowQuestionForm] = useState(false);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -93,6 +94,14 @@ export default function TestDetail() {
       loadData();
     }
   }, [id, account?.role]);
+
+  // Check scores published status after test loads
+  useEffect(() => {
+    if (test && id && (test.requiresManualGrading || account?.role === 'TEACHER')) {
+      checkScoresPublished();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [test, id, account?.role]);
 
   const loadTest = async () => {
     try {
@@ -280,6 +289,46 @@ export default function TestDetail() {
       loadTest();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to archive test');
+    }
+  };
+
+  const checkScoresPublished = async () => {
+    try {
+      const response = await gradingAPI.getAllStudentTests(id!);
+      const studentTests = response.data.studentTests || [];
+      // Check if any graded student test has published scores
+      const hasPublished = studentTests.some(
+        (st: any) => st.status === 'graded' && st.scoreVisibleToStudent === true
+      );
+      setHasPublishedScores(hasPublished);
+    } catch (error: any) {
+      console.error('Failed to check scores published status:', error);
+    }
+  };
+
+  const handlePublishAllScores = async () => {
+    if (!window.confirm('Publish all graded scores for this test? All students with graded tests will be able to see their scores.')) {
+      return;
+    }
+    try {
+      await gradingAPI.bulkReleaseScores(id!);
+      toast.success('All scores published successfully');
+      await checkScoresPublished();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to publish scores');
+    }
+  };
+
+  const handleUnpublishAllScores = async () => {
+    if (!window.confirm('Unpublish all scores for this test? Students will no longer be able to see their scores.')) {
+      return;
+    }
+    try {
+      await gradingAPI.bulkHideScores(id!);
+      toast.success('All scores unpublished successfully');
+      await checkScoresPublished();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to unpublish scores');
     }
   };
 
@@ -471,12 +520,29 @@ export default function TestDetail() {
         </div>
         <div className="flex space-x-2 flex-wrap gap-2">
           {(test && test.requiresManualGrading) || (account && account.role === 'TEACHER' && test) ? (
-            <Link
-              to={`/tests/${id}/grade`}
-              className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg"
-            >
-              Grade Tests
-            </Link>
+            <>
+              <Link
+                to={`/tests/${id}/grade`}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg"
+              >
+                Grade Tests
+              </Link>
+              {hasPublishedScores ? (
+                <button
+                  onClick={handleUnpublishAllScores}
+                  className="bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-lg"
+                >
+                  Unpublish All Scores
+                </button>
+              ) : (
+                <button
+                  onClick={handlePublishAllScores}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg"
+                >
+                  Publish All Scores
+                </button>
+              )}
+            </>
           ) : null}
           {test && !test.isPublished && !test.isArchived && (
             <button
@@ -758,18 +824,34 @@ export default function TestDetail() {
                 </label>
               </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <label className="flex items-start cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={testForm.scoreVisibility}
-                    onChange={(e) => setTestForm({ ...testForm, scoreVisibility: e.target.checked })}
-                    className="mr-3 w-5 h-5 text-primary focus:ring-primary rounded mt-1"
-                  />
-                  <div>
-                    <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 block">Show scores to students after completion</span>
-                    <span className="text-xs text-gray-500">Students can see their scores immediately after submitting</span>
-                  </div>
-                </label>
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-2">Score Visibility</label>
+                <span className="text-xs text-gray-500 block mb-2">Control when students can see their scores</span>
+                <div className="flex space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setTestForm({ ...testForm, scoreVisibility: true })}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      testForm.scoreVisibility
+                        ? 'bg-green-600 text-white hover:bg-green-700'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    Show Scores
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTestForm({ ...testForm, scoreVisibility: false })}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      !testForm.scoreVisibility
+                        ? 'bg-red-600 text-white hover:bg-red-700'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    Hide Scores
+                  </button>
+                </div>
+              </div>
               <label className="flex items-start cursor-pointer group">
                   <input
                     type="checkbox"

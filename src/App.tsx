@@ -31,6 +31,9 @@ import AuditLogs from './pages/institution/AuditLogs';
 import TestGroups from './pages/institution/TestGroups';
 import Subjects from './pages/institution/Subjects';
 import GradingSchemes from './pages/institution/GradingSchemes';
+import GradingModeSelection from './pages/institution/GradingModeSelection';
+import GradeByStudent from './pages/institution/GradeByStudent';
+import GradeByQuestion from './pages/institution/GradeByQuestion';
 
 // Student pages
 import StudentTestPage from './pages/student/StudentTestPage';
@@ -40,6 +43,7 @@ import StudentTestReview from './pages/student/StudentTestReview';
 import StudentRegister from './pages/student/StudentRegister';
 import StudentLogin from './pages/student/StudentLogin';
 import StudentDashboard from './pages/student/StudentDashboard';
+import SchoolLogin from './pages/student/SchoolLogin';
 
 // Parent pages
 import ParentLogin from './pages/parent/ParentLogin';
@@ -167,8 +171,11 @@ function App() {
           <Route path="/:slug/test/:testId" element={<StudentTestTaking />} />
           <Route path="/:slug/test/:testId/result" element={<StudentTestResult />} />
           
-          {/* Institution slug route - CATCH-ALL (must be last among slug routes) */}
-          <Route path="/:slug" element={<StudentTestPage />} />
+          {/* School login page - shows login for teachers and students */}
+          <Route path="/:slug" element={<SchoolLogin />} />
+          
+          {/* Legacy test portal route - redirects to login */}
+          <Route path="/:slug/portal" element={<StudentTestPage />} />
 
           {/* Institution protected routes */}
           <Route
@@ -207,6 +214,46 @@ function App() {
               <PrivateRoute>
                 <InstitutionLayout>
                   <ManualGrading />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/tests/:testId/grade/select-mode"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <GradingModeSelection />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/tests/:testId/grade/by-student"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <GradeByStudent />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/tests/:testId/grade/by-question"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <GradeByQuestion />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/tests/:testId/grade/by-question/:questionId"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <GradeByQuestion />
                 </InstitutionLayout>
               </PrivateRoute>
             }

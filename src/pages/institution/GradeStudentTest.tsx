@@ -127,16 +127,16 @@ export default function GradeStudentTest() {
   };
 
   const handleReleaseScore = async () => {
-    if (!window.confirm('Release this score to the student? They will be able to see their results.')) {
+    if (!window.confirm('Publish this score? The student will be able to see their results.')) {
       return;
     }
     setReleasing(true);
     try {
       await gradingAPI.releaseScore(studentTestId!);
-      toast.success('Score released to student');
+      toast.success('Score published successfully. Student can now see their results.');
       loadStudentTest();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to release score');
+      toast.error(error.response?.data?.error || 'Failed to publish score');
     } finally {
       setReleasing(false);
     }
@@ -182,14 +182,37 @@ export default function GradeStudentTest() {
 
   const manualGradingAnswers = studentTest.answers.filter(a => a.question.requiresManualGrading);
 
+  // Calculate old and new scores
+  const calculateScores = () => {
+    // Old score (from database)
+    const oldScore = studentTest.answers.reduce((sum, a) => sum + (a.pointsEarned || 0), 0);
+    const maxPoints = studentTest.answers.reduce((sum, a) => sum + a.question.points, 0);
+    const oldPercentage = maxPoints > 0 ? (oldScore / maxPoints) * 100 : 0;
+
+    // New score (from current grading data)
+    const newScore = studentTest.answers.reduce((sum, a) => {
+      if (a.question.requiresManualGrading) {
+        const grading = gradingData[a.id];
+        return sum + (grading?.pointsEarned ?? a.pointsEarned ?? 0);
+      }
+      return sum + (a.pointsEarned || 0);
+    }, 0);
+    const newPercentage = maxPoints > 0 ? (newScore / maxPoints) * 100 : 0;
+
+    return { oldScore, oldPercentage, newScore, newPercentage, maxPoints };
+  };
+
+  const scores = calculateScores();
+  const hasChanged = scores.newScore !== scores.oldScore;
+
   return (
     <div className="space-y-8">
       {/* Header */}
       <div className="bg-gradient-to-r from-primary to-primary-600 rounded-2xl shadow-xl p-8 text-white">
         <div className="flex justify-between items-start">
           <div>
-            <Link to={`/tests/${testId}/grade`} className="text-primary-100 hover:text-white mb-2 inline-block">
-              ← Back to Grading List
+            <Link to={`/tests/${testId}/grade/by-student`} className="text-primary-100 hover:text-white mb-2 inline-block">
+              ← Back to Students
             </Link>
             <h1 className="text-4xl font-bold mb-2">Grade Student Test</h1>
             <p className="text-primary-100 text-lg">
@@ -218,6 +241,36 @@ export default function GradeStudentTest() {
                 Next →
               </button>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Score Comparison */}
+      <div className="card">
+        <h2 className="text-xl font-semibold mb-4">Score Summary</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className={`p-4 rounded-lg border-2 ${hasChanged ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200 bg-gray-50'}`}>
+            <div className="text-sm font-medium text-gray-600 mb-1">Old Score</div>
+            <div className="text-2xl font-bold text-gray-700">
+              {scores.oldScore.toFixed(1)} / {scores.maxPoints.toFixed(1)}
+            </div>
+            <div className="text-sm text-gray-600 mt-1">{scores.oldPercentage.toFixed(1)}%</div>
+          </div>
+          <div className={`p-4 rounded-lg border-2 ${hasChanged ? 'border-primary bg-primary-50' : 'border-gray-200 bg-gray-50'}`}>
+            <div className="text-sm font-medium text-gray-600 mb-1">
+              New Score {hasChanged && <span className="text-primary">(Changed)</span>}
+            </div>
+            <div className={`text-2xl font-bold ${hasChanged ? 'text-primary' : 'text-gray-700'}`}>
+              {scores.newScore.toFixed(1)} / {scores.maxPoints.toFixed(1)}
+            </div>
+            <div className={`text-sm mt-1 ${hasChanged ? 'text-primary font-semibold' : 'text-gray-600'}`}>
+              {scores.newPercentage.toFixed(1)}%
+              {hasChanged && (
+                <span className="ml-2">
+                  ({scores.newScore > scores.oldScore ? '+' : ''}{(scores.newScore - scores.oldScore).toFixed(1)} pts)
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -326,13 +379,14 @@ export default function GradeStudentTest() {
                 onClick={handleReleaseScore}
                 disabled={releasing}
                 className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg"
+                title="Publish this score so the student can see it"
               >
-                {releasing ? 'Releasing...' : 'Release Score'}
+                {releasing ? 'Publishing...' : '📢 Publish Score'}
               </button>
             )}
             {studentTest && studentTest.scoreVisibleToStudent && (
               <span className="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-green-100 text-green-800">
-                ✓ Score Released
+                ✓ Score Published
               </span>
             )}
             <button

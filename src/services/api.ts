@@ -86,7 +86,7 @@ export const authAPI = {
     uniqueSlug?: string;
     parentId?: string;
   }) => api.post('/auth/register', data),
-  login: (data: { email: string; password: string; role?: string }) =>
+  login: (data: { email: string; password: string; role?: string; schoolId?: string }) =>
     api.post('/auth/login', data),
   studentLogin: (data: { username: string; password: string }) =>
     api.post('/auth/student/login', data),
@@ -135,11 +135,15 @@ export const customFieldAPI = {
 // Grading
 export const gradingAPI = {
   getTestsNeedingGrading: (testId: string) => api.get(`/grading/test/${testId}/needing-grading`),
+  getAllStudentTests: (testId: string) => api.get(`/grading/test/${testId}/all-students`),
+  getQuestionsNeedingGrading: (testId: string) => api.get(`/grading/test/${testId}/questions`),
+  getQuestionAnswersForGrading: (testId: string, questionId: string) => api.get(`/grading/test/${testId}/question/${questionId}/answers`),
   getStudentTestForGrading: (studentTestId: string) => api.get(`/grading/student-test/${studentTestId}`),
   gradeAnswer: (answerId: string, data: any) => api.post(`/grading/answer/${answerId}`, data),
   gradeStudentTest: (studentTestId: string, data: any) => api.post(`/grading/student-test/${studentTestId}`, data),
   releaseScore: (studentTestId: string) => api.post(`/grading/student-test/${studentTestId}/release`),
   bulkReleaseScores: (testId: string, data?: { studentTestIds?: string[] }) => api.post(`/grading/test/${testId}/release-scores`, data || {}),
+  bulkHideScores: (testId: string, data?: { studentTestIds?: string[] }) => api.post(`/grading/test/${testId}/hide-scores`, data || {}),
   hideScore: (studentTestId: string) => api.post(`/grading/student-test/${studentTestId}/hide`),
 };
 
@@ -396,6 +400,8 @@ export const gradingSchemeAPI = {
   getOne: (id: string) => api.get(`/grading-schemes/${id}`),
   create: (data: { subjectId: string; sessionClassId: string; weights: Array<{ testGroupId: string; weight: number }> }) =>
     api.post('/grading-schemes', data),
+  bulkCreate: (data: { subjectIds: string[]; sessionClassIds: string[]; weights: Array<{ testGroupId: string; weight: number }> }) =>
+    api.post('/grading-schemes/bulk', data),
   update: (id: string, data: { weights: Array<{ testGroupId: string; weight: number }> }) =>
     api.put(`/grading-schemes/${id}`, data),
   delete: (id: string) => api.delete(`/grading-schemes/${id}`),
