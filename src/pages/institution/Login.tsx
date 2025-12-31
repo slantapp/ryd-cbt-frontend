@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { authAPI } from '../../services/api';
@@ -11,8 +11,27 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
+
+  // Check for auto-filled password
+  useEffect(() => {
+    const checkAutoFill = () => {
+      if (passwordInputRef.current) {
+        const input = passwordInputRef.current;
+        // Check if input has a value (including auto-filled)
+        if (input.value && !password) {
+          setPassword(input.value);
+        }
+      }
+    };
+
+    // Check immediately and after a short delay (for auto-fill)
+    checkAutoFill();
+    const timer = setTimeout(checkAutoFill, 100);
+    return () => clearTimeout(timer);
+  }, [password]);
 
   const handleRoleSelect = (selectedRole: 'SUPER_ADMIN' | 'MINISTRY' | 'SCHOOL' | 'TEACHER' | 'STUDENT') => {
     if (selectedRole === 'STUDENT') {
@@ -137,40 +156,54 @@ export default function Login() {
           )}
           
           {/* Role Selection Buttons */}
-          <div className="space-y-3">
+          <div className="space-y-4">
             {!role && (
               <>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  I am a:
+                <label className="block text-sm font-semibold text-gray-700 mb-4 text-center">
+                  Select your role to continue
                 </label>
-                <div className="grid grid-cols-1 gap-3">
+                <div className="space-y-2">
                   <button
                     type="button"
-                    onClick={() => handleRoleSelect('MINISTRY')}
-                    className="px-4 py-3 text-left rounded-lg border-2 border-gray-200 hover:border-primary hover:bg-gray-50 text-gray-700 transition-all"
+                    onClick={() => handleRoleSelect('STUDENT')}
+                    className="w-full flex items-center px-4 py-3 rounded-lg border-2 border-gray-200 hover:border-primary hover:bg-primary-50 text-gray-700 transition-all hover:shadow-md"
                   >
-                    I am a Ministry/Organization
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleRoleSelect('SCHOOL')}
-                    className="px-4 py-3 text-left rounded-lg border-2 border-gray-200 hover:border-primary hover:bg-gray-50 text-gray-700 transition-all"
-                  >
-                    I am a School Administrator
+                    <svg className="w-5 h-5 mr-3 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14v7m0 0v-7m0 7H9m3 0h3" />
+                    </svg>
+                    <span className="font-medium">I am a Student</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => handleRoleSelect('TEACHER')}
-                    className="px-4 py-3 text-left rounded-lg border-2 border-gray-200 hover:border-primary hover:bg-gray-50 text-gray-700 transition-all"
+                    className="w-full flex items-center px-4 py-3 rounded-lg border-2 border-gray-200 hover:border-primary hover:bg-primary-50 text-gray-700 transition-all hover:shadow-md"
                   >
-                    I am a Teacher
+                    <svg className="w-5 h-5 mr-3 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    <span className="font-medium">I am a Teacher</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleRoleSelect('STUDENT')}
-                    className="px-4 py-3 text-left rounded-lg border-2 border-gray-200 hover:border-primary hover:bg-gray-50 text-gray-700 transition-all"
+                    onClick={() => handleRoleSelect('SCHOOL')}
+                    className="w-full flex items-center px-4 py-3 rounded-lg border-2 border-gray-200 hover:border-primary hover:bg-primary-50 text-gray-700 transition-all hover:shadow-md"
                   >
-                    I am a Student
+                    <svg className="w-5 h-5 mr-3 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    <span className="font-medium">I am a School Administrator</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRoleSelect('MINISTRY')}
+                    className="w-full flex items-center px-4 py-3 rounded-lg border-2 border-gray-200 hover:border-primary hover:bg-primary-50 text-gray-700 transition-all hover:shadow-md"
+                  >
+                    <svg className="w-5 h-5 mr-3 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    <span className="font-medium">I am a Ministry/Organization</span>
                   </button>
                 </div>
               </>
@@ -198,54 +231,56 @@ export default function Login() {
                 </button>
               </div>
             )}
-          </div>
+            </div>
 
           {/* Login Form - Only show if role is selected */}
           {role && (
             <div className="space-y-4 border-t pt-4">
-              <div>
-                <label htmlFor="email" className="sr-only">
-                  Email address
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  className={`input-field ${error ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
-                  placeholder="Email address"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setError(null);
-                  }}
-                />
-              </div>
-              <div>
-                <label htmlFor="password" className="sr-only">
-                  Password
-                </label>
+            <div>
+              <label htmlFor="email" className="sr-only">
+                Email address
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className={`input-field ${error ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
+                placeholder="Email address"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setError(null);
+                }}
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="sr-only">
+                Password
+              </label>
                 <div className="relative">
-                  <input
-                    id="password"
-                    name="password"
+              <input
+                    ref={passwordInputRef}
+                id="password"
+                name="password"
                     type={showPassword ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    required
+                autoComplete="current-password"
+                required
                     className={`input-field pr-10 ${error ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setError(null);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700 focus:outline-none"
-                  >
+                placeholder="Password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setError(null);
+                }}
+              />
+                  {(password || (passwordInputRef.current && passwordInputRef.current.value)) && (
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700 focus:outline-none"
+                    >
                     {showPassword ? (
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
@@ -256,30 +291,31 @@ export default function Login() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                       </svg>
                     )}
-                  </button>
-                </div>
-              </div>
+                    </button>
+                  )}
+            </div>
+          </div>
 
-              <div className="flex items-center justify-between">
-                <div className="text-sm">
-                  <Link
-                    to="/forgot-password"
-                    className="font-medium text-primary hover:text-primary-600"
-                  >
-                    Forgot your password?
-                  </Link>
-                </div>
-              </div>
+          <div className="flex items-center justify-between">
+            <div className="text-sm">
+              <Link
+                to="/forgot-password"
+                className="font-medium text-primary hover:text-primary-600"
+              >
+                Forgot your password?
+              </Link>
+            </div>
+          </div>
 
-              <div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="btn-primary w-full"
-                >
-                  {loading ? 'Signing in...' : 'Sign in'}
-                </button>
-              </div>
+          <div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary w-full"
+            >
+              {loading ? 'Signing in...' : 'Sign in'}
+            </button>
+          </div>
             </div>
           )}
         </form>

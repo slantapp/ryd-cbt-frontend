@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { testAPI, sessionAPI, classroomAPI, teacherAPI, customFieldAPI } from '../../services/api';
+import { testAPI, sessionAPI, classroomAPI, teacherAPI, customFieldAPI, testGroupAPI, subjectAPI } from '../../services/api';
 import { Test, Session, Classroom, Institution, TestCustomField } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
@@ -15,14 +15,22 @@ export default function Tests() {
   const [teacherData, setTeacherData] = useState<any>(null);
   const [customFields, setCustomFields] = useState<TestCustomField[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
+  const [testGroups, setTestGroups] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [filters, setFilters] = useState({
+    classroomId: '',
+    testGroupId: '',
+    subjectId: '',
+  });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [tempDueDate, setTempDueDate] = useState('');
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    testGroup: 'Assignment',
+    testGroupId: '',
+    subjectId: '',
     isTimed: false,
     duration: '',
     dueDate: '',
@@ -67,6 +75,8 @@ export default function Tests() {
   useEffect(() => {
     loadTests();
     loadCustomFields();
+    loadTestGroups();
+    loadSubjects();
     if (account && account.role === 'TEACHER') {
       loadTeacherData();
     } else {
@@ -79,6 +89,24 @@ export default function Tests() {
       }
     }
   }, [account?.role, isSuperAdmin]);
+
+  const loadTestGroups = async () => {
+    try {
+      const response = await testGroupAPI.getAll();
+      setTestGroups(response.data);
+    } catch (error: any) {
+      console.error('Failed to load test groups');
+    }
+  };
+
+  const loadSubjects = async () => {
+    try {
+      const response = await subjectAPI.getAll();
+      setSubjects(response.data);
+    } catch (error: any) {
+      console.error('Failed to load subjects');
+    }
+  };
 
   const loadTeacherData = async () => {
     try {
@@ -273,7 +301,8 @@ export default function Tests() {
       setFormData({
         title: '',
         description: '',
-        testGroup: 'Assignment',
+        testGroupId: '',
+        subjectId: '',
         isTimed: false,
         duration: '',
         dueDate: '',
@@ -306,6 +335,23 @@ export default function Tests() {
 
   const activeTests = tests.filter(t => t.isActive).length;
   const totalQuestions = tests.reduce((sum, test) => sum + (test.questions?.length || 0), 0);
+
+  // Filter tests based on selected filters
+  const filteredTests = tests.filter((test) => {
+    if (filters.classroomId && test.classrooms && test.classrooms.length > 0) {
+      const hasClassroom = test.classrooms.some((tc: any) => 
+        (tc.classroom?.id || tc.id) === filters.classroomId
+      );
+      if (!hasClassroom) return false;
+    }
+    if (filters.testGroupId && (test as any).testGroupId !== filters.testGroupId) {
+      return false;
+    }
+    if (filters.subjectId && (test as any).subjectId !== filters.subjectId) {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-8">
@@ -398,16 +444,11 @@ export default function Tests() {
                 <option value="">Select a session</option>
                 {sessions
                   .filter((s) => s.isActive)
-                    .map((session) => {
-                      // For teachers, show which classes are in the session
-                      const sessionClasses = session.classAssignments?.map((ca: any) => ca.classroom?.name).filter(Boolean).join(', ') || '';
-                      return (
+                    .map((session) => (
                     <option key={session.id} value={session.id}>
                       {session.name}
-                          {sessionClasses && ` (${sessionClasses})`}
                     </option>
-                      );
-                    })}
+                    ))}
               </select>
                 {sessions.filter((s) => s.isActive).length === 0 && account && account.role !== 'TEACHER' && (
                 <p className="text-sm text-red-600 mt-2 flex items-center">
@@ -535,18 +576,36 @@ export default function Tests() {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Test Group <span className="text-red-500">*</span>
+                  Test Group
                 </label>
                 <select
                   className="input-field"
-                  value={formData.testGroup}
-                  onChange={(e) => setFormData({ ...formData, testGroup: e.target.value })}
-                  required
+                  value={formData.testGroupId}
+                  onChange={(e) => setFormData({ ...formData, testGroupId: e.target.value })}
                 >
-                  <option value="Assignment">Assignment</option>
-                  <option value="Practice Banks">Practice Banks</option>
-                  <option value="Quiz">Quiz</option>
-                  <option value="Final Assessment">Final Assessment</option>
+                  <option value="">Select Test Group (optional)</option>
+                  {testGroups.filter(tg => tg.isActive).map((tg) => (
+                    <option key={tg.id} value={tg.id}>
+                      {tg.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Subject
+                </label>
+                <select
+                  className="input-field"
+                  value={formData.subjectId}
+                  onChange={(e) => setFormData({ ...formData, subjectId: e.target.value })}
+                >
+                  <option value="">Select Subject (optional)</option>
+                  {subjects.filter(s => s.isActive).map((subject) => (
+                    <option key={subject.id} value={subject.id}>
+                      {subject.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -716,6 +775,64 @@ export default function Tests() {
         </div>
       )}
 
+      {/* Filters */}
+      {tests.length > 0 && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+            {(filters.classroomId || filters.testGroupId || filters.subjectId) && (
+              <button
+                onClick={() => setFilters({ classroomId: '', testGroupId: '', subjectId: '' })}
+                className="text-sm text-primary hover:text-primary-600 font-medium"
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Filter by Class
+              </label>
+              <select
+                className="input-field"
+                value={filters.classroomId}
+                onChange={(e) => setFilters({ ...filters, classroomId: e.target.value })}
+              >
+                <option value="">All Classes</option>
+                {classrooms.map((classroom) => (
+                  <option key={classroom.id} value={classroom.id}>
+                    {classroom.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Filter by Test Group
+              </label>
+              <select
+                className="input-field"
+                value={filters.testGroupId}
+                onChange={(e) => setFilters({ ...filters, testGroupId: e.target.value })}
+              >
+                <option value="">All Test Groups</option>
+                {testGroups.filter(tg => tg.isActive).map((tg) => (
+                  <option key={tg.id} value={tg.id}>
+                    {tg.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {(filters.classroomId || filters.testGroupId || filters.subjectId) && (
+            <div className="mt-4 text-sm text-gray-600">
+              Showing {filteredTests.length} of {tests.length} test(s)
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Tests List */}
       {tests.length === 0 ? (
         <div className="card text-center py-16 border-2 border-dashed border-gray-300">
@@ -726,9 +843,18 @@ export default function Tests() {
             Create Your First Test
           </button>
         </div>
+      ) : filteredTests.length === 0 ? (
+        <div className="card text-center py-16 border-2 border-dashed border-gray-300">
+          <div className="text-6xl mb-4">🔍</div>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">No tests match your filters</h3>
+          <p className="text-gray-500 mb-6">Try adjusting your filter criteria</p>
+          <button onClick={() => setFilters({ classroomId: '', testGroupId: '', subjectId: '' })} className="btn-primary">
+            Clear Filters
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {tests.map((test) => (
+          {filteredTests.map((test) => (
             <Link
               key={test.id}
               to={`/tests/${test.id}`}
@@ -765,7 +891,7 @@ export default function Tests() {
                   <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="font-medium">{test.duration} min</span>
+                  <span className="font-medium">{test.isTimed ? `${test.duration} min` : 'Untimed'}</span>
                 </div>
                 <div className="flex items-center space-x-2 text-sm text-gray-600">
                   <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">

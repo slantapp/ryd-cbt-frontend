@@ -37,6 +37,10 @@ export default function Dashboard() {
     };
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [teacherFilters, setTeacherFilters] = useState({
+    classroomId: '',
+    testGroup: '',
+  });
 
   useEffect(() => {
     if (account) {
@@ -209,21 +213,52 @@ export default function Dashboard() {
               >
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <h3 className="font-semibold text-lg text-gray-900 mb-1">{test.title}</h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-lg text-gray-900">{test.title}</h3>
+                      {test.testGroup && (
+                        <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">
+                          {test.testGroup}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-600 mb-3">{test.description}</p>
                     <div className="flex items-center space-x-4 text-sm text-gray-500">
-                      <span>⏱️ {test.duration} min</span>
+                      <span>⏱️ {test.isTimed ? `${test.duration} min` : 'Untimed'}</span>
                       <span>❓ {test.questions?.length || 0} questions</span>
                       <span>👥 {test._count?.studentTests || 0} attempts</span>
+                      {test.dueDate && (
+                        <span className="text-orange-600">
+                          📅 {new Date(test.dueDate).toLocaleDateString()}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                      test.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    {test.isActive ? 'Active' : 'Inactive'}
-                  </span>
+                  <div className="flex flex-col items-end gap-2 ml-4">
+                    {test.classrooms && test.classrooms.length > 0 && (
+                      <div className="flex flex-wrap gap-1 justify-end max-w-[200px]">
+                        {test.classrooms.slice(0, 2).map((tc: any) => (
+                          <span
+                            key={tc.classroom?.id || tc.id}
+                            className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full whitespace-nowrap"
+                          >
+                            {tc.classroom?.name || tc.name}
+                          </span>
+                        ))}
+                        {test.classrooms.length > 2 && (
+                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                            +{test.classrooms.length - 2}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <span
+                      className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                        test.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      {test.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
                 </div>
               </Link>
             ))}
@@ -469,6 +504,33 @@ export default function Dashboard() {
     const school = teacherStats?.school;
     const stats = teacherStats?.stats ?? { classCount: 0, testCount: 0 };
 
+    // Get unique test groups for filter
+    const uniqueTestGroups = Array.from(new Set(tests.map(t => t.testGroup).filter(Boolean)));
+
+    // Get unique classrooms from assignments
+    const uniqueClassrooms = Array.from(
+      new Map(
+        assignments
+          .map((a: any) => a.classroom)
+          .filter((c: any) => c && c.id)
+          .map((c: any) => [c.id, c])
+      ).values()
+    );
+
+    // Filter tests based on selected filters
+    const filteredTests = tests.filter((test) => {
+      if (teacherFilters.classroomId && test.classrooms && test.classrooms.length > 0) {
+        const hasClassroom = test.classrooms.some((tc: any) => 
+          (tc.classroom?.id || tc.id) === teacherFilters.classroomId
+        );
+        if (!hasClassroom) return false;
+      }
+      if (teacherFilters.testGroup && test.testGroup !== teacherFilters.testGroup) {
+        return false;
+      }
+      return true;
+    });
+
     return (
       <>
         <div className="bg-gradient-to-r from-emerald-600 to-teal-500 rounded-xl shadow-lg p-8 text-white">
@@ -606,8 +668,65 @@ export default function Dashboard() {
                 View All →
               </Link>
             </div>
+
+            {/* Filters */}
+            <div className="mb-4 pb-4 border-b border-gray-200">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-700">Filters</h3>
+                {(teacherFilters.classroomId || teacherFilters.testGroup) && (
+                  <button
+                    onClick={() => setTeacherFilters({ classroomId: '', testGroup: '' })}
+                    className="text-xs text-primary hover:text-primary-600 font-medium"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Filter by Class
+                  </label>
+                  <select
+                    className="input-field text-sm py-2"
+                    value={teacherFilters.classroomId}
+                    onChange={(e) => setTeacherFilters({ ...teacherFilters, classroomId: e.target.value })}
+                  >
+                    <option value="">All Classes</option>
+                    {uniqueClassrooms.map((classroom: any) => (
+                      <option key={classroom.id} value={classroom.id}>
+                        {classroom.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Filter by Test Group
+                  </label>
+                  <select
+                    className="input-field text-sm py-2"
+                    value={teacherFilters.testGroup}
+                    onChange={(e) => setTeacherFilters({ ...teacherFilters, testGroup: e.target.value })}
+                  >
+                    <option value="">All Test Groups</option>
+                    {uniqueTestGroups.map((group) => (
+                      <option key={group} value={group}>
+                        {group}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              {(teacherFilters.classroomId || teacherFilters.testGroup) && (
+                <div className="mt-2 text-xs text-gray-500">
+                  Showing {filteredTests.length} of {tests.length} test(s)
+                </div>
+              )}
+            </div>
+
             <div className="space-y-3">
-              {tests.slice(0, 5).map((test) => (
+              {(filteredTests.length === 0 ? tests : filteredTests).slice(0, 5).map((test) => (
                 <Link
                   key={test.id}
                   to={`/tests/${test.id}`}
@@ -615,41 +734,53 @@ export default function Dashboard() {
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">{test.title}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-gray-900">{test.title}</h3>
+                        {test.testGroup && (
+                          <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">
+                            {test.testGroup}
+                          </span>
+                        )}
+                      </div>
                       {test.description && (
                         <p className="text-sm text-gray-500 mt-1">{test.description}</p>
                       )}
                       <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                        {test.duration && (
-                          <span>⏱️ {test.duration} min</span>
-                        )}
+                        <span>⏱️ {test.isTimed ? `${test.duration} min` : 'Untimed'}</span>
                         {test.questions && (
                           <span>❓ {test.questions.length || 0} questions</span>
                         )}
                         {test.passingScore && (
                           <span>✅ {test.passingScore}% passing</span>
                         )}
+                        {test.dueDate && (
+                          <span className="text-orange-600">
+                            📅 {new Date(test.dueDate).toLocaleDateString()}
+                          </span>
+                        )}
                       </div>
+                    </div>
+                    <div className="ml-4 flex flex-col items-end gap-2">
                       {test.classrooms && test.classrooms.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {test.classrooms.slice(0, 3).map((tc: any) => (
+                        <div className="flex flex-wrap gap-1 justify-end max-w-[200px]">
+                          {test.classrooms.slice(0, 2).map((tc: any) => (
                             <span
-                              key={tc.classroom?.id}
-                              className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+                              key={tc.classroom?.id || tc.id}
+                              className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full whitespace-nowrap"
                             >
-                              {tc.classroom?.name}
+                              {tc.classroom?.name || tc.name}
                             </span>
                           ))}
-                          {test.classrooms.length > 3 && (
-                            <span className="px-2 py-1 text-gray-500 text-xs">
-                              +{test.classrooms.length - 3} more
+                          {test.classrooms.length > 2 && (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                              +{test.classrooms.length - 2}
                             </span>
                           )}
                         </div>
                       )}
-                    </div>
-                    <div className="ml-4 text-primary text-sm font-medium">
-                      View →
+                      <div className="text-primary text-sm font-medium">
+                        View →
+                      </div>
                     </div>
                   </div>
                 </Link>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { studentAPI, sessionAPI, classroomAPI, institutionAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
@@ -156,13 +156,36 @@ export default function Students() {
     }
   };
 
+  // Auto-generate username from firstName and lastName
+  const generateUsername = (firstName: string, lastName: string): string => {
+    if (!firstName || !lastName) return '';
+    
+    // Normalize: lowercase, remove special characters, replace spaces with dots
+    const normalize = (name: string): string => {
+      return name
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '') // Remove special characters
+        .replace(/\s+/g, '.') // Replace spaces with dots
+        .replace(/\.+/g, '.') // Replace multiple dots with single dot
+        .replace(/^\.|\.$/g, ''); // Remove leading/trailing dots
+    };
+    
+    const normalizedFirst = normalize(firstName);
+    const normalizedLast = normalize(lastName);
+    
+    return normalizedFirst && normalizedLast ? `${normalizedFirst}.${normalizedLast}` : '';
+  };
+
+
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const submitData: any = {
         firstName: createFormData.firstName.trim(),
         lastName: createFormData.lastName.trim(),
-        username: createFormData.username.trim(),
+        // Username is optional - backend will auto-generate if not provided
+        ...(createFormData.username.trim() && { username: createFormData.username.trim() }),
       };
       
       if (createFormData.email) submitData.email = createFormData.email.trim();
@@ -950,9 +973,10 @@ export default function Students() {
            currentAssignment.sessionId !== assignForm.sessionId);
 
         return (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
-              <h2 className="text-2xl font-bold mb-4">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full my-auto max-h-[90vh] flex flex-col">
+              <div className="p-6 overflow-y-auto flex-1">
+                <h2 className="text-2xl font-bold mb-4">
                 {isBulkAssignment 
                   ? `Assign ${selectedStudents.length} Student${selectedStudents.length > 1 ? 's' : ''} to Class`
                   : (currentAssignment ? 'Reassign Student to Class' : 'Assign Student to Class')
@@ -1096,8 +1120,8 @@ export default function Students() {
                   </p>
                 </div>
               )}
-
-              <div className="flex space-x-2 mt-6">
+              </div>
+              <div className="p-6 pt-4 border-t border-gray-200 flex space-x-2 bg-white rounded-b-xl">
                 <button 
                   onClick={handleAssignStudent} 
                   disabled={assigning || (!isBulkAssignment && !assignForm.studentId) || !assignForm.classroomId || !assignForm.sessionId}
@@ -1128,53 +1152,55 @@ export default function Students() {
 
       {/* Promote Dialog - Only for Schools */}
       {showPromoteDialog && isSchool && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
-            <h2 className="text-2xl font-bold mb-4">Promote Students</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Promoting {promoteForm.studentIds.length} student(s) to the next class
-            </p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Target Session
-                </label>
-                <select
-                  className="input-field"
-                  value={promoteForm.targetSessionId}
-                  onChange={(e) =>
-                    setPromoteForm({ ...promoteForm, targetSessionId: e.target.value })
-                  }
-                >
-                  <option value="">Choose a session...</option>
-                  {sessions.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Target Class
-                </label>
-                <select
-                  className="input-field"
-                  value={promoteForm.targetClassroomId}
-                  onChange={(e) =>
-                    setPromoteForm({ ...promoteForm, targetClassroomId: e.target.value })
-                  }
-                >
-                  <option value="">Choose a class...</option>
-                  {classrooms.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full my-auto max-h-[90vh] flex flex-col">
+            <div className="p-6 overflow-y-auto flex-1">
+              <h2 className="text-2xl font-bold mb-4">Promote Students</h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Promoting {promoteForm.studentIds.length} student(s) to the next class
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Target Session
+                  </label>
+                  <select
+                    className="input-field"
+                    value={promoteForm.targetSessionId}
+                    onChange={(e) =>
+                      setPromoteForm({ ...promoteForm, targetSessionId: e.target.value })
+                    }
+                  >
+                    <option value="">Choose a session...</option>
+                    {sessions.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Target Class
+                  </label>
+                  <select
+                    className="input-field"
+                    value={promoteForm.targetClassroomId}
+                    onChange={(e) =>
+                      setPromoteForm({ ...promoteForm, targetClassroomId: e.target.value })
+                    }
+                  >
+                    <option value="">Choose a class...</option>
+                    {classrooms.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
-            <div className="flex space-x-2 mt-6">
+            <div className="p-6 pt-4 border-t border-gray-200 flex space-x-2 bg-white rounded-b-xl">
               <button onClick={handlePromoteStudents} className="btn-primary flex-1">
                 Promote
               </button>
@@ -1207,7 +1233,20 @@ export default function Students() {
                     type="text"
                     className="input-field w-full"
                     value={createFormData.firstName}
-                    onChange={(e) => setCreateFormData({ ...createFormData, firstName: e.target.value })}
+                    onChange={(e) => {
+                      const newFirstName = e.target.value;
+                      setCreateFormData((prev) => {
+                        const updated = { ...prev, firstName: newFirstName };
+                        // Auto-generate username if both names are present and username is empty
+                        if (newFirstName && prev.lastName && !prev.username) {
+                          const generatedUsername = generateUsername(newFirstName, prev.lastName);
+                          if (generatedUsername) {
+                            updated.username = generatedUsername;
+                          }
+                        }
+                        return updated;
+                      });
+                    }}
                     required
                   />
                 </div>
@@ -1219,7 +1258,20 @@ export default function Students() {
                     type="text"
                     className="input-field w-full"
                     value={createFormData.lastName}
-                    onChange={(e) => setCreateFormData({ ...createFormData, lastName: e.target.value })}
+                    onChange={(e) => {
+                      const newLastName = e.target.value;
+                      setCreateFormData((prev) => {
+                        const updated = { ...prev, lastName: newLastName };
+                        // Auto-generate username if both names are present and username is empty
+                        if (prev.firstName && newLastName && !prev.username) {
+                          const generatedUsername = generateUsername(prev.firstName, newLastName);
+                          if (generatedUsername) {
+                            updated.username = generatedUsername;
+                          }
+                        }
+                        return updated;
+                      });
+                    }}
                     required
                   />
                 </div>
@@ -1227,15 +1279,15 @@ export default function Students() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Username <span className="text-red-500">*</span>
+                    Username <span className="text-gray-500 text-xs font-normal">(Auto-generated if empty)</span>
                   </label>
                   <input
                     type="text"
                     className="input-field w-full"
                     value={createFormData.username}
                     onChange={(e) => setCreateFormData({ ...createFormData, username: e.target.value })}
-                    required
                     autoComplete="off"
+                    placeholder="Will be auto-generated from name"
                   />
                 </div>
                 <div>
@@ -1432,14 +1484,6 @@ export default function Students() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
             <h2 className="text-2xl font-bold mb-4">Reset Student Password</h2>
-            <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-              <p className="text-sm text-gray-700">
-                <strong>Student:</strong> {selectedStudent.firstName} {selectedStudent.lastName}
-              </p>
-              <p className="text-sm text-gray-600 mt-1">
-                <strong>Username:</strong> {selectedStudent.username}
-              </p>
-            </div>
 
             <div className="space-y-4">
               <div>
@@ -1471,11 +1515,9 @@ export default function Students() {
                 />
               </div>
 
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-xs text-blue-800">
-                  <strong>Note:</strong> The student's password will be reset immediately. The student will be required to reset their password on their first login. Please share the new password with the student directly.
-                </p>
-              </div>
+              <p className="text-xs text-gray-600">
+                Password will also be sent to student's email if one is available
+              </p>
             </div>
 
             <div className="flex space-x-2 mt-6 pt-4 border-t border-gray-200">

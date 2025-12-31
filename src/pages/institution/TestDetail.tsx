@@ -916,7 +916,7 @@ export default function TestDetail() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm text-gray-500">Duration</label>
-              <p className="font-medium">{test.duration} minutes</p>
+              <p className="font-medium">{test.isTimed ? `${test.duration} minutes` : 'Untimed'}</p>
             </div>
             <div>
               <label className="text-sm text-gray-500">Passing Score</label>
@@ -937,6 +937,30 @@ export default function TestDetail() {
                   }`}
                 >
                   {test.isActive ? 'Active' : 'Inactive'}
+                </span>
+              </p>
+            </div>
+            <div>
+              <label className="text-sm text-gray-500">Allow Retrial</label>
+              <p className="font-medium">
+                <span className={`px-2 py-1 text-xs rounded-full ${test.allowRetrial ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                  {test.allowRetrial ? 'Yes' : 'No'}
+                </span>
+              </p>
+            </div>
+            <div>
+              <label className="text-sm text-gray-500">Show Scores to Students</label>
+              <p className="font-medium">
+                <span className={`px-2 py-1 text-xs rounded-full ${test.scoreVisibility ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                  {test.scoreVisibility ? 'Yes' : 'No'}
+                </span>
+              </p>
+            </div>
+            <div>
+              <label className="text-sm text-gray-500">Requires Manual Grading</label>
+              <p className="font-medium">
+                <span className={`px-2 py-1 text-xs rounded-full ${test.requiresManualGrading ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'}`}>
+                  {test.requiresManualGrading ? 'Yes' : 'No'}
                 </span>
               </p>
             </div>
@@ -1163,10 +1187,40 @@ export default function TestDetail() {
                     }
                     required
                   />
+                ) : questionForm.questionType === 'multiple_choice' ? (
+                  (() => {
+                    // Get available option keys from the parsed options
+                    let availableOptions: string[] = [];
+                    try {
+                      const parsedOptions = typeof questionForm.options === 'string' 
+                        ? JSON.parse(questionForm.options) 
+                        : questionForm.options;
+                      availableOptions = Object.keys(parsedOptions || {}).filter(key => parsedOptions[key] && parsedOptions[key].trim() !== '');
+                    } catch (e) {
+                      // If parsing fails, use optionInputs instead
+                      availableOptions = (['A', 'B', 'C', 'D', 'E'] as const).filter(key => optionInputs[key] && optionInputs[key].trim() !== '');
+                    }
+                    
+                    return (
+                      <select
+                        className="input-field"
+                        value={questionForm.correctAnswer}
+                        onChange={(e) =>
+                          setQuestionForm({ ...questionForm, correctAnswer: e.target.value })
+                        }
+                        required
+                      >
+                        <option value="">Select correct answer</option>
+                        {availableOptions.map((key) => (
+                          <option key={key} value={key}>{key}</option>
+                        ))}
+                      </select>
+                    );
+                  })()
                 ) : (
                   <input
                     className="input-field"
-                    placeholder="Correct answer (e.g., A, B, C, D, E or comma-separated for multiple select)"
+                    placeholder="Correct answer (comma-separated for multiple select, e.g., A,C or A, B, C)"
                     value={questionForm.correctAnswer}
                     onChange={(e) =>
                       setQuestionForm({ ...questionForm, correctAnswer: e.target.value })

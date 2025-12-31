@@ -28,6 +28,9 @@ import Impersonation from './pages/institution/Impersonation';
 import ForgotPassword from './pages/institution/ForgotPassword';
 import ResetPassword from './pages/institution/ResetPassword';
 import AuditLogs from './pages/institution/AuditLogs';
+import TestGroups from './pages/institution/TestGroups';
+import Subjects from './pages/institution/Subjects';
+import GradingSchemes from './pages/institution/GradingSchemes';
 
 // Student pages
 import StudentTestPage from './pages/student/StudentTestPage';
@@ -374,6 +377,36 @@ function App() {
               <PrivateRoute>
                 <InstitutionLayout>
                   <AuditLogs />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/test-groups"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <TestGroups />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/subjects"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <Subjects />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/grading-schemes"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <GradingSchemes />
                 </InstitutionLayout>
               </PrivateRoute>
             }

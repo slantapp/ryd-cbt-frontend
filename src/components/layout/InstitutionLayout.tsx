@@ -81,6 +81,9 @@ const navConfig: NavItem[] = [
     children: [
       { label: 'Theme', path: '/theme', roles: ['SCHOOL'], icon: '🎨' },
       { label: 'Custom Fields', path: '/custom-fields', roles: ['SCHOOL'], icon: '📋' },
+      { label: 'Test Groups', path: '/test-groups', roles: ['SCHOOL'], icon: '📑' },
+      { label: 'Subjects', path: '/subjects', roles: ['SCHOOL'], icon: '📚' },
+      { label: 'Grading Schemes', path: '/grading-schemes', roles: ['SCHOOL'], icon: '📊' },
       { label: 'Impersonation', path: '/impersonation', roles: ['SCHOOL'], icon: '👤' },
     ]
   },

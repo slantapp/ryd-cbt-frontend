@@ -370,6 +370,37 @@ export const teacherAPI = {
   }),
 };
 
+// Test Groups
+export const testGroupAPI = {
+  getAll: () => api.get('/test-groups'),
+  getOne: (id: string) => api.get(`/test-groups/${id}`),
+  create: (data: { name: string; description?: string }) => api.post('/test-groups', data),
+  update: (id: string, data: { name?: string; description?: string; isActive?: boolean }) =>
+    api.put(`/test-groups/${id}`, data),
+  delete: (id: string) => api.delete(`/test-groups/${id}`),
+};
+
+// Subjects
+export const subjectAPI = {
+  getAll: () => api.get('/subjects'),
+  getOne: (id: string) => api.get(`/subjects/${id}`),
+  create: (data: { name: string; description?: string }) => api.post('/subjects', data),
+  update: (id: string, data: { name?: string; description?: string; isActive?: boolean }) =>
+    api.put(`/subjects/${id}`, data),
+  delete: (id: string) => api.delete(`/subjects/${id}`),
+};
+
+// Grading Schemes
+export const gradingSchemeAPI = {
+  getAll: () => api.get('/grading-schemes'),
+  getOne: (id: string) => api.get(`/grading-schemes/${id}`),
+  create: (data: { subjectId: string; sessionClassId: string; weights: Array<{ testGroupId: string; weight: number }> }) =>
+    api.post('/grading-schemes', data),
+  update: (id: string, data: { weights: Array<{ testGroupId: string; weight: number }> }) =>
+    api.put(`/grading-schemes/${id}`, data),
+  delete: (id: string) => api.delete(`/grading-schemes/${id}`),
+};
+
 export const themeAPI = {
   get: () => api.get('/theme'),
   update: (data: {
