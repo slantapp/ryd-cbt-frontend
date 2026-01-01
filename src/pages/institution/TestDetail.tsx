@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { testAPI, questionAPI, sessionAPI, classroomAPI, teacherAPI, customFieldAPI, gradingAPI } from '../../services/api';
-import { Test, Question, Session, Classroom, Institution, TestCustomField } from '../../types';
+import { testAPI, questionAPI, sessionAPI, classroomAPI, teacherAPI, customFieldAPI, gradingAPI, studentAPI } from '../../services/api';
+import { Test, Question, Session, Classroom, Institution, TestCustomField, StudentTest } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
+import { format } from 'date-fns';
 
 export default function TestDetail() {
   const { id } = useParams();
@@ -24,6 +25,9 @@ export default function TestDetail() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [testScores, setTestScores] = useState<StudentTest[]>([]);
+  const [loadingScores, setLoadingScores] = useState(false);
+  const [showScores, setShowScores] = useState(false);
   const [questionForm, setQuestionForm] = useState({
     questionText: '',
     questionType: 'multiple_choice',
@@ -306,6 +310,21 @@ export default function TestDetail() {
     }
   };
 
+  const loadTestScores = async () => {
+    if (!id) return;
+    try {
+      setLoadingScores(true);
+      const response = await studentAPI.getScores({ testId: id });
+      setTestScores(response.data || []);
+    } catch (error: any) {
+      console.error('Failed to load test scores:', error);
+      toast.error(error?.response?.data?.error || 'Failed to load test scores');
+      setTestScores([]);
+    } finally {
+      setLoadingScores(false);
+    }
+  };
+
   const handlePublishAllScores = async () => {
     if (!window.confirm('Publish all graded scores for this test? All students with graded tests will be able to see their scores.')) {
       return;
@@ -521,12 +540,12 @@ export default function TestDetail() {
         <div className="flex space-x-2 flex-wrap gap-2">
           {(test && test.requiresManualGrading) || (account && account.role === 'TEACHER' && test) ? (
             <>
-              <Link
-                to={`/tests/${id}/grade`}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg"
-              >
-                Grade Tests
-              </Link>
+            <Link
+              to={`/tests/${id}/grade`}
+              className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg"
+            >
+              Grade Tests
+            </Link>
               {hasPublishedScores ? (
                 <button
                   onClick={handleUnpublishAllScores}
@@ -824,7 +843,7 @@ export default function TestDetail() {
                 </label>
               </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <div>
+                  <div>
                 <label className="text-sm font-medium text-gray-700 block mb-2">Score Visibility</label>
                 <span className="text-xs text-gray-500 block mb-2">Control when students can see their scores</span>
                 <div className="flex space-x-2">
@@ -850,7 +869,7 @@ export default function TestDetail() {
                   >
                     Hide Scores
                   </button>
-                </div>
+                  </div>
               </div>
               <label className="flex items-start cursor-pointer group">
                   <input
@@ -994,25 +1013,128 @@ export default function TestDetail() {
         </div>
       ) : (
         <div className="card" key="test-details">
-          <h2 className="text-xl font-semibold mb-4">Test Details</h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold">Test Summary</h2>
+            <span className="text-sm text-gray-500">Complete test information</span>
+          </div>
+          
+          {/* Basic Information */}
+          <div className="mb-6 pb-6 border-b border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase mb-4">Basic Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-sm text-gray-500">Duration</label>
-              <p className="font-medium">{test.isTimed ? `${test.duration} minutes` : 'Untimed'}</p>
+                <label className="text-xs font-semibold text-gray-500 uppercase">Title</label>
+                <p className="font-medium text-gray-900 mt-1">{test.title}</p>
             </div>
             <div>
-              <label className="text-sm text-gray-500">Passing Score</label>
-              <p className="font-medium">{test.passingScore || 'N/A'}%</p>
+                <label className="text-xs font-semibold text-gray-500 uppercase">Description</label>
+                <p className="font-medium text-gray-900 mt-1">{test.description || <span className="text-gray-400 italic">No description</span>}</p>
             </div>
+              {(test as any).testGroup && (
             <div>
-              <label className="text-sm text-gray-500">Max Attempts</label>
-              <p className="font-medium">{test.maxAttempts}</p>
+                  <label className="text-xs font-semibold text-gray-500 uppercase">Test Group</label>
+                  <p className="font-medium text-gray-900 mt-1">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                      {(test as any).testGroup}
+                    </span>
+                  </p>
             </div>
+              )}
+              {((test as any).subject || (test as any).subjectName) && (
             <div>
-              <label className="text-sm text-gray-500">Status</label>
-              <p className="font-medium">
+                  <label className="text-xs font-semibold text-gray-500 uppercase">Subject</label>
+                  <p className="font-medium text-gray-900 mt-1">{(test as any).subject || (test as any).subjectName}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Session & Classes */}
+          <div className="mb-6 pb-6 border-b border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase mb-4">Session & Classes</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {test.sessions && test.sessions.length > 0 && (
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase">Session</label>
+                  <p className="font-medium text-gray-900 mt-1">
+                    {test.sessions[0]?.session?.name || 'N/A'}
+                  </p>
+                </div>
+              )}
+              {test.classrooms && test.classrooms.length > 0 && (
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase">Assigned Classes</label>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {test.classrooms.map((tc: any) => (
                 <span
-                  className={`px-2 py-1 text-xs rounded-full ${
+                        key={tc.classroom.id}
+                        className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
+                      >
+                        {tc.classroom.name}
+                        {tc.classroom.academicSession && ` (${tc.classroom.academicSession})`}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {test.teacher && (
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase">Assigned Teacher</label>
+                  <p className="font-medium text-gray-900 mt-1">{test.teacher.name || test.teacher.email || 'N/A'}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Test Settings */}
+          <div className="mb-6 pb-6 border-b border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase mb-4">Test Settings</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase">Timing</label>
+                <p className="font-medium text-gray-900 mt-1">
+                  {test.isTimed ? `${test.duration} minutes` : <span className="text-gray-400 italic">Untimed</span>}
+                </p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase">Due Date</label>
+                <p className="font-medium text-gray-900 mt-1">
+                  {test.dueDate ? (
+                    <span className="text-orange-600">
+                      {new Date(test.dueDate).toLocaleString()}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400 italic">No due date</span>
+                  )}
+                </p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase">Passing Score</label>
+                <p className="font-medium text-gray-900 mt-1">{test.passingScore ? `${test.passingScore}%` : <span className="text-gray-400 italic">Not set</span>}</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase">Max Attempts</label>
+                <p className="font-medium text-gray-900 mt-1">{test.maxAttempts || '1'}</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase">Allow Retrial</label>
+                <p className="font-medium text-gray-900 mt-1">
+                  {test.allowRetrial ? (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      ✓ Yes
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      ✗ No
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase">Status</label>
+                <p className="font-medium text-gray-900 mt-1">
+                  <span
+                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
                     test.isActive
                       ? 'bg-green-100 text-green-800'
                       : 'bg-gray-100 text-gray-800'
@@ -1022,47 +1144,76 @@ export default function TestDetail() {
                 </span>
               </p>
             </div>
-            <div>
-              <label className="text-sm text-gray-500">Allow Retrial</label>
-              <p className="font-medium">
-                <span className={`px-2 py-1 text-xs rounded-full ${test.allowRetrial ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                  {test.allowRetrial ? 'Yes' : 'No'}
-                </span>
-              </p>
             </div>
+          </div>
+
+          {/* Visibility & Grading */}
+          <div className="mb-6 pb-6 border-b border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase mb-4">Visibility & Grading</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className="text-sm text-gray-500">Show Scores to Students</label>
-              <p className="font-medium">
-                <span className={`px-2 py-1 text-xs rounded-full ${test.scoreVisibility ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                  {test.scoreVisibility ? 'Yes' : 'No'}
+                <label className="text-xs font-semibold text-gray-500 uppercase">Score Visibility</label>
+                <p className="font-medium text-gray-900 mt-1">
+                  {test.scoreVisibility ? (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      ✓ Show to students
                 </span>
-              </p>
-            </div>
-            <div>
-              <label className="text-sm text-gray-500">Requires Manual Grading</label>
-              <p className="font-medium">
-                <span className={`px-2 py-1 text-xs rounded-full ${test.requiresManualGrading ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'}`}>
-                  {test.requiresManualGrading ? 'Yes' : 'No'}
-                </span>
-              </p>
-            </div>
-            {test.classrooms && test.classrooms.length > 0 && (
-              <div className="col-span-2">
-                <label className="text-sm text-gray-500">Assigned to Classes</label>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {test.classrooms.map((tc: any) => (
-                    <span
-                      key={tc.classroom.id}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
-                    >
-                      {tc.classroom.name}
-                      {tc.classroom.academicSession && ` (${tc.classroom.academicSession})`}
+                  ) : (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                      ✗ Hide from students
                     </span>
-                  ))}
+                  )}
+              </p>
+            </div>
+            <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase">Manual Grading</label>
+                <p className="font-medium text-gray-900 mt-1">
+                  {test.requiresManualGrading ? (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                      ✓ Required
+                </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      ✗ Not required
+                    </span>
+                  )}
+              </p>
+            </div>
+            <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase">Published Status</label>
+                <p className="font-medium text-gray-900 mt-1">
+                  {test.isPublished ? (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      ✓ Published
+                </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      ✗ Not published
+                    </span>
+                  )}
+              </p>
+            </div>
                 </div>
               </div>
-            )}
+
+          {/* Custom Fields */}
+          {customFields.length > 0 && Object.keys(customFieldValues).length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-500 uppercase mb-4">Custom Fields</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {customFields.map(field => {
+                  const value = customFieldValues[field.id];
+                  if (!value || value.trim() === '') return null;
+                  return (
+                    <div key={field.id}>
+                      <label className="text-xs font-semibold text-gray-500 uppercase">{field.fieldName}</label>
+                      <p className="font-medium text-gray-900 mt-1">{value}</p>
           </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1515,6 +1666,259 @@ export default function TestDetail() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Test Scores Section */}
+      <div className="card">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Test Scores</h2>
+          <button
+            onClick={() => {
+              if (!showScores) {
+                loadTestScores();
+              }
+              setShowScores(!showScores);
+            }}
+            className="btn-secondary text-sm"
+          >
+            {showScores ? 'Hide Scores' : 'View All Scores'}
+          </button>
+        </div>
+
+        {showScores && (
+          <div>
+            {loadingScores ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                  <div className="text-gray-600">Loading scores...</div>
+                </div>
+              </div>
+            ) : testScores.length === 0 ? (
+              <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
+                <div className="text-6xl mb-4">📊</div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Scores Yet</h3>
+                <p className="text-gray-500">
+                  No students have taken this test yet. Scores will appear here once students complete the test.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <div className="text-2xl font-bold text-blue-600">{testScores.length}</div>
+                    <div className="text-sm text-blue-700 mt-1">Total Submissions</div>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                    <div className="text-2xl font-bold text-green-600">
+                      {testScores.filter(s => s.isPassed === true).length}
+                    </div>
+                    <div className="text-sm text-green-700 mt-1">Passed</div>
+                  </div>
+                  <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+                    <div className="text-2xl font-bold text-red-600">
+                      {testScores.filter(s => s.isPassed === false).length}
+                    </div>
+                    <div className="text-sm text-red-700 mt-1">Failed</div>
+                  </div>
+                  <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {testScores.length > 0
+                        ? (testScores.reduce((sum, s) => sum + (s.percentage || 0), 0) / testScores.length).toFixed(1)
+                        : '0'}%
+                    </div>
+                    <div className="text-sm text-purple-700 mt-1">Average Score</div>
+                  </div>
+                </div>
+
+                {/* Scores Table */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                      <tr>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          Student
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          Score
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          Percentage
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          Attempt
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          Submitted
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {testScores.map((score) => (
+                        <tr key={score.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center mr-3">
+                                <span className="text-primary font-bold text-sm">
+                                  {score.student?.firstName?.[0] || score.student?.lastName?.[0] || 'U'}
+                                </span>
+                              </div>
+                              <div>
+                                <div className="text-sm font-semibold text-gray-900">
+                                  {score.student ? `${score.student.firstName} ${score.student.lastName}` : 'Unknown'}
+                                </div>
+                                {score.student?.email && (
+                                  <div className="text-sm text-gray-500">{score.student.email}</div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-bold text-gray-900">
+                              {score.score !== null && score.score !== undefined
+                                ? `${score.score.toFixed(1)}`
+                                : 'N/A'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center space-x-3">
+                              <div className={`text-sm font-bold ${
+                                score.percentage !== null && score.percentage !== undefined
+                                  ? score.percentage >= 70
+                                    ? 'text-green-600'
+                                    : score.percentage >= 50
+                                    ? 'text-yellow-600'
+                                    : 'text-red-600'
+                                  : 'text-gray-600'
+                              }`}>
+                                {score.percentage !== null && score.percentage !== undefined
+                                  ? `${score.percentage.toFixed(1)}%`
+                                  : 'N/A'}
+                              </div>
+                              {score.percentage !== null && score.percentage !== undefined && (
+                                <div className="w-20 bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className={`h-2 rounded-full transition-all ${
+                                      score.percentage >= 70
+                                        ? 'bg-green-500'
+                                        : score.percentage >= 50
+                                        ? 'bg-yellow-500'
+                                        : 'bg-red-500'
+                                    }`}
+                                    style={{ width: `${Math.min(score.percentage, 100)}%` }}
+                                  ></div>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`px-3 py-1.5 inline-flex text-xs leading-5 font-bold rounded-full ${
+                                score.status === 'graded' || score.status === 'submitted'
+                                  ? score.isPassed === true
+                                    ? 'bg-green-100 text-green-800'
+                                    : score.isPassed === false
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-blue-100 text-blue-800'
+                                  : score.status === 'in_progress'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}
+                            >
+                              {(score.status === 'graded' || score.status === 'submitted') && score.isPassed !== null
+                                ? score.isPassed
+                                  ? '✓ Passed'
+                                  : '✗ Failed'
+                                : score.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-500 font-medium">
+                              Attempt {score.attemptNumber}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-500">
+                              {score.submittedAt
+                                ? format(new Date(score.submittedAt), 'MMM dd, yyyy HH:mm')
+                                : 'N/A'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              {score.test?.allowRetrial &&
+                                (score.status === 'graded' || score.status === 'submitted') &&
+                                score.attemptNumber < (score.test?.maxAttempts || 1) && (
+                                  <button
+                                    onClick={async () => {
+                                      if (!confirm('Grant a retrial to this student?')) return;
+                                      try {
+                                        await studentAPI.grantRetrial(score.id);
+                                        toast.success('Retrial granted successfully');
+                                        loadTestScores();
+                                      } catch (error: any) {
+                                        toast.error(error.response?.data?.error || 'Failed to grant retrial');
+                                      }
+                                    }}
+                                    className="text-primary hover:text-primary-600 font-semibold hover:underline"
+                                  >
+                                    Grant Retrial
+                                  </button>
+                                )}
+                              {score.status === 'graded' && (
+                                <>
+                                  {score.scoreVisibleToStudent ? (
+                                    <button
+                                      onClick={async () => {
+                                        if (!confirm('Hide this score from the student?')) return;
+                                        try {
+                                          await gradingAPI.hideScore(score.id);
+                                          toast.success('Score hidden from student');
+                                          loadTestScores();
+                                        } catch (error: any) {
+                                          toast.error(error.response?.data?.error || 'Failed to hide score');
+                                        }
+                                      }}
+                                      className="text-orange-600 hover:text-orange-800 font-semibold hover:underline"
+                                    >
+                                      Hide Score
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={async () => {
+                                        try {
+                                          await gradingAPI.releaseScore(score.id);
+                                          toast.success('Score released to student');
+                                          loadTestScores();
+                                        } catch (error: any) {
+                                          toast.error(error.response?.data?.error || 'Failed to release score');
+                                        }
+                                      }}
+                                      className="text-green-600 hover:text-green-800 font-semibold hover:underline"
+                                    >
+                                      Release Score
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -69,15 +69,13 @@ export default function GradeStudentTest() {
       setStudentTest(response.data.studentTest);
       setNavigation(response.data.navigation as Navigation);
       
-      // Initialize grading data with current values
+      // Initialize grading data with current values for ALL answers (both manual and auto-graded)
       const initialData: Record<string, { pointsEarned: number; isCorrect: boolean | null }> = {};
       response.data.studentTest.answers.forEach((answer: StudentAnswer) => {
-        if (answer.question.requiresManualGrading) {
-          initialData[answer.id] = {
-            pointsEarned: answer.pointsEarned || 0,
-            isCorrect: answer.isCorrect ?? null,
-          };
-        }
+        initialData[answer.id] = {
+          pointsEarned: answer.pointsEarned || 0,
+          isCorrect: answer.isCorrect ?? null,
+        };
       });
       setGradingData(initialData);
     } catch (error: any) {
@@ -189,13 +187,10 @@ export default function GradeStudentTest() {
     const maxPoints = studentTest.answers.reduce((sum, a) => sum + a.question.points, 0);
     const oldPercentage = maxPoints > 0 ? (oldScore / maxPoints) * 100 : 0;
 
-    // New score (from current grading data)
+    // New score (from current grading data) - includes both manual and auto-graded questions
     const newScore = studentTest.answers.reduce((sum, a) => {
-      if (a.question.requiresManualGrading) {
-        const grading = gradingData[a.id];
-        return sum + (grading?.pointsEarned ?? a.pointsEarned ?? 0);
-      }
-      return sum + (a.pointsEarned || 0);
+      const grading = gradingData[a.id];
+      return sum + (grading?.pointsEarned ?? a.pointsEarned ?? 0);
     }, 0);
     const newPercentage = maxPoints > 0 ? (newScore / maxPoints) * 100 : 0;
 
@@ -275,21 +270,22 @@ export default function GradeStudentTest() {
         </div>
       </div>
 
-      {/* Grading Form */}
+      {/* All Questions - Auto-graded and Manual */}
       <div className="card">
-        <h2 className="text-xl font-semibold mb-6">Manual Grading Questions</h2>
-        {manualGradingAnswers.length === 0 ? (
+        <h2 className="text-xl font-semibold mb-6">All Questions</h2>
+        {studentTest.answers.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-600">No manual grading questions found.</p>
+            <p className="text-gray-600">No questions found.</p>
           </div>
         ) : (
           <div className="space-y-6">
-            {manualGradingAnswers.map((answer) => {
-              const grading = gradingData[answer.id] || { pointsEarned: 0, isCorrect: null };
+            {studentTest.answers.map((answer) => {
+              const isManualGrading = answer.question.requiresManualGrading;
+              const grading = gradingData[answer.id] || { pointsEarned: answer.pointsEarned || 0, isCorrect: answer.isCorrect ?? null };
               const maxPoints = answer.question.points;
               
               return (
-                <div key={answer.id} className="border border-gray-200 rounded-lg p-6">
+                <div key={answer.id} className={`border rounded-lg p-6 ${isManualGrading ? 'border-gray-200' : 'border-blue-200 bg-blue-50'}`}>
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-2">
@@ -297,9 +293,19 @@ export default function GradeStudentTest() {
                           Question {answer.question.order}
                         </span>
                         <span className="text-xs text-gray-400">({maxPoints} points)</span>
-                        {answer.manuallyGraded && (
+                        {!isManualGrading && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                            Auto-graded ({answer.question.questionType}) - Editable
+                          </span>
+                        )}
+                        {isManualGrading && answer.manuallyGraded && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
                             Graded
+                          </span>
+                        )}
+                        {isManualGrading && !answer.manuallyGraded && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                            Needs Grading
                           </span>
                         )}
                       </div>

@@ -6,8 +6,8 @@ import { Test, Question, ThemeConfig } from '../../types';
 import toast from 'react-hot-toast';
 
 const defaultTheme: ThemeConfig = {
-  primaryColor: '#1d4ed8',
-  secondaryColor: '#2563eb',
+  primaryColor: '#0f172a', // Dark slate - matches backend default
+  secondaryColor: '#1d4ed8',
   accentColor: '#facc15',
   backgroundColor: '#f8fafc',
   textColor: '#0f172a',
@@ -252,7 +252,21 @@ export default function StudentTestTaking() {
           // 1. There's an existing in-progress test
           // 2. AND there's a matching localStorage session
           // 3. AND the session's studentTestId matches the existing test
+          // 4. AND the due date has not passed
           if (existingTest && existingTest.status === 'in_progress' && savedSession) {
+            // Check if due date has passed
+            if (response.data.dueDate) {
+              const dueDate = new Date(response.data.dueDate);
+              const now = new Date();
+              if (dueDate < now) {
+                // Due date passed - test should be auto-submitted, don't restore session
+                if (storageKey) localStorage.removeItem(storageKey);
+                toast.error('The test due date has passed. Your in-progress attempt has been automatically submitted.');
+                setLoading(false);
+                return;
+              }
+            }
+            
             try {
               const session = JSON.parse(savedSession);
               
@@ -348,6 +362,17 @@ export default function StudentTestTaking() {
 
   const handleStartTest = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if due date has passed
+    if (test?.dueDate) {
+      const dueDate = new Date(test.dueDate);
+      const now = new Date();
+      if (dueDate < now) {
+        toast.error('This test is no longer available. The due date has passed.');
+        return;
+      }
+    }
+    
     setLoading(true);
 
     try {
@@ -633,7 +658,35 @@ export default function StudentTestTaking() {
               <p>⏱️ Duration: {test.duration} minutes</p>
               <p>❓ Questions: {questions.length}</p>
               {test.passingScore && <p>✅ Passing Score: {test.passingScore}%</p>}
+              {test.dueDate && (
+                <p className={(() => {
+                  const dueDate = new Date(test.dueDate);
+                  const now = new Date();
+                  return dueDate < now ? 'text-red-600 font-semibold' : 'text-gray-600';
+                })()}>
+                  📅 Due: {new Date(test.dueDate).toLocaleString()}
+                  {(() => {
+                    const dueDate = new Date(test.dueDate);
+                    const now = new Date();
+                    return dueDate < now ? ' (Passed)' : '';
+                  })()}
+                </p>
+              )}
             </div>
+            {test.dueDate && (() => {
+              const dueDate = new Date(test.dueDate);
+              const now = new Date();
+              if (dueDate < now) {
+                return (
+                  <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-800 font-semibold text-center">
+                      ⚠️ This test is no longer available. The due date has passed.
+                    </p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
           <form onSubmit={handleStartTest} className="space-y-4">
             <div className="flex items-center mb-4">
@@ -685,11 +738,11 @@ export default function StudentTestTaking() {
             )}
             <button
               type="submit"
-              disabled={loading}
-              className="w-full py-3 text-lg font-semibold rounded-lg shadow"
+              disabled={loading || !!(test?.dueDate && new Date(test.dueDate) < new Date())}
+              className="w-full py-3 text-lg font-semibold rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed"
               style={primaryButtonStyle}
             >
-              {loading ? 'Starting...' : 'Start Test'}
+              {loading ? 'Starting...' : (test?.dueDate && new Date(test.dueDate) < new Date()) ? 'Test Closed' : 'Start Test'}
             </button>
           </form>
         </div>
@@ -753,13 +806,13 @@ export default function StudentTestTaking() {
               const style = isActive
                 ? {
                     backgroundColor: brand.primaryColor,
-                    color: brand.backgroundColor,
+                    color: brand.backgroundColor || '#ffffff',
                     transform: 'scale(1.05)',
                     boxShadow: '0 10px 15px rgba(0,0,0,0.1)',
                   }
                 : isAnswered
-                ? { backgroundColor: '#dcfce7', color: '#166534' }
-                : { backgroundColor: '#f3f4f6', color: '#374151' };
+                ? { backgroundColor: '#16a34a', color: '#ffffff' } // Deeper green
+                : { backgroundColor: '#6b7280', color: '#ffffff' }; // Deeper grey
 
               return (
                 <button
@@ -779,16 +832,20 @@ export default function StudentTestTaking() {
           </div>
           <div className="flex justify-center mt-4 text-xs text-gray-600 space-x-4">
             <span className="flex items-center">
-              <span className="w-3 h-3 bg-green-100 rounded mr-1"></span>
+              <span className="w-3 h-3 rounded mr-1" style={{ backgroundColor: '#16a34a' }}></span>
               Answered
             </span>
             <span className="flex items-center">
-              <span className="w-3 h-3 bg-gray-100 rounded mr-1"></span>
+              <span className="w-3 h-3 rounded mr-1" style={{ backgroundColor: '#6b7280' }}></span>
               Not Answered
             </span>
             <span className="flex items-center">
               <span className="text-xs mr-1">🚩</span>
               Flagged
+            </span>
+            <span className="flex items-center">
+              <span className="w-3 h-3 rounded mr-1" style={{ backgroundColor: brand.primaryColor }}></span>
+              Current
             </span>
           </div>
         </div>

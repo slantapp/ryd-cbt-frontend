@@ -49,7 +49,31 @@ export default function Sessions() {
   const loadSessions = async () => {
     try {
       const response = await sessionAPI.getAll();
-      setSessions(response.data);
+      // Ensure dates are always strings in YYYY-MM-DD format
+      const normalizeDates = (sessions: Session[]) => {
+        return sessions.map(session => ({
+          ...session,
+          startDate: typeof session.startDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(session.startDate)
+            ? session.startDate
+            : (() => {
+                const date = new Date(session.startDate);
+                const year = date.getUTCFullYear();
+                const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+                const day = String(date.getUTCDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+              })(),
+          endDate: typeof session.endDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(session.endDate)
+            ? session.endDate
+            : (() => {
+                const date = new Date(session.endDate);
+                const year = date.getUTCFullYear();
+                const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+                const day = String(date.getUTCDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+              })(),
+        }));
+      };
+      setSessions(normalizeDates(response.data));
     } catch (error: any) {
       toast.error('Failed to load sessions');
     } finally {
@@ -384,8 +408,37 @@ export default function Sessions() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {sessions.map((session) => {
-            const startDate = new Date(session.startDate);
-            const endDate = new Date(session.endDate);
+            // Parse dates as UTC to avoid timezone shifts
+            // Dates are now returned as YYYY-MM-DD strings from the backend
+            // Parse them for display and comparison
+            const parseDate = (dateStr: string | Date) => {
+              if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                const [year, month, day] = dateStr.split('-').map(Number);
+                return new Date(Date.UTC(year, month - 1, day));
+              }
+              return new Date(dateStr);
+            };
+            const startDate = parseDate(session.startDate);
+            const endDate = parseDate(session.endDate);
+            // Format dates using UTC to prevent one-day backward shift
+            // Since dates come as YYYY-MM-DD strings, parse them directly for display
+            const formatUTCDate = (dateStr: string | Date) => {
+              // If it's already a string in YYYY-MM-DD format, use it directly
+              if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                const [year, month, day] = dateStr.split('-').map(Number);
+                // Create a UTC date at noon to avoid timezone shifts when formatting
+                const utcDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+                return format(utcDate, 'MMM dd, yyyy');
+              }
+              // If it's a Date object, extract UTC components
+              const date = dateStr instanceof Date ? dateStr : new Date(dateStr);
+              const year = date.getUTCFullYear();
+              const month = date.getUTCMonth();
+              const day = date.getUTCDate();
+              // Create a UTC date at noon to avoid timezone shifts when formatting
+              const utcDate = new Date(Date.UTC(year, month, day, 12, 0, 0));
+              return format(utcDate, 'MMM dd, yyyy');
+            };
             const isActive = session.isActive && startDate <= new Date() && endDate >= new Date();
             const isScheduled = session.isActive && startDate > new Date();
             
@@ -436,13 +489,13 @@ export default function Sessions() {
                     <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    <span className="font-medium">Starts: {format(startDate, 'MMM dd, yyyy')}</span>
+                    <span className="font-medium">Starts: {formatUTCDate(session.startDate)}</span>
                   </div>
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    <span className="font-medium">Ends: {format(endDate, 'MMM dd, yyyy')}</span>
+                    <span className="font-medium">Ends: {formatUTCDate(session.endDate)}</span>
                   </div>
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">

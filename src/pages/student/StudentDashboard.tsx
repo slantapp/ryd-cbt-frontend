@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { studentAPI, publicAPI, testGroupAPI, subjectAPI } from '../../services/api';
+import { studentAPI, publicAPI, testGroupAPI, subjectAPI, themeAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import { applyTheme } from '../../utils/themeUtils';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
@@ -11,10 +12,22 @@ export default function StudentDashboard() {
   const [studentClass, setStudentClass] = useState<{ id: string; name: string; sessionId?: string; sessionName?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'available' | 'completed' | 'missed'>('available');
-  const [filterSessionId, setFilterSessionId] = useState<string>('');
-  const [filterClassroomId, setFilterClassroomId] = useState<string>('');
   const [filterSubjectId, setFilterSubjectId] = useState<string>('');
   const [filterTestGroupId, setFilterTestGroupId] = useState<string>('');
+  const [theme, setTheme] = useState({
+    primaryColor: '#0f172a',
+    secondaryColor: '#1d4ed8',
+    accentColor: '#facc15',
+    backgroundColor: '#ffffff',
+    textColor: '#0f172a',
+  });
+  
+  // Clear filters when switching tabs
+  const handleTabChange = (tab: 'available' | 'completed' | 'missed') => {
+    setActiveTab(tab);
+    setFilterSubjectId('');
+    setFilterTestGroupId('');
+  };
   const [subjects, setSubjects] = useState<any[]>([]);
   const [testGroups, setTestGroups] = useState<any[]>([]);
   const [sortByDueDate, setSortByDueDate] = useState<boolean>(true);
@@ -24,8 +37,28 @@ export default function StudentDashboard() {
       loadTests();
       loadSubjects();
       loadTestGroups();
+      loadTheme();
     }
   }, [account]);
+
+  const loadTheme = async () => {
+    try {
+      const { data } = await themeAPI.get();
+      if (data) {
+        const loadedTheme = {
+          primaryColor: data.primaryColor || '#0f172a',
+          secondaryColor: data.secondaryColor || '#1d4ed8',
+          accentColor: data.accentColor || '#facc15',
+          backgroundColor: data.backgroundColor || '#ffffff',
+          textColor: data.textColor || '#0f172a',
+        };
+        setTheme(loadedTheme);
+        applyTheme(loadedTheme);
+      }
+    } catch (error) {
+      console.error('Failed to load theme:', error);
+    }
+  };
 
   const loadSubjects = async () => {
     try {
@@ -104,8 +137,26 @@ export default function StudentDashboard() {
   const canTakeTest = (test: any) => {
     if (!test) return false;
     
+    // Check if due date has passed - cannot take test if due date passed
+    if (test.dueDate) {
+      const dueDate = new Date(test.dueDate);
+      const now = new Date();
+      if (dueDate < now) {
+        return false;
+      }
+    }
+    
     const studentTest = test.studentTests?.[0];
     if (!studentTest) return true;
+    
+    // Cannot continue in-progress tests if due date passed (should be auto-submitted)
+    if (studentTest.status === 'in_progress' && test.dueDate) {
+      const dueDate = new Date(test.dueDate);
+      const now = new Date();
+      if (dueDate < now) {
+        return false;
+      }
+    }
     
     // Can retake if test allows retrial and hasn't exceeded max attempts
     if (test.allowRetrial && studentTest.attemptNumber < (test.maxAttempts || 1)) {
@@ -207,6 +258,10 @@ export default function StudentDashboard() {
     });
   });
   const sessions = Array.from(sessionsMap.values());
+  
+  // Find active session
+  const activeSession = sessions.find((s: any) => s.isActive === true);
+  const activeSessionId = activeSession?.id;
 
   const classroomsMap = new Map<string, any>();
   tests.forEach(t => {
@@ -221,6 +276,13 @@ export default function StudentDashboard() {
   // Filter tests based on active tab
   let filteredTests = Array.isArray(tests) ? tests.filter(t => t) : [];
   
+  // ALWAYS filter to active session first
+  if (activeSessionId) {
+    filteredTests = filteredTests.filter(t => 
+      t.sessions?.some((ts: any) => ts.session?.id === activeSessionId)
+    );
+  }
+  
   if (activeTab === 'available') {
     filteredTests = filteredTests.filter(t => canTakeTest(t));
   } else if (activeTab === 'completed') {
@@ -232,32 +294,51 @@ export default function StudentDashboard() {
     filteredTests = filteredTests.filter(t => isMissedTest(t));
   }
 
-  // Apply session filter
-  if (filterSessionId) {
-    filteredTests = filteredTests.filter(t => 
-      t.sessions?.some((ts: any) => ts.session?.id === filterSessionId)
-    );
+  // Get subjects and test groups from completed/missed tests only (for filter dropdowns)
+  const completedAndMissedTests = Array.isArray(tests) ? tests.filter(t => {
+    if (!t) return false;
+    // Filter to active session
+    if (activeSessionId && !t.sessions?.some((ts: any) => ts.session?.id === activeSessionId)) {
+      return false;
+    }
+    const status = getTestStatus(t);
+    return status.status === 'completed' || isMissedTest(t);
+  }) : [];
+  
+  const takenSubjectIds = new Set<string>();
+  const takenTestGroupIds = new Set<string>();
+  
+  completedAndMissedTests.forEach(t => {
+    // Check for subjectId directly (should be in the test object from Prisma)
+    const subjectId = (t as any).subjectId;
+    if (subjectId && typeof subjectId === 'string' && subjectId.trim() !== '') {
+      takenSubjectIds.add(subjectId);
+    }
+    
+    // Check for testGroupId directly (should be in the test object from Prisma)
+    const testGroupId = (t as any).testGroupId;
+    if (testGroupId && typeof testGroupId === 'string' && testGroupId.trim() !== '') {
+      takenTestGroupIds.add(testGroupId);
+    }
+  });
+  
+  const availableSubjects = subjects.filter(s => s.isActive && takenSubjectIds.has(s.id));
+  const availableTestGroups = testGroups.filter(tg => tg.isActive && takenTestGroupIds.has(tg.id));
+
+  // Apply subject filter (only for completed/missed tabs)
+  if ((activeTab === 'completed' || activeTab === 'missed') && filterSubjectId) {
+    filteredTests = filteredTests.filter(t => {
+      const subjectId = (t as any).subjectId || (t as any).subject?.id;
+      return subjectId === filterSubjectId;
+    });
   }
 
-  // Apply classroom filter
-  if (filterClassroomId) {
-    filteredTests = filteredTests.filter(t => 
-      t.classrooms?.some((tc: any) => tc.classroom?.id === filterClassroomId)
-    );
-  }
-
-  // Apply subject filter
-  if (filterSubjectId) {
-    filteredTests = filteredTests.filter(t => 
-      (t as any).subjectId === filterSubjectId
-    );
-  }
-
-  // Apply test group filter
-  if (filterTestGroupId) {
-    filteredTests = filteredTests.filter(t => 
-      (t as any).testGroupId === filterTestGroupId
-    );
+  // Apply test group filter (only for completed/missed tabs)
+  if ((activeTab === 'completed' || activeTab === 'missed') && filterTestGroupId) {
+    filteredTests = filteredTests.filter(t => {
+      const testGroupId = (t as any).testGroupId || (t as any).testGroup?.id;
+      return testGroupId === filterTestGroupId;
+    });
   }
 
   // Sort by due date (closest to farthest) for available tests
@@ -273,25 +354,48 @@ export default function StudentDashboard() {
     });
   }
 
-  const availableTests = Array.isArray(tests) ? tests.filter(t => t && canTakeTest(t)) : [];
-  const completedTests = Array.isArray(tests) ? tests.filter(t => {
-    if (!t) return false;
+  // Calculate counts - filter to active session first
+  let availableTests = Array.isArray(tests) ? tests.filter(t => t) : [];
+  let completedTests = Array.isArray(tests) ? tests.filter(t => t) : [];
+  let missedTests = Array.isArray(tests) ? tests.filter(t => t) : [];
+  
+  // Filter to active session
+  if (activeSessionId) {
+    availableTests = availableTests.filter(t => 
+      t.sessions?.some((ts: any) => ts.session?.id === activeSessionId)
+    );
+    completedTests = completedTests.filter(t => 
+      t.sessions?.some((ts: any) => ts.session?.id === activeSessionId)
+    );
+    missedTests = missedTests.filter(t => 
+      t.sessions?.some((ts: any) => ts.session?.id === activeSessionId)
+    );
+  }
+  
+  // Apply tab-specific filters
+  availableTests = availableTests.filter(t => canTakeTest(t));
+  completedTests = completedTests.filter(t => {
     const status = getTestStatus(t);
     return status.status === 'completed';
-  }) : [];
-  const missedTests = Array.isArray(tests) ? tests.filter(t => t && isMissedTest(t)) : [];
+  });
+  missedTests = missedTests.filter(t => isMissedTest(t));
 
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-2xl shadow-2xl p-8 text-white relative overflow-hidden">
+      <div 
+        className="rounded-2xl shadow-2xl p-8 text-white relative overflow-hidden"
+        style={{
+          background: `linear-gradient(to right, ${theme.primaryColor}, ${theme.secondaryColor || theme.primaryColor}, ${theme.accentColor || theme.primaryColor})`
+        }}
+      >
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
         <div className="relative z-10">
           <h1 className="text-4xl font-bold mb-2">
             Welcome, {account?.firstName || account?.name || 'Student'}! 👋
           </h1>
-          <p className="text-blue-100 text-lg">View and take your assigned tests</p>
+          <p className="text-white/80 text-lg">View and take your assigned tests</p>
           {studentClass && (
             <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -299,7 +403,7 @@ export default function StudentDashboard() {
               </svg>
               <span className="font-semibold">Class: {studentClass.name}</span>
               {studentClass.sessionName && (
-                <span className="text-blue-100">• {studentClass.sessionName}</span>
+                <span className="text-white/80">• {studentClass.sessionName}</span>
               )}
             </div>
           )}
@@ -309,28 +413,46 @@ export default function StudentDashboard() {
       {/* Stats Cards - Clickable */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <button
-          onClick={() => setActiveTab('available')}
-          className={`card bg-gradient-to-br from-green-50 to-green-100 border-2 transition-all hover:shadow-lg cursor-pointer ${
-            activeTab === 'available' ? 'border-green-400 ring-2 ring-green-300' : 'border-green-200'
+          onClick={() => handleTabChange('available')}
+          className={`card border-2 transition-all hover:shadow-lg cursor-pointer ${
+            activeTab === 'available' ? 'ring-2' : ''
           }`}
+          style={{
+            background: activeTab === 'available' 
+              ? `linear-gradient(to bottom right, ${theme.primaryColor}15, ${theme.primaryColor}25)`
+              : `linear-gradient(to bottom right, ${theme.primaryColor}08, ${theme.primaryColor}15)`,
+            borderColor: activeTab === 'available' ? theme.primaryColor : `${theme.primaryColor}40`,
+          }}
         >
-          <div className="text-3xl font-bold text-green-600 mb-1">{availableTests.length}</div>
+          <div className="text-3xl font-bold mb-1" style={{ color: theme.primaryColor }}>{availableTests.length}</div>
           <div className="text-sm text-gray-600">Available Test</div>
         </button>
         <button
-          onClick={() => setActiveTab('completed')}
-          className={`card bg-gradient-to-br from-purple-50 to-purple-100 border-2 transition-all hover:shadow-lg cursor-pointer ${
-            activeTab === 'completed' ? 'border-purple-400 ring-2 ring-purple-300' : 'border-purple-200'
+          onClick={() => handleTabChange('completed')}
+          className={`card border-2 transition-all hover:shadow-lg cursor-pointer ${
+            activeTab === 'completed' ? 'ring-2' : ''
           }`}
+          style={{
+            background: activeTab === 'completed' 
+              ? `linear-gradient(to bottom right, ${theme.secondaryColor || theme.primaryColor}15, ${theme.secondaryColor || theme.primaryColor}25)`
+              : `linear-gradient(to bottom right, ${theme.secondaryColor || theme.primaryColor}08, ${theme.secondaryColor || theme.primaryColor}15)`,
+            borderColor: activeTab === 'completed' ? (theme.secondaryColor || theme.primaryColor) : `${theme.secondaryColor || theme.primaryColor}40`,
+          }}
         >
-          <div className="text-3xl font-bold text-purple-600 mb-1">{completedTests.length}</div>
+          <div className="text-3xl font-bold mb-1" style={{ color: theme.secondaryColor || theme.primaryColor }}>{completedTests.length}</div>
           <div className="text-sm text-gray-600">Completed Test</div>
         </button>
         <button
-          onClick={() => setActiveTab('missed')}
-          className={`card bg-gradient-to-br from-red-50 to-red-100 border-2 transition-all hover:shadow-lg cursor-pointer ${
-            activeTab === 'missed' ? 'border-red-400 ring-2 ring-red-300' : 'border-red-200'
+          onClick={() => handleTabChange('missed')}
+          className={`card border-2 transition-all hover:shadow-lg cursor-pointer ${
+            activeTab === 'missed' ? 'ring-2' : ''
           }`}
+          style={{
+            background: activeTab === 'missed' 
+              ? `linear-gradient(to bottom right, #dc262615, #dc262625)`
+              : `linear-gradient(to bottom right, #dc262608, #dc262615)`,
+            borderColor: activeTab === 'missed' ? '#dc2626' : '#dc262640',
+          }}
         >
           <div className="text-3xl font-bold text-red-600 mb-1">{missedTests.length}</div>
           <div className="text-sm text-gray-600">Missed Test</div>
@@ -338,49 +460,12 @@ export default function StudentDashboard() {
       </div>
 
       {/* Filters and Sort */}
-      {(sessions.length > 0 || classrooms.length > 0 || subjects.length > 0 || testGroups.length > 0 || activeTab === 'available') && (
         <div className="card">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          {/* Show filters for Completed and Missed tabs */}
+          {(activeTab === 'completed' || activeTab === 'missed') && (
             <div className="flex flex-wrap items-center gap-4">
-              {sessions.length > 0 && (
-                <div className="flex-1 min-w-[200px]">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Filter by Session
-                  </label>
-                  <select
-                    value={filterSessionId}
-                    onChange={(e) => setFilterSessionId(e.target.value)}
-                    className="input-field w-full"
-                  >
-                    <option value="">All Sessions</option>
-                    {sessions.map((session: any) => (
-                      <option key={session.id} value={session.id}>
-                        {session.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              {classrooms.length > 0 && (
-                <div className="flex-1 min-w-[200px]">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Filter by Class
-                  </label>
-                  <select
-                    value={filterClassroomId}
-                    onChange={(e) => setFilterClassroomId(e.target.value)}
-                    className="input-field w-full"
-                  >
-                    <option value="">All Classes</option>
-                    {classrooms.map((classroom: any) => (
-                      <option key={classroom.id} value={classroom.id}>
-                        {classroom.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              {subjects.length > 0 && (
+              {availableSubjects.length > 0 && (
                 <div className="flex-1 min-w-[200px]">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Filter by Subject
@@ -391,7 +476,7 @@ export default function StudentDashboard() {
                     className="input-field w-full"
                   >
                     <option value="">All Subjects</option>
-                    {subjects.filter(s => s.isActive).map((subject: any) => (
+                    {availableSubjects.filter(s => s.isActive).map((subject: any) => (
                       <option key={subject.id} value={subject.id}>
                         {subject.name}
                       </option>
@@ -399,7 +484,7 @@ export default function StudentDashboard() {
                   </select>
                 </div>
               )}
-              {testGroups.length > 0 && (
+              {availableTestGroups.length > 0 && (
                 <div className="flex-1 min-w-[200px]">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Filter by Test Group
@@ -410,7 +495,7 @@ export default function StudentDashboard() {
                     className="input-field w-full"
                   >
                     <option value="">All Test Groups</option>
-                    {testGroups.filter(tg => tg.isActive).map((testGroup: any) => (
+                    {availableTestGroups.filter(tg => tg.isActive).map((testGroup: any) => (
                       <option key={testGroup.id} value={testGroup.id}>
                         {testGroup.name}
                       </option>
@@ -418,7 +503,31 @@ export default function StudentDashboard() {
                   </select>
                 </div>
               )}
+              {(filterSubjectId || filterTestGroupId) && (
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterSubjectId('');
+                      setFilterTestGroupId('');
+                    }}
+                    className="btn-secondary text-sm"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              )}
+              {completedAndMissedTests.length > 0 && availableSubjects.length === 0 && availableTestGroups.length === 0 && (
+                <p className="text-sm text-gray-500 italic">
+                  No filters available - your completed/missed tests don't have subjects or test groups assigned
+                </p>
+              )}
+              {completedAndMissedTests.length === 0 && (
+                <p className="text-sm text-gray-500 italic">No completed or missed tests yet</p>
+              )}
             </div>
+          )}
+          {/* Show sort option for Available tab */}
             {activeTab === 'available' && (
               <div className="flex items-center">
                 <label className="flex items-center cursor-pointer">
@@ -436,7 +545,6 @@ export default function StudentDashboard() {
             )}
           </div>
         </div>
-      )}
 
       {/* Tests Display */}
       {filteredTests.length > 0 && (
@@ -518,13 +626,26 @@ export default function StudentDashboard() {
                     >
                       Continue Test
                     </Link>
-                  ) : (
+                  ) : canTakeTest(test) ? (
                     <Link
                       to={testUrl}
                       className="block w-full btn-primary text-center"
                     >
                       {test.studentTests?.[0] ? 'Retake Test' : 'Start Test'}
                     </Link>
+                  ) : (
+                    <button
+                      disabled
+                      className="block w-full bg-gray-300 text-gray-500 cursor-not-allowed py-2 px-4 rounded-lg text-center"
+                    >
+                      {(() => {
+                        const dueDateInfo = getDueDateInfo(test);
+                        if (dueDateInfo?.isPastDue) {
+                          return 'Test Closed (Due Date Passed)';
+                        }
+                        return 'Not Available';
+                      })()}
+                    </button>
                   )}
                 </div>
               );
@@ -575,12 +696,23 @@ export default function StudentDashboard() {
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
+                    {(() => {
+                      const studentTest = test.studentTests?.[0];
+                      const isScoreVisible = studentTest?.scoreVisibleToStudent === true;
+                      
+                      // Only show Review Test button if scores are published
+                      if (isScoreVisible) {
+                        return (
                     <Link
                       to={getReviewUrl(test)}
                       className="btn-primary text-sm"
                     >
                       Review Test
                     </Link>
+                        );
+                      }
+                      return null;
+                    })()}
                   <Link
                     to={getResultUrl(test)}
                     className="btn-secondary text-sm"
@@ -602,15 +734,13 @@ export default function StudentDashboard() {
           <div className="text-6xl mb-4">🔍</div>
           <p className="text-gray-600 text-lg mb-2">No tests found</p>
           <p className="text-gray-500">
-            {(filterSessionId || filterClassroomId || filterSubjectId || filterTestGroupId)
+            {(activeTab === 'completed' || activeTab === 'missed') && (filterSubjectId || filterTestGroupId)
               ? 'Try adjusting your filters to see more tests.'
-              : `No ${activeTab === 'available' ? 'available' : activeTab === 'completed' ? 'completed' : ''} tests at the moment.`}
+              : `No ${activeTab === 'available' ? 'available' : activeTab === 'completed' ? 'completed' : 'missed'} tests in the current active session.`}
           </p>
-          {(filterSessionId || filterClassroomId || filterSubjectId || filterTestGroupId) && (
+          {(activeTab === 'completed' || activeTab === 'missed') && (filterSubjectId || filterTestGroupId) && (
             <button
               onClick={() => {
-                setFilterSessionId('');
-                setFilterClassroomId('');
                 setFilterSubjectId('');
                 setFilterTestGroupId('');
               }}

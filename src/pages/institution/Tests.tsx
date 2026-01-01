@@ -769,6 +769,156 @@ export default function Tests() {
                 </label>
               </div>
             </div>
+
+            {/* Test Summary Section */}
+            <div className="border-t border-gray-200 pt-6 mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Test Summary</h3>
+                <span className="text-xs text-gray-500">Review all your test details</span>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-xs font-semibold text-gray-500 uppercase">Title</span>
+                    <p className="text-sm text-gray-900 mt-1">{formData.title || <span className="text-gray-400 italic">Not set</span>}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-gray-500 uppercase">Description</span>
+                    <p className="text-sm text-gray-900 mt-1">{formData.description || <span className="text-gray-400 italic">No description</span>}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-gray-500 uppercase">Session</span>
+                    <p className="text-sm text-gray-900 mt-1">
+                      {formData.sessionId 
+                        ? sessions.find(s => s.id === formData.sessionId)?.name || 'Selected'
+                        : <span className="text-red-500 italic">Required</span>}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-gray-500 uppercase">Classes</span>
+                    <p className="text-sm text-gray-900 mt-1">
+                      {formData.classroomIds.length > 0 
+                        ? `${formData.classroomIds.length} class${formData.classroomIds.length !== 1 ? 'es' : ''} selected`
+                        : <span className="text-red-500 italic">Required</span>}
+                    </p>
+                    {formData.classroomIds.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {formData.classroomIds.map(id => {
+                          const classroom = getAvailableClassrooms().find(c => c.id === id);
+                          return classroom ? (
+                            <span key={id} className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-800">
+                              {classroom.name}
+                            </span>
+                          ) : null;
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-gray-500 uppercase">Test Group</span>
+                    <p className="text-sm text-gray-900 mt-1">
+                      {formData.testGroupId 
+                        ? testGroups.find(tg => tg.id === formData.testGroupId)?.name || 'Selected'
+                        : <span className="text-gray-400 italic">Not set</span>}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-gray-500 uppercase">Subject</span>
+                    <p className="text-sm text-gray-900 mt-1">
+                      {formData.subjectId 
+                        ? subjects.find(s => s.id === formData.subjectId)?.name || 'Selected'
+                        : <span className="text-gray-400 italic">Not set</span>}
+                    </p>
+                  </div>
+                  {account?.role === 'SCHOOL' && (
+                    <div>
+                      <span className="text-xs font-semibold text-gray-500 uppercase">Assigned Teacher</span>
+                      <p className="text-sm text-gray-900 mt-1">
+                        {formData.teacherId 
+                          ? teachers.find(t => t.id === formData.teacherId)?.name || 'Selected'
+                          : <span className="text-gray-400 italic">School-owned</span>}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-xs font-semibold text-gray-500 uppercase">Timing</span>
+                    <p className="text-sm text-gray-900 mt-1">
+                      {formData.isTimed 
+                        ? `${formData.duration || 'Not set'} minutes`
+                        : <span className="text-gray-400 italic">Untimed</span>}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-gray-500 uppercase">Due Date</span>
+                    <p className="text-sm text-gray-900 mt-1">
+                      {formData.dueDate 
+                        ? formatDueDate(formData.dueDate)
+                        : <span className="text-gray-400 italic">No due date</span>}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-gray-500 uppercase">Passing Score</span>
+                    <p className="text-sm text-gray-900 mt-1">
+                      {formData.passingScore 
+                        ? `${formData.passingScore}%`
+                        : <span className="text-gray-400 italic">Not set</span>}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-gray-500 uppercase">Max Attempts</span>
+                    <p className="text-sm text-gray-900 mt-1">{formData.maxAttempts || '1'}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-gray-500 uppercase">Allow Retrial</span>
+                    <p className="text-sm text-gray-900 mt-1">
+                      {formData.allowRetrial ? (
+                        <span className="text-green-600 font-medium">✓ Yes</span>
+                      ) : (
+                        <span className="text-gray-400">✗ No</span>
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-gray-500 uppercase">Score Visibility</span>
+                    <p className="text-sm text-gray-900 mt-1">
+                      {formData.scoreVisibility ? (
+                        <span className="text-green-600 font-medium">✓ Show to students</span>
+                      ) : (
+                        <span className="text-orange-600 font-medium">✗ Hide from students</span>
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-gray-500 uppercase">Manual Grading</span>
+                    <p className="text-sm text-gray-900 mt-1">
+                      {formData.requiresManualGrading ? (
+                        <span className="text-blue-600 font-medium">✓ Required</span>
+                      ) : (
+                        <span className="text-gray-400">✗ Not required</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                {customFields.length > 0 && Object.keys(customFieldValues).length > 0 && (
+                  <div className="border-t border-gray-200 pt-4 mt-4">
+                    <span className="text-xs font-semibold text-gray-500 uppercase block mb-2">Custom Fields</span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {customFields.map(field => {
+                        const value = customFieldValues[field.id];
+                        if (!value || value.trim() === '') return null;
+                        return (
+                          <div key={field.id}>
+                            <span className="text-xs font-semibold text-gray-500 uppercase">{field.fieldName}</span>
+                            <p className="text-sm text-gray-900 mt-1">{value}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="flex space-x-3 pt-4 border-t border-gray-200">
               <button
                 type="submit"
@@ -927,6 +1077,14 @@ export default function Tests() {
                   </svg>
                   <span className="font-medium">{test.maxAttempts} attempt{test.maxAttempts !== 1 ? 's' : ''}</span>
                 </div>
+                {test.dueDate && (
+                  <div className="flex items-center space-x-2 text-sm text-orange-600 font-medium col-span-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span>Due: {formatDueDate(test.dueDate)}</span>
+                  </div>
+                )}
               </div>
               {test.allowRetrial && (
                 <div className="mt-3 pt-3 border-t border-gray-100">

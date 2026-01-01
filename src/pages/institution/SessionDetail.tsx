@@ -51,13 +51,34 @@ export default function SessionDetail() {
     try {
       const response = await sessionAPI.getOne(id!);
       setSession(response.data);
-      const startDate = new Date(response.data.startDate);
-      const endDate = new Date(response.data.endDate);
+      // Dates are now returned as YYYY-MM-DD strings from the backend
+      // Ensure we extract just the date part (YYYY-MM-DD) if it comes as an ISO string
+      const extractDateString = (dateValue: string | Date | undefined): string => {
+        if (!dateValue) return '';
+        if (typeof dateValue === 'string') {
+          // If it's already YYYY-MM-DD format, use it directly
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+            return dateValue;
+          }
+          // If it's an ISO string, extract just the date part
+          if (dateValue.includes('T')) {
+            return dateValue.split('T')[0];
+          }
+          return dateValue;
+        }
+        // If it's a Date object, format it as YYYY-MM-DD using UTC
+        const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+        const year = date.getUTCFullYear();
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(date.getUTCDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
       setFormData({
         name: response.data.name,
         description: response.data.description || '',
-        startDate: format(startDate, "yyyy-MM-dd"),
-        endDate: format(endDate, "yyyy-MM-dd"),
+        startDate: extractDateString(response.data.startDate),
+        endDate: extractDateString(response.data.endDate),
         isActive: response.data.isActive,
         testIds: response.data.tests?.map((st: any) => st.testId) || [],
         classroomIds: response.data.classAssignments?.map((ca: any) => ca.classroomId) || [],
@@ -357,13 +378,37 @@ export default function SessionDetail() {
               <div>
                 <label className="text-sm text-gray-500">Start Date</label>
                 <p className="font-medium">
-                  {format(new Date(session.startDate), 'MMM dd, yyyy')}
+                  {session.startDate ? (() => {
+                    // If startDate is a string (YYYY-MM-DD), parse it directly
+                    if (typeof session.startDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(session.startDate)) {
+                      const [year, month, day] = session.startDate.split('-').map(Number);
+                      return format(new Date(Date.UTC(year, month - 1, day)), 'MMM dd, yyyy');
+                    }
+                    // Otherwise, parse as Date and use UTC
+                    const date = new Date(session.startDate);
+                    const year = date.getUTCFullYear();
+                    const month = date.getUTCMonth();
+                    const day = date.getUTCDate();
+                    return format(new Date(Date.UTC(year, month, day)), 'MMM dd, yyyy');
+                  })() : 'N/A'}
                 </p>
               </div>
               <div>
                 <label className="text-sm text-gray-500">End Date</label>
                 <p className="font-medium">
-                  {format(new Date(session.endDate), 'MMM dd, yyyy')}
+                  {session.endDate ? (() => {
+                    // If endDate is a string (YYYY-MM-DD), parse it directly
+                    if (typeof session.endDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(session.endDate)) {
+                      const [year, month, day] = session.endDate.split('-').map(Number);
+                      return format(new Date(Date.UTC(year, month - 1, day)), 'MMM dd, yyyy');
+                    }
+                    // Otherwise, parse as Date and use UTC
+                    const date = new Date(session.endDate);
+                    const year = date.getUTCFullYear();
+                    const month = date.getUTCMonth();
+                    const day = date.getUTCDate();
+                    return format(new Date(Date.UTC(year, month, day)), 'MMM dd, yyyy');
+                  })() : 'N/A'}
                 </p>
               </div>
               <div>

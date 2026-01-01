@@ -18,11 +18,13 @@ export default function Teachers() {
   const [assigningClassroomId, setAssigningClassroomId] = useState<string | null>(null);
   const [selectedClassroomId, setSelectedClassroomId] = useState<string>('');
   const [assigning, setAssigning] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [form, setForm] = useState({
     name: '',
     email: '',
     password: '',
     phone: '',
+    classroomIds: [] as string[],
   });
   const [editForm, setEditForm] = useState({
     name: '',
@@ -84,9 +86,30 @@ export default function Teachers() {
     e.preventDefault();
     setCreating(true);
     try {
-      await teacherAPI.create(form);
-      toast.success('Teacher account created');
-      setForm({ name: '', email: '', password: '', phone: '' });
+      const { classroomIds, ...teacherData } = form;
+      const response = await teacherAPI.create(teacherData);
+      const teacherId = response.data.teacher.id;
+      
+      // Assign teacher to selected classrooms if any
+      if (classroomIds.length > 0) {
+        try {
+          await Promise.all(
+            classroomIds.map(classroomId =>
+              classroomAPI.assignTeacher({ classroomId, teacherId })
+            )
+          );
+          toast.success(`Teacher account created and assigned to ${classroomIds.length} class(es)`);
+        } catch (assignError: any) {
+          // Teacher was created but assignment failed
+          toast.success('Teacher account created, but some class assignments failed');
+          console.error('Assignment error:', assignError);
+        }
+      } else {
+        toast.success('Teacher account created');
+      }
+      
+      setForm({ name: '', email: '', password: '', phone: '', classroomIds: [] });
+      setShowCreateModal(false);
       loadTeachers();
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to create teacher');
@@ -249,87 +272,207 @@ export default function Teachers() {
       </div>
 
       {isSchool && (
-      <div className="card">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold">Create Teacher</h2>
-          <div className="flex space-x-2">
-            <button
-              onClick={handleDownloadTemplate}
-              className="btn-secondary text-sm"
-            >
-              📥 Download Template
-            </button>
-            <button
-              onClick={() => setShowBulkUpload(!showBulkUpload)}
-              className="btn-secondary text-sm"
-            >
-              {showBulkUpload ? 'Cancel' : '📤 Bulk Upload'}
-            </button>
+        <div className="card">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">Teachers</h2>
+            <div className="flex space-x-2">
+              <button
+                onClick={handleDownloadTemplate}
+                className="btn-secondary text-sm"
+              >
+                📥 Download Template
+              </button>
+              <button
+                onClick={() => setShowBulkUpload(!showBulkUpload)}
+                className="btn-secondary text-sm"
+              >
+                {showBulkUpload ? 'Cancel' : '📤 Bulk Upload'}
+              </button>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="btn-primary text-sm"
+              >
+                ➕ Create Teacher
+              </button>
+            </div>
+          </div>
+
+          {showBulkUpload && (
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Upload Excel File
+              </label>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleBulkUpload}
+                disabled={uploading}
+                className="input-field"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                {uploading ? 'Uploading...' : 'Upload teachers using the template format'}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Create Teacher Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+            {/* Modal Header - Fixed */}
+            <div className="flex justify-between items-center p-6 border-b border-gray-200 flex-shrink-0">
+              <h2 className="text-2xl font-bold">Create Teacher</h2>
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setForm({ name: '', email: '', password: '', phone: '', classroomIds: [] });
+                }}
+                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal Body - Scrollable */}
+            <div className="overflow-y-auto flex-1 p-6">
+              <form onSubmit={handleCreate} className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Teacher Name"
+                      className="input-field w-full"
+                      required
+                      autoComplete="off"
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Email <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="teacher@example.com"
+                      className="input-field w-full"
+                      required
+                      autoComplete="off"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Phone (Optional)
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="Phone Number"
+                      className="input-field w-full"
+                      autoComplete="off"
+                      value={form.phone}
+                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Password <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Password"
+                      className="input-field w-full"
+                      required
+                      autoComplete="new-password"
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Assign to Classes (Optional)
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    You can assign the teacher to classes now or later
+                  </p>
+                  <div className="border border-gray-300 rounded-lg bg-gray-50 overflow-hidden">
+                    {classrooms.length === 0 ? (
+                      <div className="p-4">
+                        <p className="text-sm text-gray-500">No classes available. Create classes first.</p>
+                      </div>
+                    ) : (
+                      <div className="max-h-64 overflow-y-auto p-3">
+                        <div className="space-y-2">
+                          {classrooms.map((classroom) => (
+                            <label key={classroom.id} className="flex items-center space-x-2 cursor-pointer hover:bg-white p-2 rounded transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={form.classroomIds.includes(classroom.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setForm({
+                                      ...form,
+                                      classroomIds: [...form.classroomIds, classroom.id],
+                                    });
+                                  } else {
+                                    setForm({
+                                      ...form,
+                                      classroomIds: form.classroomIds.filter(id => id !== classroom.id),
+                                    });
+                                  }
+                                }}
+                                className="rounded border-gray-300 text-primary focus:ring-primary"
+                              />
+                              <span className="text-sm text-gray-700 flex-1">
+                                {classroom.name} {classroom.academicSession ? `(${classroom.academicSession})` : ''}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {form.classroomIds.length > 0 && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      {form.classroomIds.length} class{form.classroomIds.length !== 1 ? 'es' : ''} selected
+                    </p>
+                  )}
+                </div>
+              </form>
+            </div>
+
+            {/* Modal Footer - Fixed */}
+            <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setForm({ name: '', email: '', password: '', phone: '', classroomIds: [] });
+                }}
+                className="btn-secondary"
+                disabled={creating}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreate}
+                disabled={creating}
+                className="btn-primary"
+              >
+                {creating ? 'Creating...' : 'Create Teacher'}
+              </button>
+            </div>
           </div>
         </div>
-
-        {showBulkUpload && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Upload Excel File
-            </label>
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleBulkUpload}
-              disabled={uploading}
-              className="input-field"
-            />
-            <p className="text-xs text-gray-500 mt-2">
-              {uploading ? 'Uploading...' : 'Upload teachers using the template format'}
-            </p>
-          </div>
-        )}
-        <form className="grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={handleCreate}>
-          <input
-            name="teacher-name"
-            type="text"
-            placeholder="Name"
-            className="input-field"
-            required
-            autoComplete="off"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-          />
-          <input
-            name="teacher-email"
-            type="email"
-            placeholder="Email"
-            className="input-field"
-            required
-            autoComplete="off"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-          />
-          <input
-            name="teacher-phone"
-            type="tel"
-            placeholder="Phone (optional)"
-            className="input-field"
-            autoComplete="off"
-            value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
-          />
-          <input
-            name="teacher-password"
-            type="password"
-            placeholder="Password"
-            className="input-field"
-            required
-            autoComplete="new-password"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-          />
-          <button type="submit" disabled={creating} className="btn-primary col-span-full md:w-48">
-            {creating ? 'Creating...' : 'Create teacher'}
-          </button>
-        </form>
-      </div>
       )}
 
       <div className="card">
