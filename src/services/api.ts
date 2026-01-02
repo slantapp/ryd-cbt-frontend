@@ -230,6 +230,8 @@ export const studentAPI = {
     api.post('/students', data),
   getScores: (params?: { testId?: string; sessionId?: string; classroomId?: string }) =>
     api.get('/students/scores', { params }),
+  getOverallScores: (params?: { sessionId?: string; subjectId?: string }) =>
+    api.get('/students/overall-scores', { params }),
   grantRetrial: (studentTestId: string) =>
     api.post('/students/grant-retrial', { studentTestId }),
   getAll: (params?: { sessionId?: string; classroomId?: string; isAssigned?: boolean }) =>

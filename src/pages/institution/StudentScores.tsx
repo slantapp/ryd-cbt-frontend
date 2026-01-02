@@ -1,185 +1,193 @@
 import { useEffect, useState } from 'react';
-import { studentAPI, gradingAPI, sessionAPI, classroomAPI } from '../../services/api';
-import { StudentTest } from '../../types';
+import { studentAPI, sessionAPI, subjectAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 
+interface TestGroupScore {
+  testGroupId: string;
+  testGroupName: string;
+  weight: number;
+  studentScore: number;
+  totalPossible: number;
+  percentage: number;
+  contribution: number;
+  tests: Array<{
+    testId: string;
+    testTitle: string;
+    score: number;
+    maxPoints: number;
+    percentage: number;
+  }>;
+}
+
+interface SubjectScore {
+  subjectId: string;
+  subjectName: string;
+  testGroups: TestGroupScore[];
+  overallScore: number;
+  hasData: boolean;
+}
+
+interface OverallScoreData {
+  student: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+    phone?: string;
+    username: string;
+  };
+  subjects: SubjectScore[];
+  overallAverage: number;
+}
+
 export default function StudentScores() {
-  const [scores, setScores] = useState<StudentTest[]>([]);
+  const [overallScores, setOverallScores] = useState<OverallScoreData[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
-  const [classrooms, setClassrooms] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'passed' | 'failed' | 'in_progress'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
-  const [selectedClassroomId, setSelectedClassroomId] = useState<string>('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+  const [selectedStudent, setSelectedStudent] = useState<OverallScoreData | null>(null);
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
   useEffect(() => {
     loadSessions();
-    loadClassrooms();
-    loadScores(); // Load scores on initial mount
+    loadSubjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    // Reload scores when filters change
-    loadScores();
+    loadOverallScores();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSessionId, selectedClassroomId]);
+  }, [selectedSessionId, selectedSubjectId]);
 
   const loadSessions = async () => {
     try {
       const { data } = await sessionAPI.getAll();
       setSessions(data || []);
+      // Find active session and set it as default
+      const activeSession = data?.find((s: any) => 
+        s.isActive && 
+        new Date(s.startDate) <= new Date() && 
+        new Date(s.endDate) >= new Date()
+      );
+      if (activeSession) {
+        setSelectedSessionId(activeSession.id);
+      }
     } catch (error: any) {
       console.error('Failed to load sessions:', error);
-      setSessions([]); // Set empty array on error
+      setSessions([]);
     }
   };
 
-  const loadClassrooms = async () => {
+  const loadSubjects = async () => {
     try {
-      const { data } = await classroomAPI.list();
-      setClassrooms(data || []);
+      const { data } = await subjectAPI.getAll();
+      setSubjects(data || []);
     } catch (error: any) {
-      console.error('Failed to load classrooms:', error);
-      setClassrooms([]); // Set empty array on error
+      console.error('Failed to load subjects:', error);
+      setSubjects([]);
     }
   };
 
-  const loadScores = async () => {
+  const loadOverallScores = async () => {
     try {
       setLoading(true);
-      const params: { sessionId?: string; classroomId?: string } = {};
+      const params: { sessionId?: string; subjectId?: string } = {};
       if (selectedSessionId) {
         params.sessionId = selectedSessionId;
       }
-      if (selectedClassroomId) {
-        params.classroomId = selectedClassroomId;
+      if (selectedSubjectId) {
+        params.subjectId = selectedSubjectId;
       }
-      const response = await studentAPI.getScores(Object.keys(params).length > 0 ? params : undefined);
-      setScores(response.data || []);
+      const response = await studentAPI.getOverallScores(params);
+      setOverallScores(response.data || []);
     } catch (error: any) {
-      console.error('Load scores error:', error);
-      toast.error(error?.response?.data?.error || 'Failed to load scores');
-      setScores([]); // Set empty array on error to prevent crashes
+      console.error('Load overall scores error:', error);
+      toast.error(error?.response?.data?.error || 'Failed to load overall scores');
+      setOverallScores([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGrantRetrial = async (studentTestId: string) => {
-    if (!confirm('Are you sure you want to grant a retrial to this student?')) {
-      return;
-    }
-    try {
-      await studentAPI.grantRetrial(studentTestId);
-      toast.success('Retrial granted successfully');
-      loadScores();
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to grant retrial');
-    }
-  };
-
-  const handleReleaseScore = async (studentTestId: string) => {
-    try {
-      await gradingAPI.releaseScore(studentTestId);
-      toast.success('Score released to student');
-      loadScores();
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to release score');
-    }
-  };
-
-  const handleHideScore = async (studentTestId: string) => {
-    if (!confirm('Hide this score from the student?')) {
-      return;
-    }
-    try {
-      await gradingAPI.hideScore(studentTestId);
-      toast.success('Score hidden from student');
-      loadScores();
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to hide score');
-    }
-  };
-
-  const filteredScores = scores.filter((score) => {
-    // Apply status filter
-    let matchesFilter = true;
-    if (filter === 'passed') matchesFilter = score.isPassed === true;
-    else if (filter === 'failed') matchesFilter = score.isPassed === false;
-    else if (filter === 'in_progress') matchesFilter = score.status === 'in_progress';
-
-    // Apply search query
-    if (!matchesFilter) return false;
-    
+  const filteredScores = overallScores.filter((score) => {
     if (!searchQuery.trim()) return true;
-
     const query = searchQuery.toLowerCase().trim();
-    const studentName = score.student ? `${score.student.firstName} ${score.student.lastName}`.toLowerCase() : '';
-    const studentEmail = score.student?.email?.toLowerCase() || '';
-    const studentPhone = score.student?.phone?.toLowerCase() || '';
-    const testTitle = score.test?.title?.toLowerCase() || '';
-
+    const studentName = `${score.student.firstName} ${score.student.lastName}`.toLowerCase();
+    const studentEmail = score.student.email?.toLowerCase() || '';
+    const studentPhone = score.student.phone?.toLowerCase() || '';
+    const studentUsername = score.student.username?.toLowerCase() || '';
     return (
       studentName.includes(query) ||
       studentEmail.includes(query) ||
       studentPhone.includes(query) ||
-      testTitle.includes(query)
+      studentUsername.includes(query)
     );
   });
+
+  const handleViewBreakdown = (student: OverallScoreData) => {
+    setSelectedStudent(student);
+    setShowBreakdown(true);
+  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <div className="text-gray-600">Loading scores...</div>
+          <div className="text-gray-600">Loading overall scores...</div>
         </div>
       </div>
     );
   }
 
-  const passedCount = scores.filter((s) => s.isPassed === true).length;
-  const failedCount = scores.filter((s) => s.isPassed === false).length;
-  const inProgressCount = scores.filter((s) => s.status === 'in_progress').length;
-  const avgScore = scores.length > 0 
-    ? scores.reduce((sum, s) => sum + (s.percentage || 0), 0) / scores.length 
-    : 0;
+  // Get all unique test groups from the data
+  const allTestGroups = new Set<string>();
+  overallScores.forEach(score => {
+    score.subjects.forEach(subject => {
+      subject.testGroups.forEach(tg => {
+        if (tg.totalPossible > 0) {
+          allTestGroups.add(tg.testGroupName);
+        }
+      });
+    });
+  });
+  const testGroupNames = Array.from(allTestGroups).sort();
 
   return (
     <div className="space-y-8">
       {/* Header Section */}
       <div className="bg-gradient-to-r from-primary to-primary-600 rounded-2xl shadow-xl p-8 text-white">
         <div>
-          <h1 className="text-4xl font-bold mb-2">Student Scores</h1>
-          <p className="text-primary-100 text-lg">View and manage student test results</p>
+          <h1 className="text-4xl font-bold mb-2">Overall Student Scores</h1>
+          <p className="text-primary-100 text-lg">View student performance across all test groups</p>
         </div>
 
         {/* Stats */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="text-3xl font-bold">{scores.length}</div>
-            <div className="text-sm text-primary-100 mt-1">Total Submissions</div>
+            <div className="text-3xl font-bold">{filteredScores.length}</div>
+            <div className="text-sm text-primary-100 mt-1">Total Students</div>
           </div>
           <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="text-3xl font-bold">{passedCount}</div>
-            <div className="text-sm text-primary-100 mt-1">Passed</div>
+            <div className="text-3xl font-bold">
+              {filteredScores.length > 0
+                ? (filteredScores.reduce((sum, s) => sum + s.overallAverage, 0) / filteredScores.length).toFixed(1)
+                : '0.0'}%
+            </div>
+            <div className="text-sm text-primary-100 mt-1">Average Overall Score</div>
           </div>
           <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="text-3xl font-bold">{failedCount}</div>
-            <div className="text-sm text-primary-100 mt-1">Failed</div>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="text-3xl font-bold">{avgScore.toFixed(1)}%</div>
-            <div className="text-sm text-primary-100 mt-1">Average Score</div>
+            <div className="text-3xl font-bold">{testGroupNames.length}</div>
+            <div className="text-sm text-primary-100 mt-1">Active Test Groups</div>
           </div>
         </div>
       </div>
 
-      {/* Search and Filters */}
+      {/* Filters */}
       <div className="space-y-4">
-        {/* Session and Class Filters */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -188,64 +196,66 @@ export default function StudentScores() {
             <select
               className="input-field w-full"
               value={selectedSessionId}
-              onChange={(e) => {
-                setSelectedSessionId(e.target.value);
-                // Clear classroom filter when session changes
-                setSelectedClassroomId('');
-              }}
+              onChange={(e) => setSelectedSessionId(e.target.value)}
             >
               <option value="">All Sessions</option>
-              {sessions && sessions.length > 0 ? sessions.map((s) => (
+              {sessions.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name}
+                  {s.name} {s.isActive && new Date(s.startDate) <= new Date() && new Date(s.endDate) >= new Date() ? '(Active)' : ''}
                 </option>
-              )) : null}
+              ))}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Filter by Class
+              Filter by Subject
             </label>
             <select
               className="input-field w-full"
-              value={selectedClassroomId}
-              onChange={(e) => setSelectedClassroomId(e.target.value)}
+              value={selectedSubjectId}
+              onChange={(e) => setSelectedSubjectId(e.target.value)}
             >
-              <option value="">All Classes</option>
-              {classrooms && classrooms.length > 0 ? classrooms.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
+              <option value="">All Subjects</option>
+              {subjects.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
                 </option>
-              )) : null}
+              ))}
             </select>
           </div>
         </div>
 
-        {(selectedSessionId || selectedClassroomId) && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">
-              Filtering by: {selectedSessionId && sessions && `Session: ${sessions.find(s => s.id === selectedSessionId)?.name || 'Unknown'}`}
-              {selectedSessionId && selectedClassroomId && ' | '}
-              {selectedClassroomId && classrooms && `Class: ${classrooms.find(c => c.id === selectedClassroomId)?.name || 'Unknown'}`}
-            </span>
-            <button
-              onClick={() => {
-                setSelectedSessionId('');
-                setSelectedClassroomId('');
-              }}
-              className="text-sm text-primary hover:text-primary-600 font-semibold"
-            >
-              Clear Filters
-            </button>
-          </div>
-        )}
-
         {/* Search Bar */}
-        {scores.length > 0 && (
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg
+              className="h-5 w-5 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          </div>
+          <input
+            type="text"
+            className="input-field pl-10"
+            placeholder="Search by student name, email, phone, or username..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+            >
               <svg
-                className="h-5 w-5 text-gray-400"
+                className="h-5 w-5 text-gray-400 hover:text-gray-600"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -254,91 +264,18 @@ export default function StudentScores() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
-            </div>
-            <input
-              type="text"
-              className="input-field pl-10"
-              placeholder="Search by student name, email, phone, or test title..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
-              >
-                <svg
-                  className="h-5 w-5 text-gray-400 hover:text-gray-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Status Filters */}
-        {scores.length > 0 && (
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={() => setFilter('all')}
-              className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm ${
-                filter === 'all'
-                  ? 'bg-primary text-white shadow-md'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
-            >
-              All ({scores.length})
             </button>
-            <button
-              onClick={() => setFilter('passed')}
-              className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm ${
-                filter === 'passed'
-                  ? 'bg-green-600 text-white shadow-md'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
-            >
-              Passed ({passedCount})
-            </button>
-            <button
-              onClick={() => setFilter('failed')}
-              className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm ${
-                filter === 'failed'
-                  ? 'bg-red-600 text-white shadow-md'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
-            >
-              Failed ({failedCount})
-            </button>
-            <button
-              onClick={() => setFilter('in_progress')}
-              className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm ${
-                filter === 'in_progress'
-                  ? 'bg-yellow-600 text-white shadow-md'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
-            >
-              In Progress ({inProgressCount})
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Results Count */}
-      {scores.length > 0 && (searchQuery || filter !== 'all') && (
+      {filteredScores.length > 0 && searchQuery && (
         <div className="text-sm text-gray-600 font-medium">
-          Showing {filteredScores.length} of {scores.length} result{filteredScores.length !== 1 ? 's' : ''}
+          Showing {filteredScores.length} of {overallScores.length} student{filteredScores.length !== 1 ? 's' : ''}
         </div>
       )}
 
@@ -347,26 +284,19 @@ export default function StudentScores() {
         <div className="card text-center py-16 border-2 border-dashed border-gray-300">
           <div className="text-6xl mb-4">📊</div>
           <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            {searchQuery || filter !== 'all'
-              ? 'No results found'
-              : 'No test scores yet'}
+            {searchQuery ? 'No results found' : 'No scores available'}
           </h3>
           <p className="text-gray-500">
             {searchQuery
-              ? `No scores match "${searchQuery}". Try a different search term.`
-              : filter !== 'all'
-              ? `No scores match the "${filter}" filter`
-              : 'Student scores will appear here once they complete tests'}
+              ? `No students match "${searchQuery}". Try a different search term.`
+              : 'Student overall scores will appear here once they complete tests and grading schemes are configured.'}
           </p>
-          {(searchQuery || filter !== 'all') && (
+          {searchQuery && (
             <button
-              onClick={() => {
-                setSearchQuery('');
-                setFilter('all');
-              }}
+              onClick={() => setSearchQuery('')}
               className="mt-4 btn-secondary"
             >
-              Clear Filters
+              Clear Search
             </button>
           )}
         </div>
@@ -379,20 +309,13 @@ export default function StudentScores() {
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     Student
                   </th>
+                  {testGroupNames.map((tgName) => (
+                    <th key={tgName} className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                      {tgName}
+                    </th>
+                  ))}
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Test
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Score
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Percentage
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Attempt
+                    Overall Average
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     Actions
@@ -400,113 +323,211 @@ export default function StudentScores() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredScores.map((score) => (
-                  <tr key={score.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center mr-3">
-                          <span className="text-primary font-bold text-sm">
-                            {score.student?.firstName?.[0] || score.student?.lastName?.[0] || 'U'}
-                          </span>
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-gray-900">
-                            {score.student ? `${score.student.firstName} ${score.student.lastName}` : 'Unknown'}
+                {filteredScores.map((score) => {
+                  // Get test group scores for display (combine across all subjects)
+                  const testGroupMap = new Map<string, { contribution: number; weight: number; percentage: number }>();
+                  
+                  score.subjects.forEach(subject => {
+                    subject.testGroups.forEach(tg => {
+                      if (tg.totalPossible > 0) {
+                        const existing = testGroupMap.get(tg.testGroupName) || { contribution: 0, weight: 0, percentage: 0 };
+                        testGroupMap.set(tg.testGroupName, {
+                          contribution: existing.contribution + tg.contribution,
+                          weight: tg.weight,
+                          percentage: tg.percentage,
+                        });
+                      }
+                    });
+                  });
+
+                  return (
+                    <tr key={score.student.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center mr-3">
+                            <span className="text-primary font-bold text-sm">
+                              {score.student.firstName?.[0] || score.student.lastName?.[0] || 'U'}
+                            </span>
                           </div>
-                          {score.student?.email && (
-                            <div className="text-sm text-gray-500">{score.student.email}</div>
-                          )}
-                          {score.student?.phone && (
-                            <div className="text-xs text-gray-400">{score.student.phone}</div>
-                          )}
+                          <div>
+                            <div className="text-sm font-semibold text-gray-900">
+                              {score.student.firstName} {score.student.lastName}
+                            </div>
+                            {score.student.email && (
+                              <div className="text-sm text-gray-500">{score.student.email}</div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {score.test?.title || 'Unknown Test'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-bold text-gray-900">
-                        {score.score !== null && score.score !== undefined
-                          ? `${score.score.toFixed(1)}`
-                          : 'N/A'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-3">
-                        <div className={`text-sm font-bold ${
-                          score.percentage !== null && score.percentage !== undefined
-                            ? score.percentage >= 70
+                      </td>
+                      {testGroupNames.map((tgName) => {
+                        const tgData = testGroupMap.get(tgName);
+                        return (
+                          <td key={tgName} className="px-6 py-4 whitespace-nowrap">
+                            {tgData ? (
+                              <div className="text-sm">
+                                <div className="font-bold text-gray-900">
+                                  {tgData.contribution.toFixed(2)}%
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  ({tgData.percentage.toFixed(1)}% × {tgData.weight}%)
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-sm text-gray-400">-</div>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center space-x-3">
+                          <div className={`text-sm font-bold ${
+                            score.overallAverage >= 70
                               ? 'text-green-600'
-                              : score.percentage >= 50
+                              : score.overallAverage >= 50
                               ? 'text-yellow-600'
                               : 'text-red-600'
-                            : 'text-gray-600'
-                        }`}>
-                          {score.percentage !== null && score.percentage !== undefined
-                            ? `${score.percentage.toFixed(1)}%`
-                            : 'N/A'}
-                        </div>
-                        {score.percentage !== null && score.percentage !== undefined && (
+                          }`}>
+                            {score.overallAverage.toFixed(2)}%
+                          </div>
                           <div className="w-20 bg-gray-200 rounded-full h-2">
                             <div
                               className={`h-2 rounded-full transition-all ${
-                                score.percentage >= 70
+                                score.overallAverage >= 70
                                   ? 'bg-green-500'
-                                  : score.percentage >= 50
+                                  : score.overallAverage >= 50
                                   ? 'bg-yellow-500'
                                   : 'bg-red-500'
                               }`}
-                              style={{ width: `${Math.min(score.percentage, 100)}%` }}
+                              style={{ width: `${Math.min(score.overallAverage, 100)}%` }}
                             ></div>
                           </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-3 py-1.5 inline-flex text-xs leading-5 font-bold rounded-full ${
-                          score.status === 'graded' || score.status === 'submitted'
-                            ? score.isPassed === true
-                            ? 'bg-green-100 text-green-800'
-                            : score.isPassed === false
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-blue-100 text-blue-800'
-                            : score.status === 'in_progress'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {(score.status === 'graded' || score.status === 'submitted') && score.isPassed !== null
-                          ? score.isPassed
-                            ? '✓ Passed'
-                            : '✗ Failed'
-                          : score.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500 font-medium">
-                        Attempt {score.attemptNumber}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      {score.test?.allowRetrial &&
-                        (score.status === 'graded' || score.status === 'submitted') &&
-                        score.attemptNumber < (score.test?.maxAttempts || 1) && (
-                          <button
-                            onClick={() => handleGrantRetrial(score.id)}
-                            className="text-primary hover:text-primary-600 font-semibold hover:underline"
-                          >
-                            Grant Retrial
-                          </button>
-                        )}
-                    </td>
-                  </tr>
-                ))}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button
+                          onClick={() => handleViewBreakdown(score)}
+                          className="text-primary hover:text-primary-600 font-semibold hover:underline"
+                        >
+                          View Details
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Breakdown Modal */}
+      {showBreakdown && selectedStudent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-gray-900">
+                Score Breakdown - {selectedStudent.student.firstName} {selectedStudent.student.lastName}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowBreakdown(false);
+                  setSelectedStudent(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-6 py-4 overflow-y-auto flex-1">
+              {selectedStudent.subjects.filter(s => s.hasData).length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No score data available for this student.</p>
+                </div>
+              ) : (
+                selectedStudent.subjects.filter(s => s.hasData).map((subject) => (
+                <div key={subject.subjectId} className="mb-6 border-b border-gray-200 pb-6 last:border-b-0">
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">{subject.subjectName}</h3>
+                  <div className="space-y-4">
+                    {subject.testGroups
+                      .filter(tg => tg.totalPossible > 0)
+                      .map((testGroup) => (
+                        <div key={testGroup.testGroupId} className="bg-gray-50 rounded-lg p-4">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <h4 className="font-semibold text-gray-900">{testGroup.testGroupName}</h4>
+                              <p className="text-sm text-gray-600">Weight: {testGroup.weight}%</p>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-lg font-bold text-gray-900">
+                                {testGroup.contribution.toFixed(2)}%
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                Contribution
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mb-3">
+                            <div className="text-sm text-gray-700">
+                              Score: {testGroup.studentScore.toFixed(1)} / {testGroup.totalPossible.toFixed(1)} 
+                              {' '}({testGroup.percentage.toFixed(1)}%)
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              Calculation: ({testGroup.studentScore.toFixed(1)} / {testGroup.totalPossible.toFixed(1)}) × {testGroup.weight}% = {testGroup.contribution.toFixed(2)}%
+                            </div>
+                          </div>
+                          {testGroup.tests.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <p className="text-sm font-semibold text-gray-700 mb-2">Individual Tests:</p>
+                              <div className="space-y-2">
+                                {testGroup.tests.map((test) => (
+                                  <div key={test.testId} className="flex justify-between items-center text-sm bg-white rounded p-2">
+                                    <span className="text-gray-700">{test.testTitle}</span>
+                                    <span className="font-semibold text-gray-900">
+                                      {test.score.toFixed(1)} / {test.maxPoints.toFixed(1)} ({test.percentage.toFixed(1)}%)
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-gray-300">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-gray-900">Subject Overall:</span>
+                      <span className="text-lg font-bold text-primary">
+                        {subject.overallScore.toFixed(2)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                ))
+              )}
+              {selectedStudent.subjects.filter(s => s.hasData).length > 0 && (
+              <div className="mt-6 pt-6 border-t-2 border-primary">
+                <div className="flex justify-between items-center">
+                  <span className="text-xl font-bold text-gray-900">Overall Average:</span>
+                  <span className="text-2xl font-bold text-primary">
+                    {selectedStudent.overallAverage.toFixed(2)}%
+                  </span>
+                </div>
+              </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => {
+                  setShowBreakdown(false);
+                  setSelectedStudent(null);
+                }}
+                className="btn-primary"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
