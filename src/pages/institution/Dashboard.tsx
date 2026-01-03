@@ -121,7 +121,6 @@ export default function Dashboard() {
 
   // Calculate metrics based on active session
   let totalTests = 0;
-  let activeTests = 0;
   let totalClasses = 0;
   let totalStudents = 0;
 
@@ -144,7 +143,6 @@ export default function Dashboard() {
     const activeSessionTests = tests.filter(t => activeSessionTestIds.has(t.id));
     
     totalTests = activeSessionTests.length;
-    activeTests = activeSessionTests.filter((t) => t.isActive && t.isPublished).length;
     
     // Get classes assigned to the active session
     if (activeSession.classAssignments && Array.isArray(activeSession.classAssignments)) {
@@ -186,7 +184,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
         {[
           { 
             label: 'Total Tests', 
@@ -197,16 +195,6 @@ export default function Dashboard() {
               </svg>
             ), 
             gradient: 'from-primary to-primary-600' 
-          },
-          { 
-            label: 'Active Tests', 
-            value: activeTests, 
-            icon: (
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            ), 
-            gradient: 'from-green-500 to-green-600' 
           },
           { 
             label: 'Total Classes', 
