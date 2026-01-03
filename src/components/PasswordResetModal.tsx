@@ -72,7 +72,8 @@ export default function PasswordResetModal({ isOpen, userEmail, onClose }: Passw
     setLoading(true);
     try {
       const response = await authAPI.resetPasswordFirstLogin({
-        email: userEmail,
+        institutionId: account?.id, // Use account ID for more accurate lookup
+        email: userEmail, // Keep as fallback
         currentPassword,
         newPassword,
       });
