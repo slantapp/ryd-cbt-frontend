@@ -215,6 +215,105 @@ const colorPalettes = [
       textColor: '#0f172a',
     },
   },
+  {
+    name: 'Cherry Blossom',
+    description: 'Soft and delicate',
+    colors: {
+      primaryColor: '#be185d',
+      secondaryColor: '#ec4899',
+      accentColor: '#fbbf24',
+      backgroundColor: '#ffffff',
+      textColor: '#1f2937',
+    },
+  },
+  {
+    name: 'Sage Green',
+    description: 'Calm and balanced',
+    colors: {
+      primaryColor: '#365314',
+      secondaryColor: '#65a30d',
+      accentColor: '#facc15',
+      backgroundColor: '#ffffff',
+      textColor: '#1f2937',
+    },
+  },
+  {
+    name: 'Deep Blue',
+    description: 'Confident and stable',
+    colors: {
+      primaryColor: '#1e3a8a',
+      secondaryColor: '#3b82f6',
+      accentColor: '#f59e0b',
+      backgroundColor: '#ffffff',
+      textColor: '#1f2937',
+    },
+  },
+  {
+    name: 'Charcoal',
+    description: 'Modern and sleek',
+    colors: {
+      primaryColor: '#1c1917',
+      secondaryColor: '#57534e',
+      accentColor: '#fbbf24',
+      backgroundColor: '#ffffff',
+      textColor: '#1f2937',
+    },
+  },
+  {
+    name: 'Turquoise',
+    description: 'Vibrant and refreshing',
+    colors: {
+      primaryColor: '#0e7490',
+      secondaryColor: '#06b6d4',
+      accentColor: '#f59e0b',
+      backgroundColor: '#ffffff',
+      textColor: '#1f2937',
+    },
+  },
+  {
+    name: 'Burgundy',
+    description: 'Rich and elegant',
+    colors: {
+      primaryColor: '#7f1d1d',
+      secondaryColor: '#dc2626',
+      accentColor: '#fbbf24',
+      backgroundColor: '#ffffff',
+      textColor: '#1f2937',
+    },
+  },
+  {
+    name: 'Lavender',
+    description: 'Gentle and soothing',
+    colors: {
+      primaryColor: '#6b21a8',
+      secondaryColor: '#a855f7',
+      accentColor: '#fbbf24',
+      backgroundColor: '#ffffff',
+      textColor: '#1f2937',
+    },
+  },
+  {
+    name: 'Mint',
+    description: 'Fresh and clean',
+    colors: {
+      primaryColor: '#065f46',
+      secondaryColor: '#10b981',
+      accentColor: '#f59e0b',
+      backgroundColor: '#ffffff',
+      textColor: '#1f2937',
+    },
+  },
+  {
+    name: 'Coral',
+    description: 'Warm and friendly',
+    colors: {
+      primaryColor: '#c2410c',
+      secondaryColor: '#f97316',
+      accentColor: '#fbbf24',
+      backgroundColor: '#ffffff',
+      textColor: '#1f2937',
+    },
+  },
 ];
 
 export default function ThemeSettings() {

@@ -34,6 +34,9 @@ import GradingSchemes from './pages/institution/GradingSchemes';
 import GradingModeSelection from './pages/institution/GradingModeSelection';
 import GradeByStudent from './pages/institution/GradeByStudent';
 import GradeByQuestion from './pages/institution/GradeByQuestion';
+import TeacherTests from './pages/institution/TeacherTests';
+import ClassTests from './pages/institution/ClassTests';
+import SchoolAdmin from './pages/institution/SchoolAdmin';
 
 // Student pages
 import StudentTestPage from './pages/student/StudentTestPage';
@@ -454,6 +457,36 @@ function App() {
               <PrivateRoute>
                 <InstitutionLayout>
                   <GradingSchemes />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/teacher-tests"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <TeacherTests />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/class-tests"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <ClassTests />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/school-admin"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <SchoolAdmin />
                 </InstitutionLayout>
               </PrivateRoute>
             }

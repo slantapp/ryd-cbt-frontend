@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { sessionAPI, testAPI, classroomAPI } from '../../services/api';
+import { sessionAPI, testAPI, classroomAPI, studentAPI } from '../../services/api';
 import { Session, Test, Classroom } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
@@ -18,6 +18,8 @@ export default function SessionDetail() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAddClassesDialog, setShowAddClassesDialog] = useState(false);
   const [selectedClassroomIds, setSelectedClassroomIds] = useState<string[]>([]);
+  const [hasStudentTests, setHasStudentTests] = useState(false);
+  const [checkingTests, setCheckingTests] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -83,10 +85,44 @@ export default function SessionDetail() {
         testIds: response.data.tests?.map((st: any) => st.testId) || [],
         classroomIds: response.data.classAssignments?.map((ca: any) => ca.classroomId) || [],
       });
+      
+      // Check if any tests have been taken
+      if (response.data.tests && response.data.tests.length > 0) {
+        checkIfTestsTaken(response.data.tests.map((st: any) => st.testId));
+      }
     } catch (error: any) {
       toast.error('Failed to load session');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkIfTestsTaken = async (testIds: string[]) => {
+    if (testIds.length === 0) {
+      setHasStudentTests(false);
+      return;
+    }
+    
+    setCheckingTests(true);
+    try {
+      // Check if there are any student tests for these tests
+      // We'll check each test to see if it has any student tests
+      const scoresPromises = testIds.map(testId => 
+        studentAPI.getScores({ testId }).catch(() => ({ data: [] }))
+      );
+      
+      const scoresResults = await Promise.all(scoresPromises);
+      const hasTests = scoresResults.some(result => 
+        result.data && Array.isArray(result.data) && result.data.length > 0
+      );
+      
+      setHasStudentTests(hasTests);
+    } catch (error: any) {
+      console.error('Failed to check if tests have been taken:', error);
+      // If check fails, assume tests might have been taken to be safe
+      setHasStudentTests(true);
+    } finally {
+      setCheckingTests(false);
     }
   };
 
@@ -190,10 +226,22 @@ export default function SessionDetail() {
             {showEditForm ? 'Cancel Edit' : 'Edit Session'}
           </button>
           <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg"
+            onClick={() => {
+              if (!hasStudentTests && !checkingTests) {
+                setShowDeleteConfirm(true);
+              } else if (hasStudentTests) {
+                toast.error('Cannot delete session: Students have already taken tests. Please archive instead.');
+              }
+            }}
+            disabled={hasStudentTests || checkingTests}
+            className={`font-medium py-2 px-4 rounded-lg transition-colors ${
+              hasStudentTests || checkingTests
+                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                : 'bg-red-600 hover:bg-red-700 text-white'
+            }`}
+            title={hasStudentTests ? 'Cannot delete session: Students have already taken tests in this session. Please archive instead.' : 'Delete Session'}
           >
-            Delete Session
+            {checkingTests ? 'Checking...' : 'Delete Session'}
           </button>
         </div>
       </div>
@@ -201,13 +249,29 @@ export default function SessionDetail() {
       {showDeleteConfirm && (
         <div className="card bg-red-50 border border-red-200">
           <h3 className="text-lg font-semibold text-red-900 mb-2">Confirm Delete</h3>
-          <p className="text-red-700 mb-4">
-            Are you sure you want to delete this session? This action cannot be undone.
-          </p>
+          {hasStudentTests ? (
+            <div className="mb-4">
+              <p className="text-red-700 mb-2 font-medium">
+                Cannot delete this session. Students have already taken tests in this session.
+              </p>
+              <p className="text-red-600 text-sm">
+                Please archive the session instead if you want to remove it from active view.
+              </p>
+            </div>
+          ) : (
+            <p className="text-red-700 mb-4">
+              Are you sure you want to delete this session? This action cannot be undone.
+            </p>
+          )}
           <div className="flex space-x-2">
             <button
               onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg"
+              disabled={hasStudentTests}
+              className={`font-medium py-2 px-4 rounded-lg ${
+                hasStudentTests
+                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                  : 'bg-red-600 hover:bg-red-700 text-white'
+              }`}
             >
               Yes, Delete
             </button>
@@ -429,8 +493,8 @@ export default function SessionDetail() {
           </div>
 
           <div className="card">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Classes in Session</h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold">Classes & Tests</h2>
               {isSchool && (
                 <button
                   onClick={() => {
@@ -448,38 +512,88 @@ export default function SessionDetail() {
               )}
             </div>
             {session.classAssignments && session.classAssignments.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {session.classAssignments.map((ca: any) => (
-                  <div
-                    key={ca.id}
-                    className="p-4 border border-gray-200 rounded-lg hover:border-primary transition-colors"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900">{ca.classroom?.name}</h3>
-                        {ca.classroom?.academicSession && (
-                          <p className="text-sm text-gray-500 mt-1">
-                            {ca.classroom.academicSession}
-                          </p>
+              <div className="space-y-6">
+                {session.classAssignments.map((ca: any) => {
+                  // Get tests assigned to this class
+                  const classTests = session.tests?.filter((st: any) => {
+                    // Check if test is assigned to this class
+                    return st.test?.classrooms?.some((tc: any) => 
+                      tc.classroomId === ca.classroomId || tc.classroom?.id === ca.classroomId
+                    );
+                  }) || [];
+
+                  return (
+                    <div
+                      key={ca.id}
+                      className="border border-gray-200 rounded-lg overflow-hidden"
+                    >
+                      {/* Class Header */}
+                      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-gray-900 text-lg">{ca.classroom?.name}</h3>
+                          {ca.classroom?.academicSession && (
+                            <p className="text-sm text-gray-500 mt-1">
+                              {ca.classroom.academicSession}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <span className="text-sm text-gray-600">
+                            {classTests.length} test{classTests.length !== 1 ? 's' : ''}
+                          </span>
+                          {isSchool && (
+                            <button
+                              onClick={() => handleRemoveClass(ca.classroomId)}
+                              className="text-red-600 hover:text-red-800 p-1"
+                              title="Remove class"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Tests for this class */}
+                      <div className="p-4">
+                        {classTests.length > 0 ? (
+                          <div className="space-y-3">
+                            {classTests.map((st: any) => (
+                              <Link
+                                key={st.id}
+                                to={`/tests/${st.testId}`}
+                                className="block p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary-50 transition-colors"
+                              >
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <h4 className="font-medium text-gray-900">{st.test?.title}</h4>
+                                    {st.test?.description && (
+                                      <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                                        {st.test.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <svg className="w-5 h-5 text-gray-400 ml-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
+                                </div>
+                              </Link>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-6 text-gray-500">
+                            <p className="text-sm">No tests assigned to this class</p>
+                          </div>
                         )}
                       </div>
-                      {isSchool && (
-                        <button
-                          onClick={() => handleRemoveClass(ca.classroomId)}
-                          className="ml-2 text-red-600 hover:text-red-800"
-                          title="Remove class"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
-              <div className="text-center py-8">
+              <div className="text-center py-12">
+                <div className="text-4xl mb-4">🎓</div>
                 <p className="text-gray-500 mb-4">No classes assigned to this session</p>
                 {isSchool && (
                   <button
@@ -497,28 +611,6 @@ export default function SessionDetail() {
                   </button>
                 )}
               </div>
-            )}
-          </div>
-
-          <div className="card">
-            <h2 className="text-xl font-semibold mb-4">Tests in Session</h2>
-            {session.tests && session.tests.length > 0 ? (
-              <div className="space-y-3">
-                {session.tests?.map((st: any) => (
-                  <Link
-                    key={st.id}
-                    to={`/tests/${st.testId}`}
-                    className="block p-4 border border-gray-200 rounded-lg hover:border-primary transition-colors"
-                  >
-                    <h3 className="font-medium">{st.test.title}</h3>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {st.test.description}
-                    </p>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500">No tests in this session</p>
             )}
           </div>
         </>

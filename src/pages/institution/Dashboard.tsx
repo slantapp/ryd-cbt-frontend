@@ -10,6 +10,7 @@ import {
 } from '../../services/api';
 import { Test, Session, Classroom, TeacherAssignment } from '../../types';
 import toast from 'react-hot-toast';
+import { format } from 'date-fns';
 
 const copyToClipboard = (text: string) => {
   navigator.clipboard.writeText(text);
@@ -99,6 +100,7 @@ export default function Dashboard() {
     }
   };
 
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -110,8 +112,48 @@ export default function Dashboard() {
     );
   }
 
-  const activeTests = tests.filter((t) => t.isActive).length;
-  const activeSessions = sessions.filter((s) => s.isActive).length;
+  // Get active session
+  const activeSession = sessions.find(s => {
+    const start = new Date(s.startDate);
+    const end = new Date(s.endDate);
+    return s.isActive && start <= new Date() && end >= new Date();
+  });
+
+  // Calculate metrics based on active session
+  let totalTests = 0;
+  let activeTests = 0;
+  let totalClasses = 0;
+  let totalStudents = 0;
+
+  if (activeSession) {
+    // Get tests assigned to the active session
+    // Session.tests is an array of SessionTest objects with testId or test.id
+    const activeSessionTestIds = new Set<string>();
+    if (activeSession.tests && Array.isArray(activeSession.tests)) {
+      activeSession.tests.forEach((st: any) => {
+        if (st.testId) {
+          activeSessionTestIds.add(st.testId);
+        } else if (st.test?.id) {
+          activeSessionTestIds.add(st.test.id);
+        } else if (st.testId) {
+          activeSessionTestIds.add(st.testId);
+        }
+      });
+    }
+    
+    const activeSessionTests = tests.filter(t => activeSessionTestIds.has(t.id));
+    
+    totalTests = activeSessionTests.length;
+    activeTests = activeSessionTests.filter((t) => t.isActive && t.isPublished).length;
+    
+    // Get classes assigned to the active session
+    if (activeSession.classAssignments && Array.isArray(activeSession.classAssignments)) {
+      totalClasses = activeSession.classAssignments.length;
+    }
+    
+    // Count students in active session classes (if we have student data)
+    // For now, we'll leave this as 0 or calculate from student assignments if available
+  }
 
   const renderSchoolDashboard = () => (
     <>
@@ -144,11 +186,48 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: 'Total Tests', value: tests.length, emoji: '📝', gradient: 'from-primary to-primary-600' },
-          { label: 'Active Tests', value: activeTests, emoji: '✅', gradient: 'from-green-500 to-green-600' },
-          { label: 'Active Sessions', value: activeSessions, emoji: '📅', gradient: 'from-blue-500 to-blue-600' },
+          { 
+            label: 'Total Tests', 
+            value: totalTests, 
+            icon: (
+              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            ), 
+            gradient: 'from-primary to-primary-600' 
+          },
+          { 
+            label: 'Active Tests', 
+            value: activeTests, 
+            icon: (
+              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ), 
+            gradient: 'from-green-500 to-green-600' 
+          },
+          { 
+            label: 'Total Classes', 
+            value: totalClasses, 
+            icon: (
+              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            ), 
+            gradient: 'from-blue-500 to-blue-600' 
+          },
+          { 
+            label: 'Total Students', 
+            value: totalStudents, 
+            icon: (
+              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            ), 
+            gradient: 'from-purple-500 to-purple-600' 
+          },
         ].map((card) => (
           <div className="card-hover" key={card.label}>
             <div className="flex items-center">
@@ -156,7 +235,7 @@ export default function Dashboard() {
                 <div
                   className={`w-14 h-14 bg-gradient-to-br ${card.gradient} rounded-xl flex items-center justify-center shadow-lg`}
                 >
-                  <span className="text-2xl">{card.emoji}</span>
+                  {card.icon}
                 </div>
               </div>
               <div className="ml-5 flex-1">
@@ -168,26 +247,79 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="card">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Quick Actions</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { to: '/tests', label: 'Manage Tests', emoji: '📝', gradient: 'from-primary-50 to-primary-100' },
-            { to: '/sessions', label: 'Manage Sessions', emoji: '📅', gradient: 'from-blue-50 to-blue-100' },
-            { to: '/scores', label: 'View Scores', emoji: '📊', gradient: 'from-green-50 to-green-100' },
-            { to: '/profile', label: 'Profile', emoji: '👤', gradient: 'from-purple-50 to-purple-100' },
-          ].map((action) => (
+      {/* Active Session */}
+      {(() => {
+
+        if (!activeSession) {
+          return (
+            <div className="card border-2 border-dashed border-gray-300">
+              <div className="text-center py-8">
+                <div className="flex justify-center mb-3">
+                  <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Active Session</h3>
+                <p className="text-gray-500 text-sm">There is currently no active session running.</p>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div className="card border-2 border-primary-200 bg-gradient-to-br from-primary-50 to-white">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Active Session</h2>
+                  <p className="text-sm text-gray-600">Current ongoing session</p>
+                </div>
+              </div>
+              <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
+                Active Now
+              </span>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <h3 className="font-semibold text-gray-900 text-lg mb-1">{activeSession.name}</h3>
+                {activeSession.description && (
+                  <p className="text-sm text-gray-600">{activeSession.description}</p>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-200">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Start Date</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {format(new Date(activeSession.startDate), 'MMM dd, yyyy')}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">End Date</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {format(new Date(activeSession.endDate), 'MMM dd, yyyy')}
+                  </p>
+                </div>
+              </div>
+              <div className="pt-3 border-t border-gray-200">
             <Link
-              key={action.label}
-              to={action.to}
-              className={`flex flex-col items-center p-6 bg-gradient-to-br ${action.gradient} rounded-xl hover:shadow-md transition-all border-2 border-transparent hover:border-primary-300`}
-            >
-              <span className="text-4xl mb-3">{action.emoji}</span>
-              <span className="font-semibold text-gray-900">{action.label}</span>
+                  to={`/sessions/${activeSession.id}`}
+                  className="inline-flex items-center text-primary hover:text-primary-600 font-medium text-sm"
+                >
+                  View Session Details
+                  <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
             </Link>
-          ))}
         </div>
       </div>
+          </div>
+        );
+      })()}
 
       <div className="card">
         <div className="flex justify-between items-center mb-6">
@@ -223,12 +355,30 @@ export default function Dashboard() {
                     </div>
                     <p className="text-sm text-gray-600 mb-3">{test.description}</p>
                     <div className="flex items-center space-x-4 text-sm text-gray-500">
-                      <span>⏱️ {test.isTimed ? `${test.duration} min` : 'Untimed'}</span>
-                      <span>❓ {test.questions?.length || 0} questions</span>
-                      <span>👥 {test._count?.studentTests || 0} attempts</span>
+                      <span className="flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {test.isTimed ? `${test.duration} min` : 'Untimed'}
+                      </span>
+                      <span className="flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {test.questions?.length || 0} questions
+                      </span>
+                      <span className="flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                        {test._count?.studentTests || 0} attempts
+                      </span>
                       {test.dueDate && (
-                        <span className="text-orange-600">
-                          📅 {new Date(test.dueDate).toLocaleDateString()}
+                        <span className="text-orange-600 flex items-center">
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          {new Date(test.dueDate).toLocaleDateString()}
                         </span>
                       )}
                     </div>
@@ -265,6 +415,85 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Quick Actions */}
+      {(account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN') && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Teacher Tests Quick Action */}
+          <Link
+            to="/teacher-tests"
+            className="card-hover group cursor-pointer"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary transition-colors">
+                    Teacher Tests
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    View all tests assigned to each teacher
+                  </p>
+                </div>
+              </div>
+              <svg
+                className="w-6 h-6 text-gray-400 group-hover:text-primary transition-colors"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </div>
+          </Link>
+
+          {/* Class Tests Quick Action */}
+          <Link
+            to="/class-tests"
+            className="card-hover group cursor-pointer"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary transition-colors">
+                    Class Tests
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    View all tests assigned to each class
+                  </p>
+                </div>
+              </div>
+              <svg
+                className="w-6 h-6 text-gray-400 group-hover:text-primary transition-colors"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </div>
+          </Link>
+        </div>
+      )}
     </>
   );
 
@@ -326,42 +555,66 @@ export default function Dashboard() {
         label: 'Total Schools',
         value: totals.schools ?? 0,
         subLabel: `${totals.activeSchools ?? 0} active, ${totals.inactiveSchools ?? 0} inactive`,
-        icon: '🏫',
+        icon: (
+          <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+        ),
         gradient: 'from-indigo-500 to-indigo-600',
       },
       {
         label: 'Teachers',
         value: totals.teacherCount ?? 0,
         subLabel: 'Across all schools',
-        icon: '👨‍🏫',
+        icon: (
+          <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+        ),
         gradient: 'from-blue-500 to-blue-600',
       },
       {
         label: 'Students',
         value: totals.studentCount ?? 0,
         subLabel: 'Enrolled students',
-        icon: '👥',
+        icon: (
+          <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+        ),
         gradient: 'from-green-500 to-green-600',
       },
       {
         label: 'Sessions',
         value: totals.sessionCount ?? 0,
         subLabel: `${totals.activeSessionCount ?? 0} active`,
-        icon: '📅',
+        icon: (
+          <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        ),
         gradient: 'from-purple-500 to-purple-600',
       },
       {
         label: 'Tests',
         value: totals.testCount ?? 0,
         subLabel: `${totals.activeTestCount ?? 0} active`,
-        icon: '📝',
+        icon: (
+          <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        ),
         gradient: 'from-orange-500 to-orange-600',
       },
       {
         label: 'Classes',
         value: totals.classCount ?? 0,
         subLabel: 'Academic classes',
-        icon: '📚',
+        icon: (
+          <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+        ),
         gradient: 'from-pink-500 to-pink-600',
       },
     ];
@@ -746,16 +999,34 @@ export default function Dashboard() {
                         <p className="text-sm text-gray-500 mt-1">{test.description}</p>
                       )}
                       <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                        <span>⏱️ {test.isTimed ? `${test.duration} min` : 'Untimed'}</span>
+                        <span className="flex items-center">
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {test.isTimed ? `${test.duration} min` : 'Untimed'}
+                        </span>
                         {test.questions && (
-                          <span>❓ {test.questions.length || 0} questions</span>
+                          <span className="flex items-center">
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {test.questions.length || 0} questions
+                          </span>
                         )}
                         {test.passingScore && (
-                          <span>✅ {test.passingScore}% passing</span>
+                          <span className="flex items-center">
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {test.passingScore}% passing
+                          </span>
                         )}
                         {test.dueDate && (
-                          <span className="text-orange-600">
-                            📅 {new Date(test.dueDate).toLocaleDateString()}
+                          <span className="text-orange-600 flex items-center">
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            {new Date(test.dueDate).toLocaleDateString()}
                           </span>
                         )}
                       </div>

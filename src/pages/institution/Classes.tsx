@@ -13,6 +13,8 @@ export default function Classes() {
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const [classForm, setClassForm] = useState({
     name: '',
     academicSession: '',
@@ -94,6 +96,7 @@ export default function Classes() {
       await classroomAPI.create(classForm);
       toast.success(classForm.sessionId ? 'Class created and assigned to session' : 'Class created');
       setClassForm({ name: '', academicSession: '', description: '', sessionId: '' });
+      setShowCreateModal(false);
       loadClasses();
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to create class');
@@ -113,6 +116,7 @@ export default function Classes() {
       await classroomAPI.assignTeacher(assignment);
       toast.success('Teacher assigned');
       setAssignment({ classroomId: '', teacherId: '' });
+      setShowAssignModal(false);
       loadClasses();
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to assign teacher');
@@ -146,10 +150,41 @@ export default function Classes() {
         </p>
       </div>
       {isSchool && (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <div className="card">
-            <h2 className="text-xl font-semibold mb-4">Create Class</h2>
-            <form className="space-y-3" onSubmit={handleCreateClass}>
+        <div className="flex gap-4">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="btn-primary"
+          >
+            Create Class
+          </button>
+          <button
+            onClick={() => setShowAssignModal(true)}
+            className="btn-secondary"
+          >
+            Assign Teacher
+          </button>
+        </div>
+      )}
+
+      {/* Create Class Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Create Class</h2>
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setClassForm({ name: '', academicSession: '', description: '', sessionId: '' });
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <form className="p-6 space-y-4" onSubmit={handleCreateClass}>
               <input
                 name="name"
                 placeholder="Class name"
@@ -202,14 +237,45 @@ export default function Classes() {
                 value={classForm.description}
                 onChange={(e) => setClassForm({ ...classForm, description: e.target.value })}
               />
-              <button type="submit" disabled={creating} className="btn-primary w-full">
-                {creating ? 'Creating...' : 'Create class'}
-              </button>
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setClassForm({ name: '', academicSession: '', description: '', sessionId: '' });
+                  }}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button type="submit" disabled={creating} className="btn-primary flex-1">
+                  {creating ? 'Creating...' : 'Create Class'}
+                </button>
+              </div>
             </form>
           </div>
-          <div className="card">
-            <h2 className="text-xl font-semibold mb-4">Assign Teacher</h2>
-            <form className="space-y-3" onSubmit={handleAssignTeacher}>
+        </div>
+      )}
+
+      {/* Assign Teacher Modal */}
+      {showAssignModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Assign Teacher</h2>
+              <button
+                onClick={() => {
+                  setShowAssignModal(false);
+                  setAssignment({ classroomId: '', teacherId: '' });
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <form className="p-6 space-y-4" onSubmit={handleAssignTeacher}>
               <select
                 value={assignment.classroomId}
                 onChange={(e) => setAssignment({ ...assignment, classroomId: e.target.value })}
@@ -236,9 +302,21 @@ export default function Classes() {
                   </option>
                 ))}
               </select>
-              <button type="submit" disabled={assigning} className="btn-primary w-full">
-                {assigning ? 'Assigning...' : 'Assign teacher'}
-              </button>
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAssignModal(false);
+                    setAssignment({ classroomId: '', teacherId: '' });
+                  }}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button type="submit" disabled={assigning} className="btn-primary flex-1">
+                  {assigning ? 'Assigning...' : 'Assign Teacher'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
