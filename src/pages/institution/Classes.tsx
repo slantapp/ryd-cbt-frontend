@@ -15,6 +15,13 @@ export default function Classes() {
   const [assigning, setAssigning] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [editingClass, setEditingClass] = useState<any>(null);
+  const [deletingClass, setDeletingClass] = useState<any>(null);
+  const [updating, setUpdating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [classForm, setClassForm] = useState({
     name: '',
     academicSession: '',
@@ -23,6 +30,10 @@ export default function Classes() {
   });
   const [assignment, setAssignment] = useState({
     classroomId: '',
+    teacherId: '',
+  });
+  const [bulkAssignment, setBulkAssignment] = useState({
+    classroomIds: [] as string[],
     teacherId: '',
   });
 
@@ -125,6 +136,77 @@ export default function Classes() {
     }
   };
 
+  const handleBulkAssignTeacher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bulkAssignment.teacherId || bulkAssignment.classroomIds.length === 0) {
+      toast.error('Select a teacher and at least one class');
+      return;
+    }
+    setAssigning(true);
+    try {
+      const response = await classroomAPI.bulkAssignTeacher(bulkAssignment);
+      toast.success(response.data?.message || `Teacher assigned to ${bulkAssignment.classroomIds.length} class(es)`);
+      setBulkAssignment({ classroomIds: [], teacherId: '' });
+      setShowBulkAssignModal(false);
+      loadClasses();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to assign teacher to classes');
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const handleEditClass = (cls: any) => {
+    setEditingClass(cls);
+    setClassForm({
+      name: cls.name || '',
+      academicSession: cls.academicSession || '',
+      description: cls.description || '',
+      sessionId: '', // Don't pre-fill sessionId for edit
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingClass) return;
+    
+    setUpdating(true);
+    try {
+      await classroomAPI.update(editingClass.id, {
+        name: classForm.name,
+        academicSession: classForm.academicSession,
+        description: classForm.description,
+      });
+      toast.success('Class updated successfully');
+      setShowEditModal(false);
+      setEditingClass(null);
+      setClassForm({ name: '', academicSession: '', description: '', sessionId: '' });
+      loadClasses();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to update class');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeleteClass = async () => {
+    if (!deletingClass) return;
+    
+    setDeleting(true);
+    try {
+      await classroomAPI.delete(deletingClass.id);
+      toast.success('Class deleted successfully');
+      setShowDeleteConfirm(false);
+      setDeletingClass(null);
+      loadClasses();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to delete class');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleRemoveTeacher = async (classroomId: string, teacherId: string) => {
     try {
       await classroomAPI.removeTeacher(classroomId, teacherId);
@@ -162,6 +244,12 @@ export default function Classes() {
             className="btn-secondary"
           >
             Assign Teacher
+          </button>
+          <button
+            onClick={() => setShowBulkAssignModal(true)}
+            className="btn-secondary"
+          >
+            Bulk Assign Teacher
           </button>
         </div>
       )}
@@ -322,6 +410,226 @@ export default function Classes() {
         </div>
       )}
 
+      {/* Bulk Assign Teacher Modal */}
+      {showBulkAssignModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Bulk Assign Teacher</h2>
+              <button
+                onClick={() => {
+                  setShowBulkAssignModal(false);
+                  setBulkAssignment({ classroomIds: [], teacherId: '' });
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <form className="p-6 space-y-4" onSubmit={handleBulkAssignTeacher}>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Teacher
+                </label>
+                <select
+                  value={bulkAssignment.teacherId}
+                  onChange={(e) => setBulkAssignment({ ...bulkAssignment, teacherId: e.target.value })}
+                  className="input-field"
+                  required
+                >
+                  <option value="">Select teacher</option>
+                  {teachers.map((teacher) => (
+                    <option key={teacher.id} value={teacher.id}>
+                      {teacher.name} ({teacher.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Classes ({bulkAssignment.classroomIds.length} selected)
+                </label>
+                <div className="border rounded-lg p-4 max-h-64 overflow-y-auto">
+                  {classes.length === 0 ? (
+                    <p className="text-gray-500 text-sm">No classes available</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {classes.map((cls) => (
+                        <label key={cls.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                          <input
+                            type="checkbox"
+                            checked={bulkAssignment.classroomIds.includes(cls.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setBulkAssignment({
+                                  ...bulkAssignment,
+                                  classroomIds: [...bulkAssignment.classroomIds, cls.id],
+                                });
+                              } else {
+                                setBulkAssignment({
+                                  ...bulkAssignment,
+                                  classroomIds: bulkAssignment.classroomIds.filter(id => id !== cls.id),
+                                });
+                              }
+                            }}
+                            className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                          />
+                          <span className="text-sm text-gray-700">{cls.name}</span>
+                          {cls.academicSession && (
+                            <span className="text-xs text-gray-500">({cls.academicSession})</span>
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBulkAssignment({
+                        ...bulkAssignment,
+                        classroomIds: classes.map(cls => cls.id),
+                      });
+                    }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBulkAssignment({
+                        ...bulkAssignment,
+                        classroomIds: [],
+                      });
+                    }}
+                    className="text-xs text-gray-500 hover:underline"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBulkAssignModal(false);
+                    setBulkAssignment({ classroomIds: [], teacherId: '' });
+                  }}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button type="submit" disabled={assigning || bulkAssignment.classroomIds.length === 0} className="btn-primary flex-1">
+                  {assigning ? 'Assigning...' : `Assign to ${bulkAssignment.classroomIds.length} Class(es)`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Class Modal */}
+      {showEditModal && editingClass && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Edit Class</h2>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingClass(null);
+                  setClassForm({ name: '', academicSession: '', description: '', sessionId: '' });
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <form className="p-6 space-y-4" onSubmit={handleUpdateClass}>
+              <input
+                name="name"
+                placeholder="Class name"
+                className="input-field"
+                required
+                value={classForm.name}
+                onChange={(e) => setClassForm({ ...classForm, name: e.target.value })}
+              />
+              <input
+                name="academicSession"
+                placeholder="Academic Session"
+                className="input-field"
+                value={classForm.academicSession}
+                onChange={(e) => setClassForm({ ...classForm, academicSession: e.target.value })}
+              />
+              <textarea
+                name="description"
+                placeholder="Description"
+                className="input-field h-24"
+                value={classForm.description}
+                onChange={(e) => setClassForm({ ...classForm, description: e.target.value })}
+              />
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingClass(null);
+                    setClassForm({ name: '', academicSession: '', description: '', sessionId: '' });
+                  }}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button type="submit" disabled={updating} className="btn-primary flex-1">
+                  {updating ? 'Updating...' : 'Update Class'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && deletingClass && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold mb-4">Delete Class</h2>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete <strong>{deletingClass.name}</strong>? This action cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    setDeletingClass(null);
+                  }}
+                  className="btn-secondary flex-1"
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteClass}
+                  disabled={deleting}
+                  className="btn-primary flex-1 bg-red-600 hover:bg-red-700"
+                >
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <h2 className="text-2xl font-bold mb-4">Classes</h2>
         {loading ? (
@@ -333,18 +641,45 @@ export default function Classes() {
             {classes.map((cls) => (
               <div key={cls.id} className="p-4 border rounded-lg">
                 <div className="flex justify-between items-start">
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="font-semibold text-gray-900">{cls.name}</p>
                     <p className="text-sm text-gray-500">{cls.academicSession}</p>
                     <p className="text-sm text-gray-600 mt-2">{cls.description}</p>
                   </div>
-                  <span
-                    className={`text-xs px-3 py-1 rounded-full ${
-                      cls.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                    }`}
-                  >
-                    {cls.isActive ? 'Active' : 'Inactive'}
-                  </span>
+                  <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                    <span
+                      className={`text-xs px-3 py-1 rounded-full ${
+                        cls.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {cls.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                    {isSchool && (
+                      <>
+                        <button
+                          onClick={() => handleEditClass(cls)}
+                          className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                          title="Edit class"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDeletingClass(cls);
+                            setShowDeleteConfirm(true);
+                          }}
+                          className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                          title="Delete class"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div className="mt-3">
                   <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Teachers</p>

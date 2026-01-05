@@ -349,8 +349,13 @@ export const classroomAPI = {
   create: (data: { name: string; description?: string; academicSession?: string; sessionId?: string }) =>
     api.post('/classrooms', data),
   list: () => api.get('/classrooms'),
+  update: (id: string, data: { name: string; description?: string; academicSession?: string }) =>
+    api.put(`/classrooms/${id}`, data),
+  delete: (id: string) => api.delete(`/classrooms/${id}`),
   assignTeacher: (data: { classroomId: string; teacherId: string }) =>
     api.post('/classrooms/assign', data),
+  bulkAssignTeacher: (data: { classroomIds: string[]; teacherId: string }) =>
+    api.post('/classrooms/bulk-assign', data),
   removeTeacher: (classroomId: string, teacherId: string) =>
     api.delete(`/classrooms/${classroomId}/teachers/${teacherId}`),
 };

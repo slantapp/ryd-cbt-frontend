@@ -266,6 +266,7 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
   const [openDropdowns, setOpenDropdowns] = useState<Set<string>>(new Set());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [theme, setTheme] = useState<any>(null);
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const userMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -305,6 +306,7 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
         // SUPER_ADMIN without school context will get default theme from backend
         const { data } = await themeAPI.get();
         if (data) {
+          setTheme(data);
           applyTheme(data);
         }
       } catch (error) {
@@ -553,15 +555,8 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
       {/* Sidebar - Fixed and unscrollable */}
       <aside className="hidden lg:flex lg:flex-shrink-0 lg:fixed lg:inset-y-0 lg:left-0 lg:z-30">
         <div className="flex flex-col w-64 h-full bg-white border-r border-gray-200">
-          {/* Logo - Fixed at top */}
-          <div className="flex-shrink-0 flex items-center justify-between h-16 px-4 border-b border-gray-200">
-            <Link
-              to="/dashboard"
-              className="text-xl font-bold bg-gradient-to-r from-primary to-primary-600 bg-clip-text text-transparent"
-            >
-              CBT Platform
-            </Link>
-          </div>
+          {/* Empty space where logo was */}
+          <div className="flex-shrink-0 h-16 px-4 border-b border-gray-200"></div>
 
           {/* Navigation - Scrollable if content overflows */}
           <nav className="flex-1 overflow-y-auto px-4 py-4">
@@ -684,6 +679,39 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
               </button>
             </div>
             <div className="flex items-center space-x-4 ml-auto">
+              <Link to="/dashboard" className="flex items-center">
+                {theme?.logoUrl && !theme.logoUrl.startsWith('http') ? (
+                  <img
+                    src={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${theme.logoUrl}`}
+                    alt={account?.name || 'School Logo'}
+                    className="h-8 w-auto max-w-[140px] object-contain"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      const schoolName = encodeURIComponent(account?.name || 'School');
+                      const themeColor = theme?.primaryColor?.replace('#', '') || '1d4ed8';
+                      target.src = `https://ui-avatars.com/api/?name=${schoolName}&background=${themeColor}&color=fff&size=64&bold=true`;
+                    }}
+                  />
+                ) : theme?.logoUrl && theme.logoUrl.startsWith('http') ? (
+                  <img
+                    src={theme.logoUrl}
+                    alt={account?.name || 'School Logo'}
+                    className="h-8 w-auto max-w-[140px] object-contain"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      const schoolName = encodeURIComponent(account?.name || 'School');
+                      const themeColor = theme?.primaryColor?.replace('#', '') || '1d4ed8';
+                      target.src = `https://ui-avatars.com/api/?name=${schoolName}&background=${themeColor}&color=fff&size=64&bold=true`;
+                    }}
+                  />
+                ) : (
+                  <img
+                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(account?.name || 'School')}&background=${theme?.primaryColor?.replace('#', '') || '1d4ed8'}&color=fff&size=64&bold=true`}
+                    alt={account?.name || 'School Logo'}
+                    className="h-8 w-8 rounded-full object-cover"
+                  />
+                )}
+              </Link>
               <NotificationBell />
             </div>
           </div>

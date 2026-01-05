@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { testAPI, questionAPI, sessionAPI, classroomAPI, teacherAPI, customFieldAPI, gradingAPI, studentAPI } from '../../services/api';
+import { testAPI, questionAPI, sessionAPI, classroomAPI, teacherAPI, customFieldAPI, gradingAPI, studentAPI, subjectAPI, testGroupAPI } from '../../services/api';
 import { Test, Question, Session, Classroom, Institution, TestCustomField, StudentTest } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
@@ -15,6 +15,8 @@ export default function TestDetail() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [teachers, setTeachers] = useState<Institution[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [testGroups, setTestGroups] = useState<any[]>([]);
   const [customFields, setCustomFields] = useState<TestCustomField[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -24,6 +26,7 @@ export default function TestDetail() {
   const [showEditForm, setShowEditForm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [creatingQuestion, setCreatingQuestion] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [testScores, setTestScores] = useState<StudentTest[]>([]);
   const [loadingScores, setLoadingScores] = useState(false);
@@ -47,6 +50,8 @@ export default function TestDetail() {
     title: '',
     description: '',
     testGroup: 'Assignment',
+    testGroupId: '',
+    subjectId: '',
     isTimed: false,
     duration: '',
     dueDate: '',
@@ -58,6 +63,7 @@ export default function TestDetail() {
     isActive: true,
     sessionId: '',
     classroomId: '',
+    classroomIds: [] as string[],
     teacherId: '',
   });
   const [aiForm, setAiForm] = useState({
@@ -80,6 +86,8 @@ export default function TestDetail() {
             loadQuestions(),
             loadSessions(),
             loadCustomFields(),
+            loadSubjects(),
+            loadTestGroups(),
           ]);
           
           if (account && (account.role === 'SCHOOL' || account.role === 'TEACHER')) {
@@ -116,10 +124,13 @@ export default function TestDetail() {
       const currentTeacher = (response.data as any).teacher;
       
       const dueDate = response.data.dueDate ? new Date(response.data.dueDate).toISOString().slice(0, 16) : '';
+      const allClassroomIds = response.data.classrooms?.map((tc: any) => tc.classroom?.id || tc.classroomId).filter(Boolean) || [];
       setTestForm({
         title: response.data.title,
         description: response.data.description || '',
         testGroup: response.data.testGroup || 'Assignment',
+        testGroupId: response.data.testGroupId || '',
+        subjectId: response.data.subjectId || '',
         isTimed: response.data.isTimed || false,
         duration: response.data.duration?.toString() || '',
         dueDate: dueDate,
@@ -131,6 +142,7 @@ export default function TestDetail() {
         isActive: response.data.isActive,
         sessionId: currentSession?.id || '',
         classroomId: currentClassroom?.id || '',
+        classroomIds: allClassroomIds,
         teacherId: currentTeacher?.id || '',
       });
     } catch (error: any) {
@@ -164,6 +176,24 @@ export default function TestDetail() {
       setSessions(response.data);
     } catch (error: any) {
       console.error('Failed to load sessions');
+    }
+  };
+
+  const loadSubjects = async () => {
+    try {
+      const response = await subjectAPI.getAll();
+      setSubjects(response.data || []);
+    } catch (error: any) {
+      console.error('Failed to load subjects');
+    }
+  };
+
+  const loadTestGroups = async () => {
+    try {
+      const response = await testGroupAPI.getAll();
+      setTestGroups(response.data || []);
+    } catch (error: any) {
+      console.error('Failed to load test groups');
     }
   };
 
@@ -229,7 +259,13 @@ export default function TestDetail() {
     }
     
     try {
-      await testAPI.update(id!, testForm);
+      const updateData = {
+        ...testForm,
+        classroomIds: testForm.classroomIds.length > 0 ? testForm.classroomIds : undefined,
+        subjectId: testForm.subjectId || undefined,
+        testGroupId: testForm.testGroupId || undefined,
+      };
+      await testAPI.update(id!, updateData);
 
       // Save custom field values if any
       if (Object.keys(customFieldValues).length > 0) {
@@ -353,6 +389,13 @@ export default function TestDetail() {
 
   const handleCreateQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent double submission
+    if (creatingQuestion) {
+      return;
+    }
+    
+    setCreatingQuestion(true);
     try {
       const questionData: any = {
         testId: id,
@@ -370,6 +413,7 @@ export default function TestDetail() {
             : questionForm.options;
         } catch (parseError) {
           toast.error('Invalid JSON format for options. Please check your options format.');
+          setCreatingQuestion(false);
           return;
         }
       } else {
@@ -397,6 +441,8 @@ export default function TestDetail() {
       loadQuestions();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to create question');
+    } finally {
+      setCreatingQuestion(false);
     }
   };
 
@@ -530,78 +576,79 @@ export default function TestDetail() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <Link to="/tests" className="text-primary hover:text-primary-600">
-            ← Back to Tests
+      {/* Title Section at Top */}
+      <div>
+        <Link to="/tests" className="text-primary hover:text-primary-600">
+          ← Back to Tests
+        </Link>
+        <h1 className="text-3xl font-bold text-gray-900 mt-2">{test.title}</h1>
+      </div>
+
+      {/* Action Buttons Below Title */}
+      <div className="flex flex-wrap gap-3 pb-4 border-b border-gray-200">
+        {(test && test.requiresManualGrading) || (account && (account.role === 'TEACHER' || account.role === 'SCHOOL' || account.role === 'SCHOOL_ADMIN') && test) ? (
+          <>
+          <Link
+            to={`/tests/${id}/grade`}
+            className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg"
+          >
+            Grade Tests
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900 mt-2">{test.title}</h1>
-        </div>
-        <div className="flex space-x-2 flex-wrap gap-2">
-          {(test && test.requiresManualGrading) || (account && account.role === 'TEACHER' && test) ? (
-            <>
-            <Link
-              to={`/tests/${id}/grade`}
-              className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg"
-            >
-              Grade Tests
-            </Link>
-              {hasPublishedScores ? (
-                <button
-                  onClick={handleUnpublishAllScores}
-                  className="bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-lg"
-                >
-                  Unpublish All Scores
-                </button>
-              ) : (
-                <button
-                  onClick={handlePublishAllScores}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg"
-                >
-                  Publish All Scores
-                </button>
-              )}
-            </>
-          ) : null}
-          {test && !test.isPublished && !test.isArchived && (
-            <button
-              onClick={handlePublish}
-              className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg"
-            >
-              Publish Test
-            </button>
-          )}
-          {test && test.isPublished && !test.isArchived && (
-            <button
-              onClick={handleUnpublish}
-              className="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg"
-            >
-              Unpublish Test
-            </button>
-          )}
-          {test && !test.isArchived && (
-            <button
-              onClick={handleArchive}
-              className="bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-lg"
-            >
-              Archive Test
-            </button>
-          )}
+            {hasPublishedScores ? (
+              <button
+                onClick={handleUnpublishAllScores}
+                className="bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-lg"
+              >
+                Unpublish All Scores
+              </button>
+            ) : (
+              <button
+                onClick={handlePublishAllScores}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg"
+              >
+                Publish All Scores
+              </button>
+            )}
+          </>
+        ) : null}
+        {test && !test.isPublished && !test.isArchived && (
           <button
-            onClick={() => setShowEditForm(!showEditForm)}
-            className="btn-secondary"
+            onClick={handlePublish}
+            className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg"
           >
-            {showEditForm ? 'Cancel Edit' : 'Edit Test'}
+            Publish Test
           </button>
-          {account?.role === 'SCHOOL' && (
+        )}
+        {test && test.isPublished && !test.isArchived && (
           <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg"
+            onClick={handleUnpublish}
+            className="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg"
           >
-            Delete Test
+            Unpublish Test
           </button>
-          )}
-        </div>
+        )}
+        {test && !test.isArchived && (
+          <button
+            onClick={handleArchive}
+            className="bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-lg"
+          >
+            Archive Test
+          </button>
+        )}
+        <button
+          onClick={() => setShowEditForm(!showEditForm)}
+          className="btn-secondary"
+        >
+          {showEditForm ? 'Cancel Edit' : 'Edit Test'}
+        </button>
+        {account?.role === 'SCHOOL' && (
+        <button
+          onClick={() => setShowDeleteConfirm(true)}
+          className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg"
+        >
+          Delete Test
+        </button>
+        )}
       </div>
 
       {showDeleteConfirm && (
@@ -670,29 +717,58 @@ export default function TestDetail() {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Class <span className="text-red-500">*</span>
+                  Classes <span className="text-red-500">*</span>
                   {account && account.role === 'TEACHER' && <span className="text-xs text-gray-500 ml-2">(Locked)</span>}
                 </label>
                 {account && account.role === 'TEACHER' ? (
-                  <div className="input-field bg-gray-50 cursor-not-allowed">
-                    {test?.classrooms?.[0]?.classroom?.name || 'No class assigned'}
-                    {test?.classrooms?.[0]?.classroom?.academicSession && ` (${test.classrooms[0].classroom.academicSession})`}
+                  <div className="space-y-2">
+                    {test?.classrooms?.map((tc: any) => (
+                      <div key={tc.classroom?.id || tc.classroomId} className="input-field bg-gray-50 cursor-not-allowed">
+                        {tc.classroom?.name || 'Unknown'}
+                        {tc.classroom?.academicSession && ` (${tc.classroom.academicSession})`}
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <select
-                    className="input-field"
-                    value={testForm.classroomId}
-                    onChange={(e) => setTestForm({ ...testForm, classroomId: e.target.value })}
-                    required
-                  >
-                    <option value="">Select a class</option>
-                    {classrooms.map((classroom) => (
-                      <option key={classroom.id} value={classroom.id}>
-                        {classroom.name}
-                        {classroom.academicSession && ` - ${classroom.academicSession}`}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="border rounded-lg p-4 max-h-48 overflow-y-auto">
+                    {classrooms.length === 0 ? (
+                      <p className="text-sm text-gray-500">No classes available</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {classrooms.map((classroom) => (
+                          <label key={classroom.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                            <input
+                              type="checkbox"
+                              checked={testForm.classroomIds.includes(classroom.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setTestForm({
+                                    ...testForm,
+                                    classroomIds: [...testForm.classroomIds, classroom.id],
+                                    classroomId: classroom.id, // Keep for backwards compatibility
+                                  });
+                                } else {
+                                  setTestForm({
+                                    ...testForm,
+                                    classroomIds: testForm.classroomIds.filter(id => id !== classroom.id),
+                                    classroomId: testForm.classroomIds.filter(id => id !== classroom.id)[0] || '',
+                                  });
+                                }
+                              }}
+                              className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                            />
+                            <span className="text-sm text-gray-700">{classroom.name}</span>
+                            {classroom.academicSession && (
+                              <span className="text-xs text-gray-500">({classroom.academicSession})</span>
+                            )}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {testForm.classroomIds.length === 0 && account?.role !== 'TEACHER' && (
+                  <p className="text-xs text-red-500 mt-1">Please select at least one class</p>
                 )}
               </div>
             </div>
@@ -730,18 +806,36 @@ export default function TestDetail() {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Test Group <span className="text-red-500">*</span>
+                  Test Group
                 </label>
                 <select
                   className="input-field"
-                  value={testForm.testGroup}
-                  onChange={(e) => setTestForm({ ...testForm, testGroup: e.target.value })}
-                  required
+                  value={testForm.testGroupId}
+                  onChange={(e) => setTestForm({ ...testForm, testGroupId: e.target.value, testGroup: testGroups.find(tg => tg.id === e.target.value)?.name || '' })}
                 >
-                  <option value="Assignment">Assignment</option>
-                  <option value="Practice Banks">Practice Banks</option>
-                  <option value="Quiz">Quiz</option>
-                  <option value="Final Assessment">Final Assessment</option>
+                  <option value="">Select Test Group (optional)</option>
+                  {testGroups.filter(tg => tg.isActive).map((tg) => (
+                    <option key={tg.id} value={tg.id}>
+                      {tg.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Subject
+                </label>
+                <select
+                  className="input-field"
+                  value={testForm.subjectId}
+                  onChange={(e) => setTestForm({ ...testForm, subjectId: e.target.value })}
+                >
+                  <option value="">Select Subject (optional)</option>
+                  {subjects.filter(s => s.isActive).map((subject) => (
+                    <option key={subject.id} value={subject.id}>
+                      {subject.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -1479,8 +1573,8 @@ export default function TestDetail() {
                 required
               />
               <div className="flex space-x-2">
-                <button type="submit" className="btn-primary">
-                  {editingQuestion ? 'Update' : 'Create'}
+                <button type="submit" className="btn-primary" disabled={creatingQuestion || !!(editingQuestion && creatingQuestion)}>
+                  {creatingQuestion ? 'Creating...' : editingQuestion ? 'Update' : 'Create'}
                 </button>
                 <button
                   type="button"
@@ -1881,7 +1975,15 @@ export default function TestDetail() {
                                         try {
                                           await gradingAPI.hideScore(score.id);
                                           toast.success('Score hidden from student');
-                                          loadTestScores();
+                                          // Update state immediately
+                                          setTestScores(prevScores => 
+                                            prevScores.map(s => 
+                                              s.id === score.id 
+                                                ? { ...s, scoreVisibleToStudent: false }
+                                                : s
+                                            )
+                                          );
+                                          await checkScoresPublished();
                                         } catch (error: any) {
                                           toast.error(error.response?.data?.error || 'Failed to hide score');
                                         }
@@ -1896,7 +1998,15 @@ export default function TestDetail() {
                                         try {
                                           await gradingAPI.releaseScore(score.id);
                                           toast.success('Score released to student');
-                                          loadTestScores();
+                                          // Update state immediately
+                                          setTestScores(prevScores => 
+                                            prevScores.map(s => 
+                                              s.id === score.id 
+                                                ? { ...s, scoreVisibleToStudent: true }
+                                                : s
+                                            )
+                                          );
+                                          await checkScoresPublished();
                                         } catch (error: any) {
                                           toast.error(error.response?.data?.error || 'Failed to release score');
                                         }

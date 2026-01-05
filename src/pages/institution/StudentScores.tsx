@@ -366,11 +366,18 @@ export default function StudentScores() {
                             {tgData ? (
                               <div className="text-sm">
                                 <div className="font-bold text-gray-900">
-                                  {tgData.contribution.toFixed(2)}%
+                                  {tgData.contribution > 0 ? `${tgData.contribution.toFixed(2)}%` : `${tgData.percentage.toFixed(1)}%`}
                                 </div>
-                                <div className="text-xs text-gray-500">
-                                  ({tgData.percentage.toFixed(1)}% × {tgData.weight}%)
-                                </div>
+                                {tgData.contribution > 0 && (
+                                  <div className="text-xs text-gray-500">
+                                    ({tgData.percentage.toFixed(1)}% × {tgData.weight}%)
+                                  </div>
+                                )}
+                                {tgData.contribution === 0 && tgData.percentage > 0 && (
+                                  <div className="text-xs text-gray-500">
+                                    (Not in grading scheme)
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               <div className="text-sm text-gray-400">-</div>

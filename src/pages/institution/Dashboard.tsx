@@ -184,13 +184,13 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {[
           { 
             label: 'Total Tests', 
             value: totalTests, 
             icon: (
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 sm:w-7 sm:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             ), 
@@ -491,7 +491,7 @@ export default function Dashboard() {
         <h1 className="text-4xl font-bold mb-2">Super Admin Overview</h1>
         <p className="text-slate-200 text-lg">Global health across ministries and schools</p>
       </div>
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {[
           { label: 'Ministries', value: adminStats?.stats?.totals?.ministries ?? 0 },
           { label: 'Pending Requests', value: adminStats?.stats?.totals?.pendingMinistries ?? 0 },
@@ -502,7 +502,7 @@ export default function Dashboard() {
         ].map((stat) => (
           <div className="card-hover" key={stat.label}>
             <p className="text-sm text-gray-500">{stat.label}</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{stat.value}</p>
+            <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-2">{stat.value}</p>
           </div>
         ))}
       </div>
@@ -613,18 +613,18 @@ export default function Dashboard() {
           <h1 className="text-4xl font-bold mb-2">Ministry Overview</h1>
           <p className="text-indigo-100 text-lg">Comprehensive metrics across all schools under your umbrella</p>
         </div>
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {metrics.map((metric) => (
             <div
               key={metric.label}
-              className="bg-white rounded-xl shadow-md p-6 border border-gray-100 hover:shadow-lg transition-shadow"
+              className="bg-white rounded-xl shadow-md p-4 sm:p-6 border border-gray-100 hover:shadow-lg transition-shadow"
             >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${metric.gradient} flex items-center justify-center text-2xl shadow-md`}>
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-gradient-to-br ${metric.gradient} flex items-center justify-center text-xl sm:text-2xl shadow-md`}>
                   {metric.icon}
                 </div>
               </div>
-              <p className="text-3xl font-bold text-gray-900 mb-1">{metric.value.toLocaleString()}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{metric.value.toLocaleString()}</p>
               <p className="text-sm font-semibold text-gray-700 mb-1">{metric.label}</p>
               <p className="text-xs text-gray-500">{metric.subLabel}</p>
             </div>
@@ -816,41 +816,41 @@ export default function Dashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
           <div className="card-hover">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm text-gray-500">Assigned Classes</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{stats.classCount}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-2">{stats.classCount}</p>
               </div>
-              <div className="p-3 bg-blue-100 rounded-full">
-                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-2 sm:p-3 bg-blue-100 rounded-full flex-shrink-0">
+                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
               </div>
             </div>
           </div>
           <div className="card-hover">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm text-gray-500">Tests</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{stats.testCount}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-2">{stats.testCount}</p>
               </div>
-              <div className="p-3 bg-green-100 rounded-full">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-2 sm:p-3 bg-green-100 rounded-full flex-shrink-0">
+                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
             </div>
           </div>
           <div className="card-hover">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm text-gray-500">Total Assignments</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{assignments.length}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-2">{assignments.length}</p>
               </div>
-              <div className="p-3 bg-purple-100 rounded-full">
-                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-2 sm:p-3 bg-purple-100 rounded-full flex-shrink-0">
+                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>

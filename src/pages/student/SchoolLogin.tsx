@@ -200,16 +200,37 @@ export default function SchoolLogin() {
               color: 'white',
             }}
           >
-            {theme.logoUrl ? (
+            {theme.logoUrl && !theme.logoUrl.startsWith('http') ? (
+              <img
+                src={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${theme.logoUrl}`}
+                alt={data.institution.name}
+                className="h-20 w-auto mx-auto mb-4 object-contain"
+                onError={(e) => {
+                  // Fallback to ui-avatars if image fails to load
+                  const target = e.target as HTMLImageElement;
+                  const schoolName = encodeURIComponent(data.institution.name);
+                  const themeColor = theme.primaryColor?.replace('#', '') || '1d4ed8';
+                  target.src = `https://ui-avatars.com/api/?name=${schoolName}&background=${themeColor}&color=fff&size=128&bold=true`;
+                }}
+              />
+            ) : theme.logoUrl && theme.logoUrl.startsWith('http') ? (
               <img
                 src={theme.logoUrl}
                 alt={data.institution.name}
                 className="h-20 w-auto mx-auto mb-4 object-contain"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  const schoolName = encodeURIComponent(data.institution.name);
+                  const themeColor = theme.primaryColor?.replace('#', '') || '1d4ed8';
+                  target.src = `https://ui-avatars.com/api/?name=${schoolName}&background=${themeColor}&color=fff&size=128&bold=true`;
+                }}
               />
             ) : (
-              <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-4xl">🎓</span>
-              </div>
+              <img
+                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(data.institution.name)}&background=${theme.primaryColor?.replace('#', '') || '1d4ed8'}&color=fff&size=128&bold=true`}
+                alt={data.institution.name}
+                className="h-20 w-20 mx-auto mb-4 rounded-full object-cover"
+              />
             )}
             <h1 className="text-3xl font-bold mb-2">{data.institution.name}</h1>
             <p className="text-white/90 text-sm">Login to your account</p>
