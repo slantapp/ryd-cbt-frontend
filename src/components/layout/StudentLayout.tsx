@@ -23,6 +23,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [theme, setTheme] = useState<any>(null);
 
   const handleLogout = () => {
     logout();
@@ -39,6 +40,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       try {
         const { data } = await themeAPI.get();
         if (data) {
+          setTheme(data);
           applyTheme(data);
         }
       } catch (error) {
@@ -61,14 +63,40 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
             {/* Logo/Brand */}
             <div className="flex items-center">
               <Link to="/student/dashboard" className="flex items-center space-x-2">
-                <div 
-                  className="w-10 h-10 rounded-lg flex items-center justify-center"
-                  style={{
-                    background: `linear-gradient(to bottom right, var(--theme-primary, #1d4ed8), var(--theme-secondary, var(--theme-primary, #1d4ed8)))`
-                  }}
-                >
-                  <span className="text-2xl">🎓</span>
-                </div>
+                {theme?.logoUrl && !theme.logoUrl.startsWith('http') ? (
+                  <img
+                    src={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${theme.logoUrl}`}
+                    alt={account?.institution?.name || 'School Logo'}
+                    className="h-10 w-auto max-w-[120px] object-contain"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      const schoolName = encodeURIComponent(account?.institution?.name || 'School');
+                      const themeColor = theme?.primaryColor?.replace('#', '') || '1d4ed8';
+                      target.src = `https://ui-avatars.com/api/?name=${schoolName}&background=${themeColor}&color=fff&size=64&bold=true`;
+                    }}
+                  />
+                ) : theme?.logoUrl && theme.logoUrl.startsWith('http') ? (
+                  <img
+                    src={theme.logoUrl}
+                    alt={account?.institution?.name || 'School Logo'}
+                    className="h-10 w-auto max-w-[120px] object-contain"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      const schoolName = encodeURIComponent(account?.institution?.name || 'School');
+                      const themeColor = theme?.primaryColor?.replace('#', '') || '1d4ed8';
+                      target.src = `https://ui-avatars.com/api/?name=${schoolName}&background=${themeColor}&color=fff&size=64&bold=true`;
+                    }}
+                  />
+                ) : (
+                  <div 
+                    className="w-10 h-10 rounded-lg flex items-center justify-center"
+                    style={{
+                      background: `linear-gradient(to bottom right, var(--theme-primary, #1d4ed8), var(--theme-secondary, var(--theme-primary, #1d4ed8)))`
+                    }}
+                  >
+                    <span className="text-2xl">🎓</span>
+                  </div>
+                )}
                 <div className="hidden sm:block">
                   <div className="text-lg font-bold" style={{ color: 'var(--theme-text, #111827)' }}>
                     {account?.institution?.name || 'Student Portal'}

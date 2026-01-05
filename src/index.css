@@ -17,13 +17,13 @@
   -moz-osx-font-smoothing: grayscale;
 
   /* Theme CSS Variables - Default RYD colors */
-  --theme-primary: #aa468e;
+  --theme-primary: #A8518A;
   --theme-primary-50: #f5eef3;
   --theme-primary-100: #e9d6e4;
   --theme-primary-200: #d5b0ca;
   --theme-primary-300: #be85ab;
-  --theme-primary-400: #aa468e;
-  --theme-primary-500: #9a2d7a;
+  --theme-primary-400: #A8518A;
+  --theme-primary-500: #A8518A;
   --theme-primary-600: #8a2167;
   --theme-primary-700: #721c55;
   --theme-primary-800: #5f1a48;
@@ -64,6 +64,28 @@ body {
   
   .card-hover {
     @apply card hover:shadow-xl transition-shadow duration-300;
+  }
+  
+  /* Responsive table utilities */
+  .table-responsive {
+    @apply overflow-x-auto -mx-4 sm:mx-0;
+  }
+  
+  .table-responsive table {
+    @apply min-w-full;
+  }
+  
+  .table-responsive th,
+  .table-responsive td {
+    @apply px-2 sm:px-4 md:px-6 py-3 sm:py-4;
+  }
+  
+  .table-responsive th {
+    @apply text-xs sm:text-sm;
+  }
+  
+  .table-responsive td {
+    @apply text-xs sm:text-sm;
   }
 }
 

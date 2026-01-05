@@ -129,14 +129,23 @@ export default function GradeByQuestion() {
   };
 
   const handlePointsChange = (answerId: string, value: string) => {
-    const numValue = value === '' ? 0 : (parseFloat(value) || 0);
-    const maxPoints = selectedQuestion?.points || 0;
-    const clampedValue = Math.max(0, Math.min(maxPoints, numValue));
-    
-    setGradingData(prev => ({
-      ...prev,
-      [answerId]: clampedValue,
-    }));
+    if (value === '') {
+      // Allow empty string temporarily while user is typing
+      setGradingData(prev => ({
+        ...prev,
+        [answerId]: 0,
+      }));
+      return;
+    }
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue)) {
+      const maxPoints = selectedQuestion?.points || 0;
+      const clampedValue = Math.max(0, Math.min(maxPoints, numValue));
+      setGradingData(prev => ({
+        ...prev,
+        [answerId]: clampedValue,
+      }));
+    }
   };
 
   const calculateNewScore = (answer: StudentAnswer) => {
@@ -442,22 +451,24 @@ export default function GradeByQuestion() {
                         </div>
                         <div className="text-xs text-gray-500">{answer.student.username}</div>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="p-3 bg-gray-50 rounded border border-gray-200 max-w-md">
-                          <p className="text-sm text-gray-900 whitespace-pre-wrap">{answer.answer || '(No answer provided)'}</p>
+                      <td className="px-4 py-3" style={{ minWidth: '200px', maxWidth: '300px' }}>
+                        <div className="p-3 bg-gray-50 rounded border border-gray-200 max-h-32 overflow-y-auto">
+                          <p className="text-sm text-gray-900 whitespace-pre-wrap break-words">{answer.answer || '(No answer provided)'}</p>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="number"
-                          min="0"
-                          max={selectedQuestion.points}
-                          step="0.1"
-                          className="w-24 input-field text-right"
-                          value={gradingData[answer.id] ?? answer.pointsEarned}
-                          onChange={(e) => handlePointsChange(answer.id, e.target.value)}
-                        />
-                        <span className="text-xs text-gray-500 ml-1">/ {selectedQuestion.points}</span>
+                      <td className="px-4 py-3" style={{ width: '150px' }}>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            max={selectedQuestion.points}
+                            step="1"
+                            className="w-20 input-field text-right flex-shrink-0"
+                            value={gradingData[answer.id] ?? answer.pointsEarned}
+                            onChange={(e) => handlePointsChange(answer.id, e.target.value)}
+                          />
+                          <span className="text-xs text-gray-500 whitespace-nowrap">/ {selectedQuestion.points}</span>
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-sm text-gray-700">

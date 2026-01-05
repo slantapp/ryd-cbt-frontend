@@ -37,6 +37,7 @@ import GradeByQuestion from './pages/institution/GradeByQuestion';
 import TeacherTests from './pages/institution/TeacherTests';
 import ClassTests from './pages/institution/ClassTests';
 import SchoolAdmin from './pages/institution/SchoolAdmin';
+import QuestionBank from './pages/institution/QuestionBank';
 
 // Student pages
 import StudentTestPage from './pages/student/StudentTestPage';
@@ -447,6 +448,16 @@ function App() {
               <PrivateRoute>
                 <InstitutionLayout>
                   <Subjects />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/question-bank"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <QuestionBank />
                 </InstitutionLayout>
               </PrivateRoute>
             }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { sessionAPI, testAPI, classroomAPI, sessionArchiveAPI } from '../../services/api';
+import { sessionAPI, testAPI, classroomAPI, sessionArchiveAPI, themeAPI } from '../../services/api';
 import { Session, Test, Classroom } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
@@ -12,6 +12,11 @@ export default function Sessions() {
   const [archivedSessions, setArchivedSessions] = useState<Session[]>([]);
   const [tests, setTests] = useState<Test[]>([]);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const [theme, setTheme] = useState<any>({
+    primaryColor: '#A8518A',
+    secondaryColor: '#1d4ed8',
+    accentColor: '#facc15',
+  });
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
@@ -20,7 +25,7 @@ export default function Sessions() {
     archiveClassAssignments: false,
     archiveTeacherAssignments: false,
   });
-  const [activeTab, setActiveTab] = useState<'active' | 'scheduled' | 'inactive' | 'archived'>('active');
+  const [activeTab, setActiveTab] = useState<'active-scheduled' | 'inactive' | 'archived'>('active-scheduled');
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -62,6 +67,23 @@ export default function Sessions() {
       return 'inactive';
     }
   };
+
+  // Load theme
+  useEffect(() => {
+    const loadTheme = async () => {
+      try {
+        const { data } = await themeAPI.get();
+        if (data) {
+          setTheme(data);
+        }
+      } catch (error) {
+        console.error('Failed to load theme:', error);
+      }
+    };
+    if (account && (account.role === 'SCHOOL' || account.role === 'TEACHER' || account.role === 'SCHOOL_ADMIN')) {
+      loadTheme();
+    }
+  }, [account]);
 
   useEffect(() => {
     loadSessions();
@@ -214,41 +236,85 @@ export default function Sessions() {
     return s.isActive && start <= new Date() && end >= new Date();
   }).length;
 
+  const totalSessions = sessions.length;
+  const totalTestsInSessions = sessions.reduce((sum, s) => sum + (s.tests?.length || 0), 0);
+
   return (
     <div className="space-y-8">
-      {/* Header Section */}
-      <div className="bg-gradient-to-r from-primary to-primary-600 rounded-2xl shadow-xl p-8 text-white">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-4xl font-bold mb-2">Sessions</h1>
-            <p className="text-primary-100 text-lg">Manage test sessions and schedules</p>
-          </div>
-          {(account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN') && (
-            <button 
-              onClick={() => setShowForm(!showForm)} 
-              className="bg-white text-primary hover:bg-primary-50 font-semibold py-2.5 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl"
-            >
-              {showForm ? 'Cancel' : '+ Create New Session'}
-            </button>
-          )}
-        </div>
-
-        {/* Stats */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="text-3xl font-bold">{sessions.length}</div>
-            <div className="text-sm text-primary-100 mt-1">Total Sessions</div>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="text-3xl font-bold">{activeSessions}</div>
-            <div className="text-sm text-primary-100 mt-1">Active Now</div>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="text-3xl font-bold">
-              {sessions.reduce((sum, s) => sum + (s.tests?.length || 0), 0)}
+      {/* Header */}
+      <div 
+        className="rounded-2xl shadow-2xl p-8 text-white relative overflow-hidden"
+        style={{
+          background: `linear-gradient(to right, ${theme?.primaryColor || '#A8518A'}, ${theme?.secondaryColor || theme?.primaryColor || '#A8518A'}, ${theme?.accentColor || theme?.primaryColor || '#A8518A'})`
+        }}
+      >
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
+        <div className="relative z-10">
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-4xl font-bold mb-2">Academic Sessions</h1>
+              <p className="text-white/80 text-lg">Manage test sessions and schedules</p>
             </div>
-            <div className="text-sm text-primary-100 mt-1">Total Tests</div>
+            {(account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN') && (
+              <button 
+                onClick={() => setShowForm(!showForm)} 
+                className="bg-white font-semibold py-2.5 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl"
+                style={{ color: theme?.primaryColor || '#A8518A' }}
+              >
+                {showForm ? 'Cancel' : '+ Create New Session'}
+              </button>
+            )}
           </div>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div 
+          className="card border-2"
+          style={{
+            background: `linear-gradient(to bottom right, ${theme?.primaryColor || '#A8518A'}15, ${theme?.primaryColor || '#A8518A'}25)`,
+            borderColor: `${theme?.primaryColor || '#A8518A'}40`
+          }}
+        >
+          <div 
+            className="text-3xl font-bold mb-1"
+            style={{ color: theme?.primaryColor || '#A8518A' }}
+          >
+            {totalSessions}
+          </div>
+          <div className="text-sm text-gray-600">Total Sessions</div>
+        </div>
+        <div 
+          className="card border-2"
+          style={{
+            background: `linear-gradient(to bottom right, ${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}15, ${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}25)`,
+            borderColor: `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}40`
+          }}
+        >
+          <div 
+            className="text-3xl font-bold mb-1"
+            style={{ color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8' }}
+          >
+            {activeSessions}
+          </div>
+          <div className="text-sm text-gray-600">Active Now</div>
+        </div>
+        <div 
+          className="card border-2"
+          style={{
+            background: `linear-gradient(to bottom right, ${theme?.accentColor || theme?.primaryColor || '#facc15'}15, ${theme?.accentColor || theme?.primaryColor || '#facc15'}25)`,
+            borderColor: `${theme?.accentColor || theme?.primaryColor || '#facc15'}40`
+          }}
+        >
+          <div 
+            className="text-3xl font-bold mb-1"
+            style={{ color: theme?.accentColor || theme?.primaryColor || '#facc15' }}
+          >
+            {totalTestsInSessions}
+          </div>
+          <div className="text-sm text-gray-600">Total Tests</div>
         </div>
       </div>
 
@@ -438,8 +504,10 @@ export default function Sessions() {
           }
         };
 
-        const activeCount = sessions.filter(s => getSessionStatus(s) === 'active').length;
-        const scheduledCount = sessions.filter(s => getSessionStatus(s) === 'scheduled').length;
+        const activeScheduledCount = sessions.filter(s => {
+          const status = getSessionStatus(s);
+          return status === 'active' || status === 'scheduled';
+        }).length;
         const inactiveCount = sessions.filter(s => getSessionStatus(s) === 'inactive').length;
         const archivedCount = sessions.filter(s => getSessionStatus(s) === 'archived').length;
 
@@ -447,24 +515,14 @@ export default function Sessions() {
           <div className="card">
             <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-0">
               <button
-                onClick={() => setActiveTab('active')}
+                onClick={() => setActiveTab('active-scheduled')}
                 className={`px-4 py-2 font-semibold border-b-2 transition-colors ${
-                  activeTab === 'active'
+                  activeTab === 'active-scheduled'
                     ? 'border-green-500 text-green-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
-                Active ({activeCount})
-              </button>
-              <button
-                onClick={() => setActiveTab('scheduled')}
-                className={`px-4 py-2 font-semibold border-b-2 transition-colors ${
-                  activeTab === 'scheduled'
-                    ? 'border-yellow-500 text-yellow-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Scheduled ({scheduledCount})
+                Active & Scheduled ({activeScheduledCount})
               </button>
               <button
                 onClick={() => setActiveTab('inactive')}
@@ -493,12 +551,16 @@ export default function Sessions() {
 
       {/* Sessions List */}
       {(() => {
-        const filteredSessions = sessions.filter(s => getSessionStatus(s) === activeTab);
+        const filteredSessions = activeTab === 'active-scheduled'
+          ? sessions.filter(s => {
+              const status = getSessionStatus(s);
+              return status === 'active' || status === 'scheduled';
+            })
+          : sessions.filter(s => getSessionStatus(s) === activeTab);
 
         if (filteredSessions.length === 0) {
           const emptyMessages = {
-            active: { emoji: '✅', title: 'No active sessions', message: 'There are no sessions currently running' },
-            scheduled: { emoji: '📅', title: 'No scheduled sessions', message: 'There are no upcoming sessions' },
+            'active-scheduled': { emoji: '✅', title: 'No active or scheduled sessions', message: 'There are no active or scheduled sessions' },
             inactive: { emoji: '⏸️', title: 'No inactive sessions', message: 'There are no inactive sessions' },
             archived: { emoji: '📦', title: 'No archived sessions', message: 'Archived sessions will appear here' },
           };
@@ -509,7 +571,7 @@ export default function Sessions() {
               <div className="text-6xl mb-4">{empty.emoji}</div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">{empty.title}</h3>
               <p className="text-gray-500 mb-6">{empty.message}</p>
-              {activeTab === 'active' && (account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN') && (
+              {activeTab === 'active-scheduled' && (account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN') && (
                 <button onClick={() => setShowForm(true)} className="btn-primary">
                   Create Your First Session
                 </button>

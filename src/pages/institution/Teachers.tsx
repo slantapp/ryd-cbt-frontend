@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { teacherAPI, classroomAPI } from '../../services/api';
+import { teacherAPI, classroomAPI, themeAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -8,6 +8,11 @@ export default function Teachers() {
   const { account } = useAuthStore();
   const [teachers, setTeachers] = useState<any[]>([]);
   const [classrooms, setClassrooms] = useState<any[]>([]);
+  const [theme, setTheme] = useState<any>({
+    primaryColor: '#A8518A',
+    secondaryColor: '#1d4ed8',
+    accentColor: '#facc15',
+  });
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -62,6 +67,23 @@ export default function Teachers() {
       setLoading(false);
     }
   };
+
+  // Load theme
+  useEffect(() => {
+    const loadTheme = async () => {
+      try {
+        const { data } = await themeAPI.get();
+        if (data) {
+          setTheme(data);
+        }
+      } catch (error) {
+        console.error('Failed to load theme:', error);
+      }
+    };
+    if (isSchool || isSuperAdmin) {
+      loadTheme();
+    }
+  }, [isSchool, isSuperAdmin]);
 
   useEffect(() => {
     if (isSchool || isSuperAdmin) {
@@ -262,14 +284,79 @@ export default function Teachers() {
     return <p className="text-center text-gray-500">Only schools and super admins can view teacher accounts.</p>;
   }
 
+  const totalTeachers = teachers.length;
+  const assignedTeachers = teachers.filter(t => t.classrooms && t.classrooms.length > 0).length;
+  const unassignedTeachers = totalTeachers - assignedTeachers;
+
   return (
     <div className="space-y-8">
-      <div className="bg-gradient-to-r from-primary to-primary-600 rounded-2xl shadow-xl p-8 text-white">
-        <h1 className="text-4xl font-bold mb-2">Teachers</h1>
-        <p className="text-primary-100 text-lg">
-          {isSuperAdmin ? 'View all teachers across all schools' : 'Manage teacher accounts and assignments'}
-        </p>
+      {/* Header */}
+      <div 
+        className="rounded-2xl shadow-2xl p-8 text-white relative overflow-hidden"
+        style={{
+          background: `linear-gradient(to right, ${theme?.primaryColor || '#A8518A'}, ${theme?.secondaryColor || theme?.primaryColor || '#A8518A'}, ${theme?.accentColor || theme?.primaryColor || '#A8518A'})`
+        }}
+      >
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
+        <div className="relative z-10">
+          <h1 className="text-4xl font-bold mb-2">Teachers</h1>
+          <p className="text-white/80 text-lg">
+            {isSuperAdmin ? 'View all teachers across all schools' : 'Manage teacher accounts and assignments'}
+          </p>
+        </div>
       </div>
+
+      {/* Stats Cards */}
+      {isSchool && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div 
+            className="card border-2"
+            style={{
+              background: `linear-gradient(to bottom right, ${theme?.primaryColor || '#A8518A'}15, ${theme?.primaryColor || '#A8518A'}25)`,
+              borderColor: `${theme?.primaryColor || '#A8518A'}40`
+            }}
+          >
+            <div 
+              className="text-3xl font-bold mb-1"
+              style={{ color: theme?.primaryColor || '#A8518A' }}
+            >
+              {totalTeachers}
+            </div>
+            <div className="text-sm text-gray-600">Total Teachers</div>
+          </div>
+          <div 
+            className="card border-2"
+            style={{
+              background: `linear-gradient(to bottom right, ${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}15, ${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}25)`,
+              borderColor: `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}40`
+            }}
+          >
+            <div 
+              className="text-3xl font-bold mb-1"
+              style={{ color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8' }}
+            >
+              {assignedTeachers}
+            </div>
+            <div className="text-sm text-gray-600">Assigned</div>
+          </div>
+          <div 
+            className="card border-2"
+            style={{
+              background: `linear-gradient(to bottom right, ${theme?.accentColor || theme?.primaryColor || '#facc15'}15, ${theme?.accentColor || theme?.primaryColor || '#facc15'}25)`,
+              borderColor: `${theme?.accentColor || theme?.primaryColor || '#facc15'}40`
+            }}
+          >
+            <div 
+              className="text-3xl font-bold mb-1"
+              style={{ color: theme?.accentColor || theme?.primaryColor || '#facc15' }}
+            >
+              {unassignedTeachers}
+            </div>
+            <div className="text-sm text-gray-600">Unassigned</div>
+          </div>
+        </div>
+      )}
 
       {isSchool && (
         <div className="card">
@@ -393,6 +480,7 @@ export default function Teachers() {
                       value={form.password}
                       onChange={(e) => setForm({ ...form, password: e.target.value })}
                     />
+                    <p className="text-xs text-gray-500 mt-1">Password must be at least 6 characters long</p>
                   </div>
                 </div>
 
@@ -508,24 +596,25 @@ export default function Teachers() {
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Email</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Belongs To</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Metrics</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Classes</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredTeachers.map((teacher) => (
-                  <tr key={teacher.id} className="hover:bg-gray-50">
-                    {editingId === teacher.id ? (
-                      <>
-                        <td className="px-4 py-3">
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="inline-block min-w-full align-middle">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Name</th>
+                    <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden sm:table-cell">Email</th>
+                    <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden md:table-cell">Belongs To</th>
+                    <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden lg:table-cell">Metrics</th>
+                    <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden md:table-cell">Classes</th>
+                    <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredTeachers.map((teacher) => (
+                    <tr key={teacher.id} className="hover:bg-gray-50">
+                      {editingId === teacher.id ? (
+                        <>
+                          <td className="px-2 sm:px-4 md:px-6 py-3">
                           <input
                             type="text"
                             className="input-field text-sm"
@@ -542,7 +631,7 @@ export default function Teachers() {
                             placeholder="Phone (optional)"
                           />
                         </td>
-                        <td className="px-4 py-3">
+                          <td className="px-2 sm:px-4 md:px-6 py-3 hidden sm:table-cell">
                           <input
                             type="email"
                             className="input-field text-sm"
@@ -552,14 +641,14 @@ export default function Teachers() {
                             required
                           />
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
+                        <td className="px-2 sm:px-4 md:px-6 py-3 text-sm text-gray-600 hidden md:table-cell">
                           {teacher.parent ? (
-                            <span>{teacher.parent.name} ({teacher.parent.role})</span>
+                            <span className="text-xs">{teacher.parent.name} ({teacher.parent.role})</span>
                           ) : (
                             <span className="text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm">
+                        <td className="px-2 sm:px-4 md:px-6 py-3 text-sm hidden lg:table-cell">
                           {teacher.metrics ? (
                             <div className="flex flex-col gap-1">
                               <span className="text-xs">Classes: {teacher.metrics.classes}</span>
@@ -567,10 +656,10 @@ export default function Teachers() {
                               <span className="text-xs">Tests: {teacher.metrics.tests}</span>
                             </div>
                           ) : (
-                            <span className="text-gray-400">-</span>
+                            <span className="text-gray-400 text-xs">-</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm">
+                        <td className="px-2 sm:px-4 md:px-6 py-3 text-sm hidden md:table-cell">
                           {teacher.assignedClasses?.length > 0 ? (
                             <div className="relative group">
                               <div className="flex flex-wrap gap-1">
@@ -589,7 +678,7 @@ export default function Teachers() {
                             <span className="text-gray-400 text-xs">No classes</span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
+                          <td className="px-2 sm:px-4 md:px-6 py-3 hidden sm:table-cell">
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleUpdate(teacher.id)}
@@ -610,30 +699,20 @@ export default function Teachers() {
                       </>
                     ) : (
                       <>
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-gray-900">{teacher.name}</p>
-                          <p className="text-xs text-gray-500">{teacher.phone || 'No phone'}</p>
+                        <td className="px-2 sm:px-4 md:px-6 py-3">
+                          <p className="font-semibold text-gray-900 text-sm">{teacher.name}</p>
+                          <p className="text-xs text-gray-500 sm:hidden">{teacher.email}</p>
+                          <p className="text-xs text-gray-500 hidden sm:block">{teacher.phone || 'No phone'}</p>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{teacher.email}</td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              teacher.isActive
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
-                            }`}
-                          >
-                            {teacher.isActive ? 'Active' : 'Inactive'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
+                        <td className="px-2 sm:px-4 md:px-6 py-3 text-sm text-gray-700 hidden sm:table-cell">{teacher.email}</td>
+                        <td className="px-2 sm:px-4 md:px-6 py-3 text-sm text-gray-600 hidden md:table-cell">
                           {teacher.parent ? (
-                            <span>{teacher.parent.name} ({teacher.parent.role})</span>
+                            <span className="text-xs">{teacher.parent.name} ({teacher.parent.role})</span>
                           ) : (
                             <span className="text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm">
+                        <td className="px-2 sm:px-4 md:px-6 py-3 text-sm hidden lg:table-cell">
                           {teacher.metrics ? (
                             <div className="flex flex-col gap-1">
                               <span className="text-xs">Classes: {teacher.metrics.classes}</span>
@@ -641,10 +720,10 @@ export default function Teachers() {
                               <span className="text-xs">Tests: {teacher.metrics.tests}</span>
                             </div>
                           ) : (
-                            <span className="text-gray-400">-</span>
+                            <span className="text-gray-400 text-xs">-</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm">
+                        <td className="px-2 sm:px-4 md:px-6 py-3 text-sm hidden md:table-cell">
                           {teacher.assignedClasses?.length > 0 ? (
                             <div className="relative group">
                               <div className="flex flex-wrap gap-1">
@@ -663,7 +742,7 @@ export default function Teachers() {
                             <span className="text-gray-400 text-xs">No classes</span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 md:px-6 py-3">
                           <div className="flex gap-2 flex-wrap items-center">
                             {isSchool && (
                               <>
@@ -720,6 +799,7 @@ export default function Teachers() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>

@@ -211,6 +211,11 @@ export const questionAPI = {
   getByTest: (testId: string) => api.get(`/questions/test/${testId}`),
   update: (id: string, data: any) => api.put(`/questions/${id}`, data),
   delete: (id: string) => api.delete(`/questions/${id}`),
+  // Question Bank
+  addToBank: (data: { questionId: string; subjectId: string; grade: string }) => api.post('/questions/bank/add', data),
+  createInBank: (data: { questionText: string; questionType: string; options?: any; correctAnswer: string; points: number; subjectId: string; grade: string }) => api.post('/questions/bank/create', data),
+  getBankQuestions: (params?: { subjectId?: string; grade?: string }) => api.get('/questions/bank', { params }),
+  addFromBankToTest: (data: { testId: string; questionIds: string[] }) => api.post('/questions/bank/add-to-test', data),
 };
 
 // Sessions

@@ -1,12 +1,17 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { studentAPI, sessionAPI, classroomAPI, institutionAPI } from '../../services/api';
+import { studentAPI, sessionAPI, classroomAPI, institutionAPI, themeAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
 export default function Students() {
   const { account } = useAuthStore();
+  const [theme, setTheme] = useState<any>({
+    primaryColor: '#A8518A',
+    secondaryColor: '#1d4ed8',
+    accentColor: '#facc15',
+  });
   const navigate = useNavigate();
   const [students, setStudents] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
@@ -75,6 +80,23 @@ export default function Students() {
   const isSuperAdmin = useMemo(() => {
     return account?.role === 'SUPER_ADMIN';
   }, [account?.role]);
+
+  // Load theme
+  useEffect(() => {
+    const loadTheme = async () => {
+      try {
+        const { data } = await themeAPI.get();
+        if (data) {
+          setTheme(data);
+        }
+      } catch (error) {
+        console.error('Failed to load theme:', error);
+      }
+    };
+    if (isSchool || isTeacher) {
+      loadTheme();
+    }
+  }, [isSchool, isTeacher]);
 
   useEffect(() => {
     if (isSchool || isTeacher || isSuperAdmin) {
@@ -516,14 +538,19 @@ export default function Students() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-2xl shadow-2xl p-8 text-white relative overflow-hidden">
+      <div 
+        className="rounded-2xl shadow-2xl p-8 text-white relative overflow-hidden"
+        style={{
+          background: `linear-gradient(to right, ${theme?.primaryColor || '#A8518A'}, ${theme?.secondaryColor || theme?.primaryColor || '#A8518A'}, ${theme?.accentColor || theme?.primaryColor || '#A8518A'})`
+        }}
+      >
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
         <div className="relative z-10">
           <h1 className="text-4xl font-bold mb-2">
             {isTeacher ? 'My Students' : isSuperAdmin ? 'All Students' : 'Student Management'}
           </h1>
-          <p className="text-blue-100 text-lg">
+          <p className="text-white/80 text-lg">
           {isTeacher ? 'View students from your assigned classes' : isSuperAdmin ? 'View all students across all schools' : 'Manage students, assignments, and promotions'}
         </p>
         </div>
@@ -531,29 +558,77 @@ export default function Students() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="card bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200">
-          <div className="text-3xl font-bold text-blue-600 mb-1">{students.length}</div>
+        <div 
+          className="card border-2"
+          style={{
+            background: `linear-gradient(to bottom right, ${theme?.primaryColor || '#A8518A'}15, ${theme?.primaryColor || '#A8518A'}25)`,
+            borderColor: `${theme?.primaryColor || '#A8518A'}40`
+          }}
+        >
+          <div 
+            className="text-3xl font-bold mb-1"
+            style={{ color: theme?.primaryColor || '#A8518A' }}
+          >
+            {students.length}
+          </div>
           <div className="text-sm text-gray-600">Total Students</div>
         </div>
-        <div className="card bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200">
-          <div className="text-3xl font-bold text-green-600 mb-1">
+        <div 
+          className="card border-2"
+          style={{
+            background: `linear-gradient(to bottom right, ${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}15, ${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}25)`,
+            borderColor: `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}40`
+          }}
+        >
+          <div 
+            className="text-3xl font-bold mb-1"
+            style={{ color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8' }}
+          >
             {students.filter((s) => s.isAssigned).length}
           </div>
           <div className="text-sm text-gray-600">Assigned</div>
         </div>
-        <div className="card bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-200">
-          <div className="text-3xl font-bold text-orange-600 mb-1">{unassignedCount}</div>
+        <div 
+          className="card border-2"
+          style={{
+            background: `linear-gradient(to bottom right, ${theme?.accentColor || theme?.primaryColor || '#facc15'}15, ${theme?.accentColor || theme?.primaryColor || '#facc15'}25)`,
+            borderColor: `${theme?.accentColor || theme?.primaryColor || '#facc15'}40`
+          }}
+        >
+          <div 
+            className="text-3xl font-bold mb-1"
+            style={{ color: theme?.accentColor || theme?.primaryColor || '#facc15' }}
+          >
+            {unassignedCount}
+          </div>
           <div className="text-sm text-gray-600">Unassigned</div>
         </div>
-        <div className="card bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200">
-          <div className="text-3xl font-bold text-purple-600 mb-1">{markedForPromotion}</div>
+        <div 
+          className="card border-2"
+          style={{
+            background: `linear-gradient(to bottom right, ${theme?.primaryColor || '#A8518A'}20, ${theme?.primaryColor || '#A8518A'}30)`,
+            borderColor: `${theme?.primaryColor || '#A8518A'}50`
+          }}
+        >
+          <div 
+            className="text-3xl font-bold mb-1"
+            style={{ color: theme?.primaryColor || '#A8518A' }}
+          >
+            {markedForPromotion}
+          </div>
           <div className="text-sm text-gray-600">Marked for Promotion</div>
         </div>
       </div>
 
       {/* Registration URL - Only for Schools */}
       {schoolInfo?.uniqueSlug && isSchool && (
-        <div className="card bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200">
+        <div 
+          className="card border-2"
+          style={{
+            background: `linear-gradient(to right, ${theme?.primaryColor || '#A8518A'}15, ${theme?.secondaryColor || theme?.primaryColor || '#A8518A'}15)`,
+            borderColor: `${theme?.primaryColor || '#A8518A'}40`
+          }}
+        >
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Student Self-Registration</h3>
@@ -624,7 +699,7 @@ export default function Students() {
                   setPromoteForm({ ...promoteForm, studentIds: selectedStudents });
                   setShowPromoteDialog(true);
                 }}
-                className="btn-primary text-sm bg-purple-600 hover:bg-purple-700"
+                className="btn-primary text-sm"
               >
                 🎓 Promote Selected ({selectedStudents.length})
               </button>
@@ -637,7 +712,13 @@ export default function Students() {
 
         {/* Bulk Upload Section - Only for Schools */}
         {showBulkUpload && isSchool && (
-          <div className="mb-6 p-6 bg-blue-50 border-2 border-blue-200 rounded-xl">
+          <div 
+            className="mb-6 p-6 border-2 rounded-xl"
+            style={{
+              backgroundColor: `${theme?.primaryColor || '#A8518A'}15`,
+              borderColor: `${theme?.primaryColor || '#A8518A'}40`
+            }}
+          >
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Bulk Upload Students</h3>
             
             {/* Class and Session Selection (Optional) */}
@@ -689,8 +770,17 @@ export default function Students() {
             </div>
 
             {bulkUploadClassroomId && bulkUploadSessionId && (
-              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-800">
+              <div 
+                className="mb-4 p-3 border rounded-lg"
+                style={{
+                  backgroundColor: `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}15`,
+                  borderColor: `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}40`
+                }}
+              >
+                <p 
+                  className="text-sm"
+                  style={{ color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8' }}
+                >
                   ✅ Students will be automatically assigned to: <strong>
                     {classrooms.find((c) => c.id === bulkUploadClassroomId)?.name}
                   </strong> in session <strong>
@@ -801,12 +891,13 @@ export default function Students() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="inline-block min-w-full align-middle">
+              <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
                   {isSchool && (
-                  <th className="text-left py-3 px-4">
+                  <th className="text-left py-3 px-2 sm:px-4">
                     <input
                       type="checkbox"
                       checked={selectedStudents.length === students.length && students.length > 0}
@@ -815,12 +906,12 @@ export default function Students() {
                     />
                   </th>
                   )}
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Name</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Username</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Email</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Class</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
+                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm">Name</th>
+                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm hidden sm:table-cell">Username</th>
+                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm hidden md:table-cell">Email</th>
+                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm">Class</th>
+                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm hidden lg:table-cell">Status</th>
+                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -830,7 +921,7 @@ export default function Students() {
                     className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                   >
                     {isSchool && (
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-2 sm:px-4">
                       <input
                         type="checkbox"
                         checked={selectedStudents.includes(student.id)}
@@ -839,39 +930,50 @@ export default function Students() {
                       />
                     </td>
                     )}
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-2 sm:px-4">
                       <div className="flex items-center space-x-2">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
+                        <div 
+                          className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm"
+                          style={{
+                            background: `linear-gradient(to bottom right, ${theme?.primaryColor || '#A8518A'}, ${theme?.secondaryColor || theme?.primaryColor || '#A8518A'})`
+                          }}
+                        >
                           {student.firstName?.[0] || ''}{student.lastName?.[0] || ''}
                         </div>
                         <div>
-                          <div className="font-medium text-gray-900">
+                          <div className="font-medium text-gray-900 text-xs sm:text-sm">
                             {student.firstName} {student.lastName}
                           </div>
+                          <div className="text-xs text-gray-500 sm:hidden">{student.username}</div>
                           {student.dateOfBirth && (
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-gray-500 hidden sm:block">
                               {format(new Date(student.dateOfBirth), 'MMM dd, yyyy')}
                             </div>
                           )}
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-gray-700">{student.username}</td>
-                    <td className="py-3 px-4 text-gray-600 text-sm">{student.email || '-'}</td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-2 sm:px-4 text-gray-700 text-xs sm:text-sm hidden sm:table-cell">{student.username}</td>
+                    <td className="py-3 px-2 sm:px-4 text-gray-600 text-xs sm:text-sm hidden md:table-cell">{student.email || '-'}</td>
+                    <td className="py-3 px-2 sm:px-4">
                       {student.classAssignments && student.classAssignments.length > 0 ? (
-                        // Show only the current assignment (1:1 relationship)
-                        <div className="text-sm">
-                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded">
+                        <div className="text-xs sm:text-sm">
+                          <span 
+                            className="inline-block px-2 py-1 rounded"
+                            style={{
+                              backgroundColor: `${theme?.primaryColor || '#A8518A'}20`,
+                              color: theme?.primaryColor || '#A8518A'
+                            }}
+                          >
                             {student.classAssignments[0].classroom?.name}
                             {student.classAssignments[0].session?.name && ` (${student.classAssignments[0].session.name})`}
                           </span>
                         </div>
                       ) : (
-                        <span className="text-gray-400 text-sm">Not assigned</span>
+                        <span className="text-gray-400 text-xs sm:text-sm">Not assigned</span>
                       )}
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-2 sm:px-4 hidden lg:table-cell">
                       <div className="flex flex-col space-y-1">
                         {student.isAssigned ? (
                           <span className="inline-block px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
@@ -883,20 +985,35 @@ export default function Students() {
                           </span>
                         )}
                         {student.markedForPromotion && (
-                          <span className="inline-block px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs mt-1">
-                            🎓 Marked for Promotion
+                          <span 
+                            className="inline-block px-2 py-1 rounded text-xs mt-1"
+                            style={{
+                              backgroundColor: `${theme?.accentColor || theme?.primaryColor || '#facc15'}20`,
+                              color: theme?.accentColor || theme?.primaryColor || '#facc15'
+                            }}
+                          >
+                            🎓 Marked
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-2 sm:px-4">
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => {
                             setSelectedStudent(student);
                             navigate(`/students/${student.id}`);
                           }}
-                          className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                          className="p-2 rounded-lg transition-colors"
+                          style={{
+                            color: theme?.primaryColor || '#A8518A'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = `${theme?.primaryColor || '#A8518A'}15`;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
                           title="View student profile"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -915,7 +1032,16 @@ export default function Students() {
                             });
                             setShowAssignDialog(true);
                           }}
-                          className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors"
+                          className="p-2 rounded-lg transition-colors"
+                          style={{
+                            color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}15`;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
                           title={student.isAssigned ? "Reassign student to a different class" : "Assign student to a class"}
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -956,6 +1082,7 @@ export default function Students() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>
@@ -985,12 +1112,24 @@ export default function Students() {
               
               {/* Show selected students list for bulk assignment */}
               {isBulkAssignment && (
-                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm font-semibold text-green-800 mb-2">
+                <div 
+                  className="mb-4 p-3 border rounded-lg"
+                  style={{
+                    backgroundColor: `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}15`,
+                    borderColor: `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}40`
+                  }}
+                >
+                  <p 
+                    className="text-sm font-semibold mb-2"
+                    style={{ color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8' }}
+                  >
                     Selected Students ({selectedStudents.length}):
                   </p>
                   <div className="max-h-32 overflow-y-auto">
-                    <ul className="text-sm text-green-700 space-y-1">
+                    <ul 
+                      className="text-sm space-y-1"
+                      style={{ color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8' }}
+                    >
                       {selectedStudents.map((studentId) => {
                         const student = students.find((s) => s.id === studentId);
                         return student ? (
@@ -1006,9 +1145,23 @@ export default function Students() {
 
               {/* Show selected student info if one is pre-selected (single assignment) */}
               {!isBulkAssignment && assignForm.studentId && selectedStudent && (
-                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm font-semibold text-green-800 mb-1">Selected Student:</p>
-                  <p className="text-sm text-green-700">
+                <div 
+                  className="mb-4 p-3 border rounded-lg"
+                  style={{
+                    backgroundColor: `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}15`,
+                    borderColor: `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}40`
+                  }}
+                >
+                  <p 
+                    className="text-sm font-semibold mb-1"
+                    style={{ color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8' }}
+                  >
+                    Selected Student:
+                  </p>
+                  <p 
+                    className="text-sm"
+                    style={{ color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8' }}
+                  >
                     {selectedStudent.firstName} {selectedStudent.lastName} ({selectedStudent.username})
                   </p>
                 </div>
@@ -1041,8 +1194,17 @@ export default function Students() {
                 </div>
               )}
 
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
+              <div 
+                className="mb-4 p-3 border rounded-lg"
+                style={{
+                  backgroundColor: `${theme?.primaryColor || '#A8518A'}15`,
+                  borderColor: `${theme?.primaryColor || '#A8518A'}40`
+                }}
+              >
+                <p 
+                  className="text-sm"
+                  style={{ color: theme?.primaryColor || '#A8518A' }}
+                >
                   <strong>Note:</strong> {isBulkAssignment 
                     ? `All ${selectedStudents.length} selected students will be assigned to the same class and session. A student can only belong to one class at a time.`
                     : 'A student can only belong to one class at a time. ' + 
@@ -1301,6 +1463,7 @@ export default function Students() {
                     onChange={(e) => setCreateFormData({ ...createFormData, password: e.target.value })}
                     autoComplete="new-password"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Password must be at least 6 characters long</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

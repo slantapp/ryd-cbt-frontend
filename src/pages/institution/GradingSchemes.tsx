@@ -792,29 +792,30 @@ export default function GradingSchemes() {
             <p>No grading schemes yet. Create your first grading scheme to get started.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Subject</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Class-Session</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Test Groups & Weights</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Total</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="inline-block min-w-full align-middle">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Subject</th>
+                    <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden md:table-cell">Class-Session</th>
+                    <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Test Groups & Weights</th>
+                    <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden sm:table-cell">Total</th>
+                    <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
                 {gradingSchemes.map((scheme) => {
                   const total = scheme.weights?.reduce((sum, w) => sum + w.weight, 0) || 0;
                   return (
                     <tr key={scheme.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-semibold text-gray-900">
+                      <td className="px-2 sm:px-4 md:px-6 py-3 font-semibold text-gray-900 text-xs sm:text-sm">
                         {scheme.subject?.name || 'Unknown'}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
+                      <td className="px-2 sm:px-4 md:px-6 py-3 text-xs sm:text-sm text-gray-700 hidden md:table-cell">
                         {scheme.sessionClass?.classroom?.name || 'Unknown'} - {scheme.sessionClass?.session?.name || 'Unknown'}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
+                      <td className="px-2 sm:px-4 md:px-6 py-3 text-xs sm:text-sm text-gray-700">
                         <div className="space-y-1">
                           {scheme.weights?.map((w) => (
                             <div key={w.id} className="flex items-center space-x-2">
@@ -824,7 +825,7 @@ export default function GradingSchemes() {
                           ))}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-2 sm:px-4 md:px-6 py-3 hidden sm:table-cell">
                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
                           Math.abs(total - 100) < 0.01
                             ? 'bg-green-100 text-green-800'
@@ -833,17 +834,17 @@ export default function GradingSchemes() {
                           {total.toFixed(1)}%
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex space-x-2">
+                      <td className="px-2 sm:px-4 md:px-6 py-3">
+                        <div className="flex space-x-1 sm:space-x-2">
                           <button
                             onClick={() => handleEdit(scheme)}
-                            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
+                            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded transition-colors text-xs sm:text-sm"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleDelete(scheme.id)}
-                            className="text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                            className="text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition-colors text-xs sm:text-sm"
                           >
                             Delete
                           </button>
@@ -854,6 +855,7 @@ export default function GradingSchemes() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>

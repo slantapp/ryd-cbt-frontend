@@ -7,6 +7,7 @@ import {
   adminAPI,
   ministryAPI,
   teacherAPI,
+  themeAPI,
 } from '../../services/api';
 import { Test, Session, Classroom, TeacherAssignment } from '../../types';
 import toast from 'react-hot-toast';
@@ -37,11 +38,33 @@ export default function Dashboard() {
       testCount: number;
     };
   } | null>(null);
+  const [theme, setTheme] = useState<any>({
+    primaryColor: '#A8518A',
+    secondaryColor: '#1d4ed8',
+    accentColor: '#facc15',
+  });
   const [loading, setLoading] = useState(true);
   const [teacherFilters, setTeacherFilters] = useState({
     classroomId: '',
     testGroup: '',
   });
+
+  // Load theme
+  useEffect(() => {
+    const loadTheme = async () => {
+      try {
+        const { data } = await themeAPI.get();
+        if (data) {
+          setTheme(data);
+        }
+      } catch (error) {
+        console.error('Failed to load theme:', error);
+      }
+    };
+    if (account && (account.role === 'SCHOOL' || account.role === 'TEACHER' || account.role === 'SCHOOL_ADMIN')) {
+      loadTheme();
+    }
+  }, [account]);
 
   useEffect(() => {
     if (account) {
@@ -155,9 +178,18 @@ export default function Dashboard() {
 
   const renderSchoolDashboard = () => (
     <>
-      <div className="bg-gradient-to-r from-primary to-primary-600 rounded-xl shadow-lg p-8 text-white">
-        <h1 className="text-4xl font-bold mb-2">Dashboard</h1>
-        <p className="text-primary-100 text-lg">Welcome back, {account?.name}</p>
+      {/* Header */}
+      <div 
+        className="rounded-2xl shadow-2xl p-8 text-white relative overflow-hidden"
+        style={{
+          background: `linear-gradient(to right, ${theme?.primaryColor || '#A8518A'}, ${theme?.secondaryColor || theme?.primaryColor || '#A8518A'}, ${theme?.accentColor || theme?.primaryColor || '#A8518A'})`
+        }}
+      >
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
+        <div className="relative z-10">
+          <h1 className="text-4xl font-bold mb-2">Dashboard</h1>
+          <p className="text-white/80 text-lg">Welcome back, {account?.name}</p>
         {account?.uniqueSlug && (
           <div className="mt-4 bg-white/10 backdrop-blur-sm rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
@@ -182,57 +214,56 @@ export default function Dashboard() {
             </code>
           </div>
         )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {[
-          { 
-            label: 'Total Tests', 
-            value: totalTests, 
-            icon: (
-              <svg className="w-6 h-6 sm:w-7 sm:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            ), 
-            gradient: 'from-primary to-primary-600' 
-          },
-          { 
-            label: 'Total Classes', 
-            value: totalClasses, 
-            icon: (
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            ), 
-            gradient: 'from-blue-500 to-blue-600' 
-          },
-          { 
-            label: 'Total Students', 
-            value: totalStudents, 
-            icon: (
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            ), 
-            gradient: 'from-purple-500 to-purple-600' 
-          },
-        ].map((card) => (
-          <div className="card-hover" key={card.label}>
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div
-                  className={`w-14 h-14 bg-gradient-to-br ${card.gradient} rounded-xl flex items-center justify-center shadow-lg`}
-                >
-                  {card.icon}
-                </div>
-              </div>
-              <div className="ml-5 flex-1">
-                <p className="text-sm font-medium text-gray-500">{card.label}</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">{card.value}</p>
-              </div>
-            </div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div 
+          className="card border-2"
+          style={{
+            background: `linear-gradient(to bottom right, ${theme?.primaryColor || '#A8518A'}15, ${theme?.primaryColor || '#A8518A'}25)`,
+            borderColor: `${theme?.primaryColor || '#A8518A'}40`
+          }}
+        >
+          <div 
+            className="text-3xl font-bold mb-1"
+            style={{ color: theme?.primaryColor || '#A8518A' }}
+          >
+            {totalTests}
           </div>
-        ))}
+          <div className="text-sm text-gray-600">Total Tests</div>
+        </div>
+        <div 
+          className="card border-2"
+          style={{
+            background: `linear-gradient(to bottom right, ${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}15, ${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}25)`,
+            borderColor: `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}40`
+          }}
+        >
+          <div 
+            className="text-3xl font-bold mb-1"
+            style={{ color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8' }}
+          >
+            {totalClasses}
+          </div>
+          <div className="text-sm text-gray-600">Total Classes</div>
+        </div>
+        <div 
+          className="card border-2"
+          style={{
+            background: `linear-gradient(to bottom right, ${theme?.accentColor || theme?.primaryColor || '#facc15'}15, ${theme?.accentColor || theme?.primaryColor || '#facc15'}25)`,
+            borderColor: `${theme?.accentColor || theme?.primaryColor || '#facc15'}40`
+          }}
+        >
+          <div 
+            className="text-3xl font-bold mb-1"
+            style={{ color: theme?.accentColor || theme?.primaryColor || '#facc15' }}
+          >
+            {totalStudents}
+          </div>
+          <div className="text-sm text-gray-600">Total Students</div>
+        </div>
       </div>
 
       {/* Active Session */}
@@ -255,11 +286,28 @@ export default function Dashboard() {
         }
 
         return (
-          <div className="card border-2 border-primary-200 bg-gradient-to-br from-primary-50 to-white">
+          <div 
+            className="card border-2"
+            style={{
+              background: `linear-gradient(to bottom right, ${theme?.primaryColor || '#A8518A'}10, white)`,
+              borderColor: `${theme?.primaryColor || '#A8518A'}40`
+            }}
+          >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div 
+                  className="w-12 h-12 rounded-lg flex items-center justify-center"
+                  style={{
+                    backgroundColor: `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}20`
+                  }}
+                >
+                  <svg 
+                    className="w-6 h-6" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                    style={{ color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8' }}
+                  >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
@@ -268,7 +316,13 @@ export default function Dashboard() {
                   <p className="text-sm text-gray-600">Current ongoing session</p>
                 </div>
               </div>
-              <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
+              <span 
+                className="px-3 py-1 text-xs font-semibold rounded-full"
+                style={{
+                  backgroundColor: `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}20`,
+                  color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'
+                }}
+              >
                 Active Now
               </span>
             </div>
@@ -309,101 +363,6 @@ export default function Dashboard() {
         );
       })()}
 
-      <div className="card">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Recent Tests</h2>
-          <Link to="/tests" className="text-primary hover:text-primary-600 font-medium text-sm">
-            View all →
-          </Link>
-        </div>
-        {tests.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500 mb-4">No tests yet. Create your first test!</p>
-            <Link to="/tests?create=true" className="btn-primary inline-block">
-              Create Test
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {tests.slice(0, 5).map((test) => (
-              <Link
-                key={test.id}
-                to={`/tests/${test.id}`}
-                className="block p-5 border-2 border-gray-200 rounded-xl hover:border-primary hover:shadow-md transition-all bg-gray-50 hover:bg-white"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-lg text-gray-900">{test.title}</h3>
-                      {test.testGroup && (
-                        <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">
-                          {test.testGroup}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600 mb-3">{test.description}</p>
-                    <div className="flex items-center space-x-4 text-sm text-gray-500">
-                      <span className="flex items-center">
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {test.isTimed ? `${test.duration} min` : 'Untimed'}
-                      </span>
-                      <span className="flex items-center">
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {test.questions?.length || 0} questions
-                      </span>
-                      <span className="flex items-center">
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                        </svg>
-                        {test._count?.studentTests || 0} attempts
-                      </span>
-                      {test.dueDate && (
-                        <span className="text-orange-600 flex items-center">
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                          {new Date(test.dueDate).toLocaleDateString()}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2 ml-4">
-                    {test.classrooms && test.classrooms.length > 0 && (
-                      <div className="flex flex-wrap gap-1 justify-end max-w-[200px]">
-                        {test.classrooms.slice(0, 2).map((tc: any) => (
-                          <span
-                            key={tc.classroom?.id || tc.id}
-                            className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full whitespace-nowrap"
-                          >
-                            {tc.classroom?.name || tc.name}
-                          </span>
-                        ))}
-                        {test.classrooms.length > 2 && (
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-                            +{test.classrooms.length - 2}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    <span
-                      className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                        test.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {test.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* Quick Actions */}
       {(account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN') && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -421,7 +380,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary transition-colors">
-                    Teacher Tests
+                    Test by Teacher
                   </h3>
                   <p className="text-sm text-gray-500 mt-1">
                     View all tests assigned to each teacher
@@ -458,7 +417,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary transition-colors">
-                    Class Tests
+                    Test by Class
                   </h3>
                   <p className="text-sm text-gray-500 mt-1">
                     View all tests assigned to each class

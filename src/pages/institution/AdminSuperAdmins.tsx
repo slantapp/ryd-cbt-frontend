@@ -37,14 +37,23 @@ export default function AdminSuperAdmins() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate password
+    if (form.password.length < 6) {
+      toast.error('Password must be at least 6 characters long');
+      return;
+    }
+    
     setCreating(true);
     try {
-      await adminAPI.createSuperAdmin(form);
+      const response = await adminAPI.createSuperAdmin(form);
       toast.success('Super admin created successfully');
       setForm({ name: '', email: '', password: '', phone: '' });
       loadSuperAdmins();
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to create super admin');
+      console.error('Create super admin error:', error);
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to create super admin';
+      toast.error(errorMessage);
     } finally {
       setCreating(false);
     }
@@ -89,15 +98,18 @@ export default function AdminSuperAdmins() {
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
           />
-          <input
-            name="password"
-            type="password"
-            placeholder="Password"
-            className="input-field"
-            required
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-          />
+          <div>
+            <input
+              name="password"
+              type="password"
+              placeholder="Password"
+              className="input-field"
+              required
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+            />
+            <p className="text-xs text-gray-500 mt-1">Password must be at least 6 characters long</p>
+          </div>
           <input
             name="phone"
             type="tel"

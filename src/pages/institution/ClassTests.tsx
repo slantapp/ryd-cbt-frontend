@@ -75,7 +75,7 @@ export default function ClassTests() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Class Tests</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Test by Class</h1>
           <p className="text-gray-600 mt-1">View all tests assigned to each class</p>
         </div>
       </div>

@@ -50,7 +50,7 @@ export interface ThemeData {
  * Applies theme colors to CSS custom properties on the document root
  */
 export const applyTheme = (themeData: ThemeData) => {
-  const primaryColor = themeData.primaryColor || '#aa468e';
+  const primaryColor = themeData.primaryColor || '#A8518A';
   
   // Generate primary color shades
   const root = document.documentElement;

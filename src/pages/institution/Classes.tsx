@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { classroomAPI, teacherAPI, sessionAPI } from '../../services/api';
+import { classroomAPI, teacherAPI, sessionAPI, themeAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { Session } from '../../types';
 import toast from 'react-hot-toast';
@@ -10,6 +10,11 @@ export default function Classes() {
   const [classes, setClasses] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [theme, setTheme] = useState<any>({
+    primaryColor: '#A8518A',
+    secondaryColor: '#1d4ed8',
+    accentColor: '#facc15',
+  });
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -40,6 +45,23 @@ export default function Classes() {
   const isSchool = account?.role === 'SCHOOL';
   const isTeacher = account?.role === 'TEACHER';
   const isSuperAdmin = account?.role === 'SUPER_ADMIN';
+
+  // Load theme
+  useEffect(() => {
+    const loadTheme = async () => {
+      try {
+        const { data } = await themeAPI.get();
+        if (data) {
+          setTheme(data);
+        }
+      } catch (error) {
+        console.error('Failed to load theme:', error);
+      }
+    };
+    if (isSchool || isSuperAdmin) {
+      loadTheme();
+    }
+  }, [isSchool, isSuperAdmin]);
 
   useEffect(() => {
     loadClasses();
@@ -184,7 +206,12 @@ export default function Classes() {
       setClassForm({ name: '', academicSession: '', description: '', sessionId: '' });
       loadClasses();
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to update class');
+      console.error('Update class error:', error);
+      const errorMessage = error?.response?.data?.error || 
+                          error?.response?.statusText || 
+                          error?.message || 
+                          'Failed to update class';
+      toast.error(errorMessage);
     } finally {
       setUpdating(false);
     }
@@ -201,7 +228,12 @@ export default function Classes() {
       setDeletingClass(null);
       loadClasses();
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to delete class');
+      console.error('Delete class error:', error);
+      const errorMessage = error?.response?.data?.error || 
+                          error?.response?.statusText || 
+                          error?.message || 
+                          'Failed to delete class';
+      toast.error(errorMessage);
     } finally {
       setDeleting(false);
     }
@@ -221,16 +253,81 @@ export default function Classes() {
     return <p className="text-center text-gray-500">Classes are only visible to schools, teachers, and super admins.</p>;
   }
 
+  const totalClasses = classes.length;
+  const classesWithTeachers = classes.filter(c => c.teachers && c.teachers.length > 0).length;
+  const classesWithoutTeachers = totalClasses - classesWithTeachers;
+
   return (
     <div className="space-y-8">
-      <div className="bg-gradient-to-r from-primary to-primary-600 rounded-2xl shadow-xl p-8 text-white">
-        <h1 className="text-4xl font-bold mb-2">
-          {isSuperAdmin ? 'All Classes' : 'Classes'}
-        </h1>
-        <p className="text-primary-100 text-lg">
-          {isSuperAdmin ? 'View all classes across all schools' : isTeacher ? 'View classes you are assigned to' : 'Manage classes and teacher assignments'}
-        </p>
+      {/* Header */}
+      <div 
+        className="rounded-2xl shadow-2xl p-8 text-white relative overflow-hidden"
+        style={{
+          background: `linear-gradient(to right, ${theme?.primaryColor || '#A8518A'}, ${theme?.secondaryColor || theme?.primaryColor || '#A8518A'}, ${theme?.accentColor || theme?.primaryColor || '#A8518A'})`
+        }}
+      >
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
+        <div className="relative z-10">
+          <h1 className="text-4xl font-bold mb-2">
+            {isSuperAdmin ? 'All Classes' : 'Classes'}
+          </h1>
+          <p className="text-white/80 text-lg">
+            {isSuperAdmin ? 'View all classes across all schools' : isTeacher ? 'View classes you are assigned to' : 'Manage classes and teacher assignments'}
+          </p>
+        </div>
       </div>
+
+      {/* Stats Cards */}
+      {isSchool && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div 
+            className="card border-2"
+            style={{
+              background: `linear-gradient(to bottom right, ${theme?.primaryColor || '#A8518A'}15, ${theme?.primaryColor || '#A8518A'}25)`,
+              borderColor: `${theme?.primaryColor || '#A8518A'}40`
+            }}
+          >
+            <div 
+              className="text-3xl font-bold mb-1"
+              style={{ color: theme?.primaryColor || '#A8518A' }}
+            >
+              {totalClasses}
+            </div>
+            <div className="text-sm text-gray-600">Total Classes</div>
+          </div>
+          <div 
+            className="card border-2"
+            style={{
+              background: `linear-gradient(to bottom right, ${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}15, ${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}25)`,
+              borderColor: `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}40`
+            }}
+          >
+            <div 
+              className="text-3xl font-bold mb-1"
+              style={{ color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8' }}
+            >
+              {classesWithTeachers}
+            </div>
+            <div className="text-sm text-gray-600">With Teachers</div>
+          </div>
+          <div 
+            className="card border-2"
+            style={{
+              background: `linear-gradient(to bottom right, ${theme?.accentColor || theme?.primaryColor || '#facc15'}15, ${theme?.accentColor || theme?.primaryColor || '#facc15'}25)`,
+              borderColor: `${theme?.accentColor || theme?.primaryColor || '#facc15'}40`
+            }}
+          >
+            <div 
+              className="text-3xl font-bold mb-1"
+              style={{ color: theme?.accentColor || theme?.primaryColor || '#facc15' }}
+            >
+              {classesWithoutTeachers}
+            </div>
+            <div className="text-sm text-gray-600">Without Teachers</div>
+          </div>
+        </div>
+      )}
       {isSchool && (
         <div className="flex gap-4">
           <button

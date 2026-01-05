@@ -75,8 +75,11 @@ export interface Test {
 }
 
 export interface Question {
+  isInQuestionBank?: boolean;
+  questionBankSubjectId?: string;
+  questionBankGrade?: string;
   id: string;
-  testId: string;
+  testId?: string | null;
   questionText: string;
   questionType: 'multiple_choice' | 'multiple_select' | 'true_false' | 'short_answer';
   options?: Record<string, string>;

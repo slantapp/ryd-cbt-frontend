@@ -31,6 +31,7 @@ export default function TestDetail() {
   const [testScores, setTestScores] = useState<StudentTest[]>([]);
   const [loadingScores, setLoadingScores] = useState(false);
   const [showScores, setShowScores] = useState(false);
+  const [scoreTab, setScoreTab] = useState<'best' | 'multiple'>('best');
   const [questionForm, setQuestionForm] = useState({
     questionText: '',
     questionType: 'multiple_choice',
@@ -75,6 +76,15 @@ export default function TestDetail() {
     numberOfQuestions: '5',
     questionType: 'multiple_choice' as 'multiple_choice' | 'multiple_select' | 'true_false' | 'short_answer',
   });
+  // Question Bank state
+  const [showQuestionBankModal, setShowQuestionBankModal] = useState(false);
+  const [questionBankQuestions, setQuestionBankQuestions] = useState<Question[]>([]);
+  const [questionBankFilters, setQuestionBankFilters] = useState({
+    subjectId: '',
+    grade: '',
+  });
+  const [selectedBankQuestions, setSelectedBankQuestions] = useState<Set<string>>(new Set());
+  const [loadingBankQuestions, setLoadingBankQuestions] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -154,8 +164,17 @@ export default function TestDetail() {
 
   const loadClassrooms = async () => {
     try {
-      const response = await classroomAPI.list();
-      setClassrooms(response.data);
+      if (account?.role === 'TEACHER') {
+        // For teachers, only load classrooms they are assigned to
+        const response = await teacherAPI.dashboard();
+        const assignments = response.data?.assignments || [];
+        const assignedClassrooms = assignments.map((assignment: any) => assignment.classroom).filter(Boolean);
+        setClassrooms(assignedClassrooms);
+      } else {
+        // For schools, load all classrooms
+        const response = await classroomAPI.list();
+        setClassrooms(response.data);
+      }
     } catch (error: any) {
       console.error('Failed to load classrooms');
     }
@@ -241,6 +260,49 @@ export default function TestDetail() {
     }
   };
 
+  const loadQuestionBankQuestions = async () => {
+    setLoadingBankQuestions(true);
+    try {
+      const params: any = {};
+      if (questionBankFilters.subjectId) {
+        params.subjectId = questionBankFilters.subjectId;
+      }
+      if (questionBankFilters.grade) {
+        params.grade = questionBankFilters.grade;
+      }
+      const response = await questionAPI.getBankQuestions(params);
+      setQuestionBankQuestions(response.data || []);
+    } catch (error: any) {
+      console.error('Failed to load question bank questions:', error);
+      toast.error(error.response?.data?.error || 'Failed to load question bank questions');
+      setQuestionBankQuestions([]);
+    } finally {
+      setLoadingBankQuestions(false);
+    }
+  };
+
+  const handleAddQuestionsFromBank = async () => {
+    if (selectedBankQuestions.size === 0) {
+      toast.error('Please select at least one question');
+      return;
+    }
+
+    try {
+      const response = await questionAPI.addFromBankToTest({
+        testId: id!,
+        questionIds: Array.from(selectedBankQuestions),
+      });
+      toast.success(`Added ${response.data.questions?.length || selectedBankQuestions.size} question(s) to test`);
+      setShowQuestionBankModal(false);
+      setSelectedBankQuestions(new Set());
+      setQuestionBankFilters({ subjectId: '', grade: '' });
+      await loadQuestions();
+    } catch (error: any) {
+      console.error('Failed to add questions from bank:', error);
+      toast.error(error.response?.data?.error || 'Failed to add questions from bank');
+    }
+  };
+
   const handleUpdateTest = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -259,12 +321,18 @@ export default function TestDetail() {
     }
     
     try {
-      const updateData = {
+      const updateData: any = {
         ...testForm,
-        classroomIds: testForm.classroomIds.length > 0 ? testForm.classroomIds : undefined,
         subjectId: testForm.subjectId || undefined,
         testGroupId: testForm.testGroupId || undefined,
       };
+      
+      // Always send classroomIds array if it has values, otherwise don't send it
+      // This ensures the backend correctly processes multiple classroom assignments
+      if (testForm.classroomIds && testForm.classroomIds.length > 0) {
+        updateData.classroomIds = testForm.classroomIds;
+      }
+      
       await testAPI.update(id!, updateData);
 
       // Save custom field values if any
@@ -295,7 +363,7 @@ export default function TestDetail() {
       toast.success('Test deleted');
       navigate('/tests');
     } catch (error: any) {
-      toast.error('Failed to delete test');
+      toast.error(error?.response?.data?.error || 'Failed to delete test');
     }
   };
 
@@ -577,23 +645,23 @@ export default function TestDetail() {
   return (
     <div className="space-y-6">
       {/* Title Section at Top */}
-      <div>
-        <Link to="/tests" className="text-primary hover:text-primary-600">
-          ← Back to Tests
-        </Link>
-        <h1 className="text-3xl font-bold text-gray-900 mt-2">{test.title}</h1>
-      </div>
+        <div>
+          <Link to="/tests" className="text-primary hover:text-primary-600">
+            ← Back to Tests
+          </Link>
+          <h1 className="text-3xl font-bold text-gray-900 mt-2">{test.title}</h1>
+        </div>
 
       {/* Action Buttons Below Title */}
       <div className="flex flex-wrap gap-3 pb-4 border-b border-gray-200">
         {(test && test.requiresManualGrading) || (account && (account.role === 'TEACHER' || account.role === 'SCHOOL' || account.role === 'SCHOOL_ADMIN') && test) ? (
           <>
-          <Link
-            to={`/tests/${id}/grade`}
-            className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg"
-          >
-            Grade Tests
-          </Link>
+            <Link
+              to={`/tests/${id}/grade`}
+              className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg"
+            >
+              Grade Tests
+            </Link>
             {hasPublishedScores ? (
               <button
                 onClick={handleUnpublishAllScores}
@@ -610,45 +678,45 @@ export default function TestDetail() {
               </button>
             )}
           </>
-        ) : null}
-        {test && !test.isPublished && !test.isArchived && (
+          ) : null}
+          {test && !test.isPublished && !test.isArchived && (
+            <button
+              onClick={handlePublish}
+              className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg"
+            >
+              Publish Test
+            </button>
+          )}
+          {test && test.isPublished && !test.isArchived && (
+            <button
+              onClick={handleUnpublish}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg"
+            >
+              Unpublish Test
+            </button>
+          )}
+          {test && !test.isArchived && (
+            <button
+              onClick={handleArchive}
+              className="bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-lg"
+            >
+              Archive Test
+            </button>
+          )}
           <button
-            onClick={handlePublish}
-            className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg"
+            onClick={() => setShowEditForm(!showEditForm)}
+            className="btn-secondary"
           >
-            Publish Test
+            {showEditForm ? 'Cancel Edit' : 'Edit Test'}
           </button>
-        )}
-        {test && test.isPublished && !test.isArchived && (
+          {account?.role === 'SCHOOL' && (
           <button
-            onClick={handleUnpublish}
-            className="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg"
+            onClick={() => setShowDeleteConfirm(true)}
+            className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg"
           >
-            Unpublish Test
+            Delete Test
           </button>
-        )}
-        {test && !test.isArchived && (
-          <button
-            onClick={handleArchive}
-            className="bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-lg"
-          >
-            Archive Test
-          </button>
-        )}
-        <button
-          onClick={() => setShowEditForm(!showEditForm)}
-          className="btn-secondary"
-        >
-          {showEditForm ? 'Cancel Edit' : 'Edit Test'}
-        </button>
-        {account?.role === 'SCHOOL' && (
-        <button
-          onClick={() => setShowDeleteConfirm(true)}
-          className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg"
-        >
-          Delete Test
-        </button>
-        )}
+          )}
       </div>
 
       {showDeleteConfirm && (
@@ -682,9 +750,9 @@ export default function TestDetail() {
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Session <span className="text-red-500">*</span>
-                  {account && account.role === 'TEACHER' && <span className="text-xs text-gray-500 ml-2">(Locked)</span>}
+                  {account && account.role === 'TEACHER' && test?.teacherId !== account.id && <span className="text-xs text-gray-500 ml-2">(Locked)</span>}
                 </label>
-                {account && account.role === 'TEACHER' ? (
+                {account && account.role === 'TEACHER' && test?.teacherId !== account.id ? (
                   <div className="input-field bg-gray-50 cursor-not-allowed">
                     {test?.sessions?.[0]?.session?.name || 'No session assigned'}
                     {test?.sessions?.[0]?.session?.classAssignments?.[0]?.classroom?.name && ` (${test.sessions[0].session.classAssignments[0].classroom.name})`}
@@ -718,9 +786,9 @@ export default function TestDetail() {
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Classes <span className="text-red-500">*</span>
-                  {account && account.role === 'TEACHER' && <span className="text-xs text-gray-500 ml-2">(Locked)</span>}
+                  {account && account.role === 'TEACHER' && test?.teacherId !== account.id && <span className="text-xs text-gray-500 ml-2">(Locked)</span>}
                 </label>
-                {account && account.role === 'TEACHER' ? (
+                {account && account.role === 'TEACHER' && test?.teacherId !== account.id ? (
                   <div className="space-y-2">
                     {test?.classrooms?.map((tc: any) => (
                       <div key={tc.classroom?.id || tc.classroomId} className="input-field bg-gray-50 cursor-not-allowed">
@@ -735,7 +803,7 @@ export default function TestDetail() {
                       <p className="text-sm text-gray-500">No classes available</p>
                     ) : (
                       <div className="space-y-2">
-                        {classrooms.map((classroom) => (
+                    {classrooms.map((classroom) => (
                           <label key={classroom.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
                             <input
                               type="checkbox"
@@ -895,6 +963,10 @@ export default function TestDetail() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Passing Score (%)
+                </label>
               <input
                 type="number"
                 step="0.1"
@@ -903,6 +975,11 @@ export default function TestDetail() {
                 value={testForm.passingScore}
                 onChange={(e) => setTestForm({ ...testForm, passingScore: e.target.value })}
               />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Max Attempts <span className="text-red-500">*</span>
+                </label>
               <input
                 type="number"
                 className="input-field"
@@ -911,6 +988,7 @@ export default function TestDetail() {
                 onChange={(e) => setTestForm({ ...testForm, maxAttempts: e.target.value })}
                 required
               />
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <label className="flex items-center cursor-pointer group">
@@ -1311,6 +1389,335 @@ export default function TestDetail() {
         </div>
       )}
 
+      {/* Test Scores Section */}
+      <div className="card">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Test Scores</h2>
+          <button
+            onClick={() => {
+              if (!showScores) {
+                loadTestScores();
+              }
+              setShowScores(!showScores);
+            }}
+            className="btn-secondary text-sm"
+          >
+            {showScores ? 'Hide Scores' : 'View All Scores'}
+          </button>
+        </div>
+
+        {showScores && (
+          <div>
+            {loadingScores ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                  <div className="text-gray-600">Loading scores...</div>
+                </div>
+              </div>
+            ) : testScores.length === 0 ? (
+              <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
+                <div className="text-6xl mb-4">📊</div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Scores Yet</h3>
+                <p className="text-gray-500">
+                  No students have taken this test yet. Scores will appear here once students complete the test.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Tabs */}
+                <div className="flex border-b border-gray-200">
+                  <button
+                    onClick={() => setScoreTab('best')}
+                    className={`px-4 py-2 font-semibold border-b-2 transition-colors ${
+                      scoreTab === 'best'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    Best Scores
+                  </button>
+                  <button
+                    onClick={() => setScoreTab('multiple')}
+                    className={`px-4 py-2 font-semibold border-b-2 transition-colors ${
+                      scoreTab === 'multiple'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    Multiple Attempts
+                  </button>
+                </div>
+
+                {/* Filter scores based on tab */}
+                {(() => {
+                  // Group scores by student ID
+                  const scoresByStudent = new Map<string, StudentTest[]>();
+                  testScores.forEach(score => {
+                    const studentId = score.studentId;
+                    if (!scoresByStudent.has(studentId)) {
+                      scoresByStudent.set(studentId, []);
+                    }
+                    scoresByStudent.get(studentId)!.push(score);
+                  });
+
+                  // For each student, find their best score (highest percentage, then highest score)
+                  const bestScores = Array.from(scoresByStudent.values()).map(studentScores => {
+                    return studentScores.reduce((best, current) => {
+                      const bestPercent = best.percentage || 0;
+                      const currentPercent = current.percentage || 0;
+                      if (currentPercent > bestPercent) return current;
+                      if (currentPercent === bestPercent) {
+                        return (current.score || 0) > (best.score || 0) ? current : best;
+                      }
+                      return best;
+                    });
+                  });
+
+                  // Multiple attempts are all scores that are not the best score for that student
+                  const bestScoreIds = new Set(bestScores.map(s => s.id));
+                  const multipleAttempts = testScores.filter(score => !bestScoreIds.has(score.id));
+
+                  const displayedScores = scoreTab === 'best' ? bestScores : multipleAttempts;
+
+                  return (
+                    <>
+                      {/* Stats */}
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                          <div className="text-2xl font-bold text-blue-600">{displayedScores.length}</div>
+                          <div className="text-sm text-blue-700 mt-1">Total {scoreTab === 'best' ? 'Students' : 'Attempts'}</div>
+                        </div>
+                        <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                          <div className="text-2xl font-bold text-green-600">
+                            {displayedScores.filter(s => s.isPassed === true).length}
+                          </div>
+                          <div className="text-sm text-green-700 mt-1">Passed</div>
+                        </div>
+                        <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+                          <div className="text-2xl font-bold text-red-600">
+                            {displayedScores.filter(s => s.isPassed === false).length}
+                          </div>
+                          <div className="text-sm text-red-700 mt-1">Failed</div>
+                        </div>
+                        <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                          <div className="text-2xl font-bold text-purple-600">
+                            {displayedScores.length > 0
+                              ? (displayedScores.reduce((sum, s) => sum + (s.percentage || 0), 0) / displayedScores.length).toFixed(1)
+                              : '0'}%
+                          </div>
+                          <div className="text-sm text-purple-700 mt-1">Average Score</div>
+                        </div>
+                      </div>
+
+                      {/* Scores Table */}
+                      <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                      <tr>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          Student
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          Score
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          Percentage
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          Attempt
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          Submitted
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {displayedScores.map((score) => (
+                        <tr key={score.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center mr-3">
+                                <span className="text-primary font-bold text-sm">
+                                  {score.student?.firstName?.[0] || score.student?.lastName?.[0] || 'U'}
+                                </span>
+                              </div>
+                              <div>
+                                <div className="text-sm font-semibold text-gray-900">
+                                  {score.student ? `${score.student.firstName} ${score.student.lastName}` : 'Unknown'}
+                                </div>
+                                {score.student?.email && (
+                                  <div className="text-sm text-gray-500">{score.student.email}</div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-bold text-gray-900">
+                              {score.score !== null && score.score !== undefined
+                                ? `${score.score.toFixed(1)}`
+                                : 'N/A'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center space-x-3">
+                              <div className={`text-sm font-bold ${
+                                score.percentage !== null && score.percentage !== undefined
+                                  ? score.percentage >= 70
+                                    ? 'text-green-600'
+                                    : score.percentage >= 50
+                                    ? 'text-yellow-600'
+                                    : 'text-red-600'
+                                  : 'text-gray-600'
+                              }`}>
+                                {score.percentage !== null && score.percentage !== undefined
+                                  ? `${score.percentage.toFixed(1)}%`
+                                  : 'N/A'}
+                              </div>
+                              {score.percentage !== null && score.percentage !== undefined && (
+                                <div className="w-20 bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className={`h-2 rounded-full transition-all ${
+                                      score.percentage >= 70
+                                        ? 'bg-green-500'
+                                        : score.percentage >= 50
+                                        ? 'bg-yellow-500'
+                                        : 'bg-red-500'
+                                    }`}
+                                    style={{ width: `${Math.min(score.percentage, 100)}%` }}
+                                  ></div>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                    <span
+                              className={`px-3 py-1.5 inline-flex text-xs leading-5 font-bold rounded-full ${
+                                score.status === 'graded' || score.status === 'submitted'
+                                  ? score.isPassed === true
+                                    ? 'bg-green-100 text-green-800'
+                                    : score.isPassed === false
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-blue-100 text-blue-800'
+                                  : score.status === 'in_progress'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}
+                            >
+                              {(score.status === 'graded' || score.status === 'submitted') && score.isPassed !== null
+                                ? score.isPassed
+                                  ? '✓ Passed'
+                                  : '✗ Failed'
+                                : score.status}
+                    </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-500 font-medium">
+                              Attempt {score.attemptNumber}
+                </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-500">
+                              {score.submittedAt
+                                ? format(new Date(score.submittedAt), 'MMM dd, yyyy HH:mm')
+                                : 'N/A'}
+              </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              {score.test?.allowRetrial &&
+                                (score.status === 'graded' || score.status === 'submitted') &&
+                                score.attemptNumber < (score.test?.maxAttempts || 1) && (
+                                  <button
+                                    onClick={async () => {
+                                      if (!confirm('Grant a retrial to this student?')) return;
+                                      try {
+                                        await studentAPI.grantRetrial(score.id);
+                                        toast.success('Retrial granted successfully');
+                                        loadTestScores();
+                                      } catch (error: any) {
+                                        toast.error(error.response?.data?.error || 'Failed to grant retrial');
+                                      }
+                                    }}
+                                    className="text-primary hover:text-primary-600 font-semibold hover:underline"
+                                  >
+                                    Grant Retrial
+                                  </button>
+                                )}
+                              {score.status === 'graded' && (
+                                <>
+                                  {score.scoreVisibleToStudent ? (
+                                    <button
+                                      onClick={async () => {
+                                        if (!confirm('Hide this score from the student?')) return;
+                                        try {
+                                          await gradingAPI.hideScore(score.id);
+                                          toast.success('Score hidden from student');
+                                          // Update state immediately
+                                          setTestScores(prevScores => 
+                                            prevScores.map(s => 
+                                              s.id === score.id 
+                                                ? { ...s, scoreVisibleToStudent: false }
+                                                : s
+                                            )
+                                          );
+                                          await checkScoresPublished();
+                                        } catch (error: any) {
+                                          toast.error(error.response?.data?.error || 'Failed to hide score');
+                                        }
+                                      }}
+                                      className="text-orange-600 hover:text-orange-800 font-semibold hover:underline"
+                                    >
+                                      Hide Score
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={async () => {
+                                        try {
+                                          await gradingAPI.releaseScore(score.id);
+                                          toast.success('Score released to student');
+                                          // Update state immediately
+                                          setTestScores(prevScores => 
+                                            prevScores.map(s => 
+                                              s.id === score.id 
+                                                ? { ...s, scoreVisibleToStudent: true }
+                                                : s
+                                            )
+                                          );
+                                          await checkScoresPublished();
+                                        } catch (error: any) {
+                                          toast.error(error.response?.data?.error || 'Failed to release score');
+                                        }
+                                      }}
+                                      className="text-green-600 hover:text-green-800 font-semibold hover:underline"
+                                    >
+                                      Release Score
+                                    </button>
+                                  )}
+                                </>
+            )}
+          </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                    </>
+                  );
+                })()}
+        </div>
+      )}
+          </div>
+        )}
+      </div>
+
       <div className="card">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">Questions ({questions.length})</h2>
@@ -1323,6 +1730,15 @@ export default function TestDetail() {
               className="btn-secondary text-sm"
             >
               {showQuestionForm ? 'Cancel' : 'Add Question'}
+            </button>
+            <button
+              onClick={() => {
+                setShowQuestionBankModal(true);
+                loadQuestionBankQuestions();
+              }}
+              className="btn-secondary text-sm"
+            >
+              Add from Question Bank
             </button>
             <label className="btn-secondary text-sm cursor-pointer">
               Bulk Upload
@@ -1762,274 +2178,140 @@ export default function TestDetail() {
         </div>
       </div>
 
-      {/* Test Scores Section */}
-      <div className="card">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Test Scores</h2>
-          <button
-            onClick={() => {
-              if (!showScores) {
-                loadTestScores();
-              }
-              setShowScores(!showScores);
-            }}
-            className="btn-secondary text-sm"
-          >
-            {showScores ? 'Hide Scores' : 'View All Scores'}
-          </button>
-        </div>
+      {/* Question Bank Modal */}
+      {showQuestionBankModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-xl font-semibold">Add Questions from Question Bank</h3>
+              <p className="text-sm text-gray-500 mt-1">Filter and select questions to add to this test</p>
+            </div>
+            
+            <div className="p-6 border-b border-gray-200 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Subject
+                  </label>
+                  <select
+                    className="input-field"
+                    value={questionBankFilters.subjectId}
+                    onChange={(e) => {
+                      setQuestionBankFilters({ ...questionBankFilters, subjectId: e.target.value });
+                    }}
+                  >
+                    <option value="">All Subjects</option>
+                    {subjects.map((subject) => (
+                      <option key={subject.id} value={subject.id}>
+                        {subject.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Grade
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g., Grade 1, Grade 2"
+                    value={questionBankFilters.grade}
+                    onChange={(e) => {
+                      setQuestionBankFilters({ ...questionBankFilters, grade: e.target.value });
+                    }}
+                  />
+                </div>
+              </div>
+              <button
+                onClick={loadQuestionBankQuestions}
+                className="btn-primary text-sm"
+                disabled={loadingBankQuestions}
+              >
+                {loadingBankQuestions ? 'Loading...' : 'Filter Questions'}
+              </button>
+            </div>
 
-        {showScores && (
-          <div>
-            {loadingScores ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                  <div className="text-gray-600">Loading scores...</div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {loadingBankQuestions ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">Loading questions...</p>
                 </div>
-              </div>
-            ) : testScores.length === 0 ? (
-              <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
-                <div className="text-6xl mb-4">📊</div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Scores Yet</h3>
-                <p className="text-gray-500">
-                  No students have taken this test yet. Scores will appear here once students complete the test.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {/* Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                    <div className="text-2xl font-bold text-blue-600">{testScores.length}</div>
-                    <div className="text-sm text-blue-700 mt-1">Total Submissions</div>
-                  </div>
-                  <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                    <div className="text-2xl font-bold text-green-600">
-                      {testScores.filter(s => s.isPassed === true).length}
-                    </div>
-                    <div className="text-sm text-green-700 mt-1">Passed</div>
-                  </div>
-                  <div className="bg-red-50 rounded-lg p-4 border border-red-200">
-                    <div className="text-2xl font-bold text-red-600">
-                      {testScores.filter(s => s.isPassed === false).length}
-                    </div>
-                    <div className="text-sm text-red-700 mt-1">Failed</div>
-                  </div>
-                  <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {testScores.length > 0
-                        ? (testScores.reduce((sum, s) => sum + (s.percentage || 0), 0) / testScores.length).toFixed(1)
-                        : '0'}%
-                    </div>
-                    <div className="text-sm text-purple-700 mt-1">Average Score</div>
-                  </div>
+              ) : questionBankQuestions.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No questions found. Try adjusting your filters.</p>
                 </div>
+              ) : (
+                <div className="space-y-3">
+                  {questionBankQuestions.map((question) => (
+                    <div
+                      key={question.id}
+                      className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                        selectedBankQuestions.has(question.id)
+                          ? 'border-primary bg-primary/5'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => {
+                        const newSelected = new Set(selectedBankQuestions);
+                        if (newSelected.has(question.id)) {
+                          newSelected.delete(question.id);
+                        } else {
+                          newSelected.add(question.id);
+                        }
+                        setSelectedBankQuestions(newSelected);
+                      }}
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedBankQuestions.has(question.id)}
+                          onChange={() => {}}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">{question.questionText}</p>
+                          <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                            <span>Type: {question.questionType}</span>
+                            <span>Points: {question.points}</span>
+                            {question.questionBankGrade && (
+                              <span>Grade: {question.questionBankGrade}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-                {/* Scores Table */}
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
-                      <tr>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                          Student
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                          Score
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                          Percentage
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                          Attempt
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                          Submitted
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {testScores.map((score) => (
-                        <tr key={score.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center mr-3">
-                                <span className="text-primary font-bold text-sm">
-                                  {score.student?.firstName?.[0] || score.student?.lastName?.[0] || 'U'}
-                                </span>
-                              </div>
-                              <div>
-                                <div className="text-sm font-semibold text-gray-900">
-                                  {score.student ? `${score.student.firstName} ${score.student.lastName}` : 'Unknown'}
-                                </div>
-                                {score.student?.email && (
-                                  <div className="text-sm text-gray-500">{score.student.email}</div>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-bold text-gray-900">
-                              {score.score !== null && score.score !== undefined
-                                ? `${score.score.toFixed(1)}`
-                                : 'N/A'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-3">
-                              <div className={`text-sm font-bold ${
-                                score.percentage !== null && score.percentage !== undefined
-                                  ? score.percentage >= 70
-                                    ? 'text-green-600'
-                                    : score.percentage >= 50
-                                    ? 'text-yellow-600'
-                                    : 'text-red-600'
-                                  : 'text-gray-600'
-                              }`}>
-                                {score.percentage !== null && score.percentage !== undefined
-                                  ? `${score.percentage.toFixed(1)}%`
-                                  : 'N/A'}
-                              </div>
-                              {score.percentage !== null && score.percentage !== undefined && (
-                                <div className="w-20 bg-gray-200 rounded-full h-2">
-                                  <div
-                                    className={`h-2 rounded-full transition-all ${
-                                      score.percentage >= 70
-                                        ? 'bg-green-500'
-                                        : score.percentage >= 50
-                                        ? 'bg-yellow-500'
-                                        : 'bg-red-500'
-                                    }`}
-                                    style={{ width: `${Math.min(score.percentage, 100)}%` }}
-                                  ></div>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span
-                              className={`px-3 py-1.5 inline-flex text-xs leading-5 font-bold rounded-full ${
-                                score.status === 'graded' || score.status === 'submitted'
-                                  ? score.isPassed === true
-                                    ? 'bg-green-100 text-green-800'
-                                    : score.isPassed === false
-                                    ? 'bg-red-100 text-red-800'
-                                    : 'bg-blue-100 text-blue-800'
-                                  : score.status === 'in_progress'
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}
-                            >
-                              {(score.status === 'graded' || score.status === 'submitted') && score.isPassed !== null
-                                ? score.isPassed
-                                  ? '✓ Passed'
-                                  : '✗ Failed'
-                                : score.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-500 font-medium">
-                              Attempt {score.attemptNumber}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-500">
-                              {score.submittedAt
-                                ? format(new Date(score.submittedAt), 'MMM dd, yyyy HH:mm')
-                                : 'N/A'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
-                              {score.test?.allowRetrial &&
-                                (score.status === 'graded' || score.status === 'submitted') &&
-                                score.attemptNumber < (score.test?.maxAttempts || 1) && (
-                                  <button
-                                    onClick={async () => {
-                                      if (!confirm('Grant a retrial to this student?')) return;
-                                      try {
-                                        await studentAPI.grantRetrial(score.id);
-                                        toast.success('Retrial granted successfully');
-                                        loadTestScores();
-                                      } catch (error: any) {
-                                        toast.error(error.response?.data?.error || 'Failed to grant retrial');
-                                      }
-                                    }}
-                                    className="text-primary hover:text-primary-600 font-semibold hover:underline"
-                                  >
-                                    Grant Retrial
-                                  </button>
-                                )}
-                              {score.status === 'graded' && (
-                                <>
-                                  {score.scoreVisibleToStudent ? (
-                                    <button
-                                      onClick={async () => {
-                                        if (!confirm('Hide this score from the student?')) return;
-                                        try {
-                                          await gradingAPI.hideScore(score.id);
-                                          toast.success('Score hidden from student');
-                                          // Update state immediately
-                                          setTestScores(prevScores => 
-                                            prevScores.map(s => 
-                                              s.id === score.id 
-                                                ? { ...s, scoreVisibleToStudent: false }
-                                                : s
-                                            )
-                                          );
-                                          await checkScoresPublished();
-                                        } catch (error: any) {
-                                          toast.error(error.response?.data?.error || 'Failed to hide score');
-                                        }
-                                      }}
-                                      className="text-orange-600 hover:text-orange-800 font-semibold hover:underline"
-                                    >
-                                      Hide Score
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={async () => {
-                                        try {
-                                          await gradingAPI.releaseScore(score.id);
-                                          toast.success('Score released to student');
-                                          // Update state immediately
-                                          setTestScores(prevScores => 
-                                            prevScores.map(s => 
-                                              s.id === score.id 
-                                                ? { ...s, scoreVisibleToStudent: true }
-                                                : s
-                                            )
-                                          );
-                                          await checkScoresPublished();
-                                        } catch (error: any) {
-                                          toast.error(error.response?.data?.error || 'Failed to release score');
-                                        }
-                                      }}
-                                      className="text-green-600 hover:text-green-800 font-semibold hover:underline"
-                                    >
-                                      Release Score
-                                    </button>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            <div className="p-6 border-t border-gray-200 flex justify-between items-center">
+              <div className="text-sm text-gray-600">
+                {selectedBankQuestions.size} question(s) selected
               </div>
-            )}
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => {
+                    setShowQuestionBankModal(false);
+                    setSelectedBankQuestions(new Set());
+                    setQuestionBankFilters({ subjectId: '', grade: '' });
+                  }}
+                  className="btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddQuestionsFromBank}
+                  className="btn-primary"
+                  disabled={selectedBankQuestions.size === 0}
+                >
+                  Add Selected ({selectedBankQuestions.size})
+                </button>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

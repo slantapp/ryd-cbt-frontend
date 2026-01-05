@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { studentAPI, sessionAPI, subjectAPI } from '../../services/api';
+import { studentAPI, sessionAPI, subjectAPI, themeAPI } from '../../services/api';
+import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 
 interface TestGroupScore {
@@ -41,15 +42,38 @@ interface OverallScoreData {
 }
 
 export default function StudentScores() {
+  const { account } = useAuthStore();
   const [overallScores, setOverallScores] = useState<OverallScoreData[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
+  const [theme, setTheme] = useState<any>({
+    primaryColor: '#A8518A',
+    secondaryColor: '#1d4ed8',
+    accentColor: '#facc15',
+  });
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [selectedStudent, setSelectedStudent] = useState<OverallScoreData | null>(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
+
+  // Load theme
+  useEffect(() => {
+    const loadTheme = async () => {
+      try {
+        const { data } = await themeAPI.get();
+        if (data) {
+          setTheme(data);
+        }
+      } catch (error) {
+        console.error('Failed to load theme:', error);
+      }
+    };
+    if (account && (account.role === 'SCHOOL' || account.role === 'TEACHER' || account.role === 'SCHOOL_ADMIN')) {
+      loadTheme();
+    }
+  }, [account]);
 
   useEffect(() => {
     loadSessions();
@@ -158,31 +182,69 @@ export default function StudentScores() {
 
   return (
     <div className="space-y-8">
-      {/* Header Section */}
-      <div className="bg-gradient-to-r from-primary to-primary-600 rounded-2xl shadow-xl p-8 text-white">
-        <div>
+      {/* Header */}
+      <div 
+        className="rounded-2xl shadow-2xl p-8 text-white relative overflow-hidden"
+        style={{
+          background: `linear-gradient(to right, ${theme?.primaryColor || '#A8518A'}, ${theme?.secondaryColor || theme?.primaryColor || '#A8518A'}, ${theme?.accentColor || theme?.primaryColor || '#A8518A'})`
+        }}
+      >
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
+        <div className="relative z-10">
           <h1 className="text-4xl font-bold mb-2">Overall Student Scores</h1>
-          <p className="text-primary-100 text-lg">View student performance across all test groups</p>
+          <p className="text-white/80 text-lg">View student performance across all test groups</p>
         </div>
+      </div>
 
-        {/* Stats */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="text-3xl font-bold">{filteredScores.length}</div>
-            <div className="text-sm text-primary-100 mt-1">Total Students</div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div 
+          className="card border-2"
+          style={{
+            background: `linear-gradient(to bottom right, ${theme?.primaryColor || '#A8518A'}15, ${theme?.primaryColor || '#A8518A'}25)`,
+            borderColor: `${theme?.primaryColor || '#A8518A'}40`
+          }}
+        >
+          <div 
+            className="text-3xl font-bold mb-1"
+            style={{ color: theme?.primaryColor || '#A8518A' }}
+          >
+            {filteredScores.length}
           </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="text-3xl font-bold">
-              {filteredScores.length > 0
-                ? (filteredScores.reduce((sum, s) => sum + s.overallAverage, 0) / filteredScores.length).toFixed(1)
-                : '0.0'}%
-            </div>
-            <div className="text-sm text-primary-100 mt-1">Average Overall Score</div>
+          <div className="text-sm text-gray-600">Total Students</div>
+        </div>
+        <div 
+          className="card border-2"
+          style={{
+            background: `linear-gradient(to bottom right, ${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}15, ${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}25)`,
+            borderColor: `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}40`
+          }}
+        >
+          <div 
+            className="text-3xl font-bold mb-1"
+            style={{ color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8' }}
+          >
+            {filteredScores.length > 0
+              ? (filteredScores.reduce((sum, s) => sum + s.overallAverage, 0) / filteredScores.length).toFixed(1)
+              : '0.0'}%
           </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="text-3xl font-bold">{testGroupNames.length}</div>
-            <div className="text-sm text-primary-100 mt-1">Active Test Groups</div>
+          <div className="text-sm text-gray-600">Average Overall Score</div>
+        </div>
+        <div 
+          className="card border-2"
+          style={{
+            background: `linear-gradient(to bottom right, ${theme?.accentColor || theme?.primaryColor || '#facc15'}15, ${theme?.accentColor || theme?.primaryColor || '#facc15'}25)`,
+            borderColor: `${theme?.accentColor || theme?.primaryColor || '#facc15'}40`
+          }}
+        >
+          <div 
+            className="text-3xl font-bold mb-1"
+            style={{ color: theme?.accentColor || theme?.primaryColor || '#facc15' }}
+          >
+            {testGroupNames.length}
           </div>
+          <div className="text-sm text-gray-600">Active Test Groups</div>
         </div>
       </div>
 
@@ -302,28 +364,31 @@ export default function StudentScores() {
         </div>
       ) : (
         <div className="card overflow-hidden border-2 border-gray-200 shadow-lg">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Student
-                  </th>
-                  {testGroupNames.map((tgName) => (
-                    <th key={tgName} className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                      {tgName}
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="inline-block min-w-full align-middle">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                  <tr>
+                    <th className="px-2 sm:px-4 md:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                      Student
                     </th>
-                  ))}
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Overall Average
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredScores.map((score) => {
+                    {testGroupNames.map((tgName) => (
+                      <th key={tgName} className="px-2 sm:px-4 md:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                        <span className="hidden sm:inline">{tgName}</span>
+                        <span className="sm:hidden text-[10px]">{tgName.split(' ')[0]}</span>
+                      </th>
+                    ))}
+                    <th className="px-2 sm:px-4 md:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                      <span className="hidden sm:inline">Overall Average</span>
+                      <span className="sm:hidden">Avg</span>
+                    </th>
+                    <th className="px-2 sm:px-4 md:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredScores.map((score) => {
                   // Get test group scores for display (combine across all subjects)
                   const testGroupMap = new Map<string, { contribution: number; weight: number; percentage: number }>();
                   
@@ -342,7 +407,7 @@ export default function StudentScores() {
 
                   return (
                     <tr key={score.student.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-2 sm:px-4 md:px-6 py-3 sm:py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center mr-3">
                             <span className="text-primary font-bold text-sm">
@@ -362,9 +427,9 @@ export default function StudentScores() {
                       {testGroupNames.map((tgName) => {
                         const tgData = testGroupMap.get(tgName);
                         return (
-                          <td key={tgName} className="px-6 py-4 whitespace-nowrap">
+                          <td key={tgName} className="px-2 sm:px-4 md:px-6 py-3 sm:py-4 whitespace-nowrap">
                             {tgData ? (
-                              <div className="text-sm">
+                              <div className="text-xs sm:text-sm">
                                 <div className="font-bold text-gray-900">
                                   {tgData.contribution > 0 ? `${tgData.contribution.toFixed(2)}%` : `${tgData.percentage.toFixed(1)}%`}
                                 </div>
@@ -385,7 +450,7 @@ export default function StudentScores() {
                           </td>
                         );
                       })}
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-2 sm:px-4 md:px-6 py-3 sm:py-4 whitespace-nowrap">
                         <div className="flex items-center space-x-3">
                           <div className={`text-sm font-bold ${
                             score.overallAverage >= 70
@@ -423,6 +488,7 @@ export default function StudentScores() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}

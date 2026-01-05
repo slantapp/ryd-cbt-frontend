@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { testAPI, sessionAPI, classroomAPI, teacherAPI, customFieldAPI, testGroupAPI, subjectAPI } from '../../services/api';
+import { testAPI, sessionAPI, classroomAPI, teacherAPI, customFieldAPI, testGroupAPI, subjectAPI, themeAPI } from '../../services/api';
 import { Test, Session, Classroom, Institution, TestCustomField } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
@@ -17,6 +17,11 @@ export default function Tests() {
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [testGroups, setTestGroups] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
+  const [theme, setTheme] = useState<any>({
+    primaryColor: '#A8518A',
+    secondaryColor: '#1d4ed8',
+    accentColor: '#facc15',
+  });
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState({
@@ -38,7 +43,6 @@ export default function Tests() {
     maxAttempts: '1',
     allowRetrial: false,
     scoreVisibility: false,
-    requiresManualGrading: false,
     sessionId: '',
     classroomIds: [] as string[],
     teacherId: '',
@@ -310,7 +314,6 @@ export default function Tests() {
         maxAttempts: '1',
         allowRetrial: false,
         scoreVisibility: false,
-        requiresManualGrading: false,
         sessionId: '',
         classroomIds: [],
         teacherId: '',
@@ -333,6 +336,7 @@ export default function Tests() {
     );
   }
 
+  const totalTests = tests.length;
   const activeTests = tests.filter(t => t.isActive).length;
   const totalQuestions = tests.reduce((sum, test) => sum + (test.questions?.length || 0), 0);
 
@@ -355,42 +359,85 @@ export default function Tests() {
 
   return (
     <div className="space-y-8">
-      {/* Header Section */}
-      <div className="bg-gradient-to-r from-primary to-primary-600 rounded-2xl shadow-xl p-8 text-white">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-4xl font-bold mb-2">Tests</h1>
-            <p className="text-primary-100 text-lg">Manage and create your assessment tests</p>
-          </div>
-          <div className="flex space-x-3">
-            {account && account.role === 'SCHOOL' && (
-            <Link to="/sessions" className="bg-white/20 hover:bg-white/30 text-white font-medium py-2.5 px-6 rounded-lg transition-all backdrop-blur-sm">
-              Manage Sessions
-            </Link>
-            )}
-            <button 
-              onClick={() => setShowForm(!showForm)} 
-              className="bg-white text-primary hover:bg-primary-50 font-semibold py-2.5 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl"
-            >
-              {showForm ? 'Cancel' : '+ Create New Test'}
-            </button>
+      {/* Header */}
+      <div 
+        className="rounded-2xl shadow-2xl p-8 text-white relative overflow-hidden"
+        style={{
+          background: `linear-gradient(to right, ${theme?.primaryColor || '#A8518A'}, ${theme?.secondaryColor || theme?.primaryColor || '#A8518A'}, ${theme?.accentColor || theme?.primaryColor || '#A8518A'})`
+        }}
+      >
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
+        <div className="relative z-10">
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-4xl font-bold mb-2">Tests</h1>
+              <p className="text-white/80 text-lg">Manage and create your assessment tests</p>
+            </div>
+            <div className="flex space-x-3">
+              {account && account.role === 'SCHOOL' && (
+              <Link to="/sessions" className="bg-white/20 hover:bg-white/30 text-white font-medium py-2.5 px-6 rounded-lg transition-all backdrop-blur-sm">
+                Manage Sessions
+              </Link>
+              )}
+              <button 
+                onClick={() => setShowForm(!showForm)} 
+                className="bg-white font-semibold py-2.5 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl"
+                style={{ color: theme?.primaryColor || '#A8518A' }}
+              >
+                {showForm ? 'Cancel' : '+ Create New Test'}
+              </button>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Stats */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="text-3xl font-bold">{tests.length}</div>
-            <div className="text-sm text-primary-100 mt-1">Total Tests</div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div 
+          className="card border-2"
+          style={{
+            background: `linear-gradient(to bottom right, ${theme?.primaryColor || '#A8518A'}15, ${theme?.primaryColor || '#A8518A'}25)`,
+            borderColor: `${theme?.primaryColor || '#A8518A'}40`
+          }}
+        >
+          <div 
+            className="text-3xl font-bold mb-1"
+            style={{ color: theme?.primaryColor || '#A8518A' }}
+          >
+            {totalTests}
           </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="text-3xl font-bold">{activeTests}</div>
-            <div className="text-sm text-primary-100 mt-1">Active Tests</div>
+          <div className="text-sm text-gray-600">Total Tests</div>
+        </div>
+        <div 
+          className="card border-2"
+          style={{
+            background: `linear-gradient(to bottom right, ${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}15, ${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}25)`,
+            borderColor: `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}40`
+          }}
+        >
+          <div 
+            className="text-3xl font-bold mb-1"
+            style={{ color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8' }}
+          >
+            {activeTests}
           </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="text-3xl font-bold">{totalQuestions}</div>
-            <div className="text-sm text-primary-100 mt-1">Total Questions</div>
+          <div className="text-sm text-gray-600">Active Tests</div>
+        </div>
+        <div 
+          className="card border-2"
+          style={{
+            background: `linear-gradient(to bottom right, ${theme?.accentColor || theme?.primaryColor || '#facc15'}15, ${theme?.accentColor || theme?.primaryColor || '#facc15'}25)`,
+            borderColor: `${theme?.accentColor || theme?.primaryColor || '#facc15'}40`
+          }}
+        >
+          <div 
+            className="text-3xl font-bold mb-1"
+            style={{ color: theme?.accentColor || theme?.primaryColor || '#facc15' }}
+          >
+            {totalQuestions}
           </div>
+          <div className="text-sm text-gray-600">Total Questions</div>
         </div>
       </div>
 
@@ -754,20 +801,6 @@ export default function Tests() {
                   </button>
                 </div>
               </div>
-              <div>
-                <label className="flex items-center cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={formData.requiresManualGrading}
-                    onChange={(e) => setFormData({ ...formData, requiresManualGrading: e.target.checked })}
-                    className="mr-3 w-5 h-5 text-primary focus:ring-primary rounded"
-                  />
-                  <div>
-                    <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 block">Requires manual grading</span>
-                    <span className="text-xs text-gray-500">Enable for short answer questions that need manual review</span>
-                  </div>
-                </label>
-              </div>
             </div>
 
             {/* Test Summary Section */}
@@ -885,16 +918,6 @@ export default function Tests() {
                         <span className="text-green-600 font-medium">✓ Show to students</span>
                       ) : (
                         <span className="text-orange-600 font-medium">✗ Hide from students</span>
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-gray-500 uppercase">Manual Grading</span>
-                    <p className="text-sm text-gray-900 mt-1">
-                      {formData.requiresManualGrading ? (
-                        <span className="text-blue-600 font-medium">✓ Required</span>
-                      ) : (
-                        <span className="text-gray-400">✗ Not required</span>
                       )}
                     </p>
                   </div>

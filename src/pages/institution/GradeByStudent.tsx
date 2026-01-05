@@ -10,6 +10,7 @@ interface Test {
 
 interface StudentTest {
   id: string;
+  studentId: string;
   student: {
     id: string;
     firstName: string;
@@ -21,6 +22,7 @@ interface StudentTest {
   percentage: number | null;
   manuallyGraded: boolean;
   scoreVisibleToStudent?: boolean;
+  attemptNumber: number;
   _count: {
     answers: number;
   };
@@ -34,6 +36,7 @@ export default function GradeByStudent() {
   const [studentTests, setStudentTests] = useState<StudentTest[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'graded'>('all');
+  const [activeTab, setActiveTab] = useState<'best' | 'multiple'>('best');
   const [publishing, setPublishing] = useState(false);
 
   useEffect(() => {
@@ -114,8 +117,39 @@ export default function GradeByStudent() {
   const ungradedCount = studentTests.filter(st => !st.manuallyGraded).length;
   const gradedCount = studentTests.filter(st => st.manuallyGraded).length;
 
+  // Group student tests by studentId to find best scores
+  const studentTestsByStudent = new Map<string, StudentTest[]>();
+  studentTests.forEach(st => {
+    const studentId = st.studentId || st.student.id;
+    if (!studentTestsByStudent.has(studentId)) {
+      studentTestsByStudent.set(studentId, []);
+    }
+    studentTestsByStudent.get(studentId)!.push(st);
+  });
+
+  // Get best scores (highest score per student)
+  const bestScores = Array.from(studentTestsByStudent.values()).map(studentScores => {
+    return studentScores.reduce((best, current) => {
+      const bestScore = best.score || 0;
+      const currentScore = current.score || 0;
+      if (currentScore > bestScore) return current;
+      if (currentScore === bestScore) {
+        // If scores are equal, prefer latest attempt
+        return (current.attemptNumber || 0) > (best.attemptNumber || 0) ? current : best;
+      }
+      return best;
+    });
+  });
+
+  // Get multiple attempts (all attempts that are not the best score)
+  const bestScoreIds = new Set(bestScores.map(s => s.id));
+  const multipleAttempts = studentTests.filter(st => !bestScoreIds.has(st.id));
+
+  // Filter based on active tab
+  const tabFilteredTests = activeTab === 'best' ? bestScores : multipleAttempts;
+
   // Filter and search students
-  const filteredStudentTests = studentTests.filter((studentTest) => {
+  const filteredStudentTests = tabFilteredTests.filter((studentTest) => {
     // Search filter - search by name or username
     const fullName = `${studentTest.student.firstName} ${studentTest.student.lastName}`.toLowerCase();
     const username = studentTest.student.username.toLowerCase();
@@ -181,6 +215,32 @@ export default function GradeByStudent() {
           </div>
         </div>
 
+        {/* Tabs */}
+        <div className="mb-6 border-b border-gray-200">
+          <div className="flex space-x-4">
+            <button
+              onClick={() => setActiveTab('best')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'best'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Best Scores ({bestScores.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('multiple')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'multiple'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Multiple Attempts ({multipleAttempts.length})
+            </button>
+          </div>
+        </div>
+
         {/* Search and Filter */}
         <div className="mb-6 space-y-4">
           {/* Search */}
@@ -211,7 +271,7 @@ export default function GradeByStudent() {
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                All ({studentTests.length})
+                All ({tabFilteredTests.length})
               </button>
               <button
                 onClick={() => setFilterStatus('pending')}
@@ -221,7 +281,7 @@ export default function GradeByStudent() {
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                Pending ({ungradedCount})
+                Pending ({tabFilteredTests.filter(st => !st.manuallyGraded).length})
               </button>
               <button
                 onClick={() => setFilterStatus('graded')}
@@ -231,7 +291,7 @@ export default function GradeByStudent() {
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                Graded ({gradedCount})
+                Graded ({tabFilteredTests.filter(st => st.manuallyGraded).length})
               </button>
             </div>
           </div>
@@ -323,6 +383,9 @@ export default function GradeByStudent() {
                       {studentTest.score !== null ? (
                         <span>
                           {studentTest.score.toFixed(1)} / {studentTest.percentage?.toFixed(1)}%
+                          {studentTest.attemptNumber && studentTest.attemptNumber > 1 && (
+                            <span className="text-xs text-gray-500 ml-1">(Attempt {studentTest.attemptNumber})</span>
+                          )}
                         </span>
                       ) : (
                         <span className="text-gray-400">-</span>

@@ -53,6 +53,8 @@ export default function GradeStudentTest() {
   const [studentTest, setStudentTest] = useState<StudentTest | null>(null);
   const [navigation, setNavigation] = useState<Navigation | null>(null);
   const [gradingData, setGradingData] = useState<Record<string, { pointsEarned: number; isCorrect: boolean | null }>>({});
+  const [originalScores, setOriginalScores] = useState<Record<string, number>>({});
+  const [pointsInputs, setPointsInputs] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [releasing, setReleasing] = useState(false);
 
@@ -71,13 +73,20 @@ export default function GradeStudentTest() {
       
       // Initialize grading data with current values for ALL answers (both manual and auto-graded)
       const initialData: Record<string, { pointsEarned: number; isCorrect: boolean | null }> = {};
+      const original: Record<string, number> = {};
+      const inputs: Record<string, string> = {};
       response.data.studentTest.answers.forEach((answer: StudentAnswer) => {
+        const points = answer.pointsEarned || 0;
         initialData[answer.id] = {
-          pointsEarned: answer.pointsEarned || 0,
+          pointsEarned: points,
           isCorrect: answer.isCorrect ?? null,
         };
+        original[answer.id] = points;
+        inputs[answer.id] = points.toString();
       });
       setGradingData(initialData);
+      setOriginalScores(original);
+      setPointsInputs(inputs);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to load student test');
     } finally {
@@ -333,14 +342,50 @@ export default function GradeStudentTest() {
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
                         Points Earned (0 - {maxPoints})
                       </label>
+                      {originalScores[answer.id] !== undefined && originalScores[answer.id] !== grading.pointsEarned && (
+                        <div className="text-xs text-gray-500 mb-1">
+                          Original: {originalScores[answer.id]} points
+                        </div>
+                      )}
                       <input
                         type="number"
                         min="0"
                         max={maxPoints}
-                        step="0.1"
+                        step="1"
                         className="input-field"
-                        value={grading.pointsEarned ?? 0}
-                        onChange={(e) => handleGradeChange(answer.id, 'pointsEarned', parseFloat(e.target.value) || 0)}
+                        value={pointsInputs[answer.id] ?? grading.pointsEarned.toString()}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setPointsInputs(prev => ({ ...prev, [answer.id]: value }));
+                          
+                          if (value === '') {
+                            return;
+                          }
+                          
+                          const numValue = parseFloat(value);
+                          if (!isNaN(numValue)) {
+                            const clampedValue = Math.max(0, Math.min(maxPoints, numValue));
+                            handleGradeChange(answer.id, 'pointsEarned', clampedValue);
+                            setPointsInputs(prev => ({ ...prev, [answer.id]: clampedValue.toString() }));
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const value = e.target.value;
+                          if (value === '') {
+                            handleGradeChange(answer.id, 'pointsEarned', 0);
+                            setPointsInputs(prev => ({ ...prev, [answer.id]: '0' }));
+                          } else {
+                            const numValue = parseFloat(value);
+                            if (isNaN(numValue)) {
+                              handleGradeChange(answer.id, 'pointsEarned', 0);
+                              setPointsInputs(prev => ({ ...prev, [answer.id]: '0' }));
+                            } else {
+                              const clampedValue = Math.max(0, Math.min(maxPoints, numValue));
+                              handleGradeChange(answer.id, 'pointsEarned', clampedValue);
+                              setPointsInputs(prev => ({ ...prev, [answer.id]: clampedValue.toString() }));
+                            }
+                          }
+                        }}
                       />
                     </div>
                     <div>
@@ -354,11 +399,13 @@ export default function GradeStudentTest() {
                           const value = e.target.value === '' ? false : e.target.value === 'true';
                           handleGradeChange(answer.id, 'isCorrect', value);
                         }}
+                        disabled
                       >
                         <option value="">Not Set</option>
                         <option value="true">Correct</option>
                         <option value="false">Incorrect</option>
                       </select>
+                      <p className="text-xs text-gray-500 mt-1">This field cannot be edited</p>
                     </div>
                   </div>
                 </div>
