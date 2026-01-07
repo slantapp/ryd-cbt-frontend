@@ -274,6 +274,7 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
     bannerUrl: '',
   });
   const [logoKey, setLogoKey] = useState(0); // Force logo refresh
+  const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const userMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -318,10 +319,10 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
     });
   }, []);
 
-  const loadTheme = async () => {
-    try {
-      const { data } = await themeAPI.get();
-      if (data) {
+    const loadTheme = async () => {
+      try {
+        const { data } = await themeAPI.get();
+        if (data) {
         const loadedTheme = {
           primaryColor: data.primaryColor || '#A8518A',
           secondaryColor: data.secondaryColor || '#1d4ed8',
@@ -334,11 +335,11 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
         setTheme(loadedTheme);
         applyTheme(loadedTheme);
         setLogoKey(prev => prev + 1); // Force logo refresh
+        }
+      } catch (error) {
+        console.error('Failed to load theme:', error);
       }
-    } catch (error) {
-      console.error('Failed to load theme:', error);
-    }
-  };
+    };
 
   useEffect(() => {
     if (account && (account.role === 'SCHOOL' || account.role === 'TEACHER' || account.role === 'SCHOOL_ADMIN')) {
@@ -378,6 +379,15 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Show password reset modal when mustResetPassword is true
+  useEffect(() => {
+    if (account?.mustResetPassword && (account.role === 'TEACHER' || account.role === 'STUDENT')) {
+      setShowPasswordResetModal(true);
+    } else {
+      setShowPasswordResetModal(false);
+    }
+  }, [account?.mustResetPassword, account?.role]);
 
   const renderNavItem = (item: NavItem) => {
     if (item.children && item.children.length > 0) {
@@ -495,7 +505,7 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
                     className="h-10 w-10 rounded-full object-cover"
                   />
                 )}
-              </Link>
+                </Link>
             </div>
 
             {/* Desktop Navigation */}
@@ -595,21 +605,21 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
             </div>
 
             {/* Mobile Menu Button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="md:hidden text-gray-700 hover:text-gray-900 p-2 ml-2"
               aria-label="Toggle menu"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {mobileMenuOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
-            </button>
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {mobileMenuOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  )}
+                </svg>
+              </button>
+            </div>
           </div>
-        </div>
 
         {/* Mobile Navigation Menu */}
         {mobileMenuOpen && (
@@ -650,10 +660,10 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
                             <Link
                               key={child.path}
                               to={child.path}
-                              onClick={() => {
+                onClick={() => {
                                 setOpenDropdowns(new Set());
-                                setMobileMenuOpen(false);
-                              }}
+                  setMobileMenuOpen(false);
+                }}
                               className={`flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
                                 isActive(child.path)
                                   ? 'text-primary bg-primary-50 font-semibold'
@@ -664,8 +674,8 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
                               {child.label}
                             </Link>
                           ))}
-                        </div>
-                      )}
+          </div>
+        )}
                     </div>
                   );
                 }
@@ -701,9 +711,9 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
       {/* Password Reset Modal */}
       {account?.mustResetPassword && (account.role === 'TEACHER' || account.role === 'STUDENT') && (
         <PasswordResetModal
-          isOpen={true}
+          isOpen={showPasswordResetModal}
           userEmail={account.email}
-          onClose={() => {}}
+          onClose={() => setShowPasswordResetModal(false)}
         />
       )}
     </div>

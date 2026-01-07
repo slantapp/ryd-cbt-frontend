@@ -109,17 +109,17 @@ export default function PasswordResetModal({ isOpen, userEmail, onClose }: Passw
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[9999] p-4">
       <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-6 border-2 border-primary">
-        <div className="mb-6">
+          <div className="mb-6">
           <div className="flex items-center mb-3">
             <div className="bg-amber-100 rounded-full p-2 mr-3">
               <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">Password Reset Required</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Password Reset Recommended</h2>
           </div>
           <p className="text-sm text-gray-600 ml-11">
-            You must reset your password before continuing. Please create a new secure password.
+            For security reasons, we recommend resetting your password. You can continue with your current password, but this reminder will appear again on your next login.
           </p>
         </div>
 
@@ -234,6 +234,14 @@ export default function PasswordResetModal({ isOpen, userEmail, onClose }: Passw
 
           <div className="flex space-x-3 pt-4">
             <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="btn-secondary flex-1"
+            >
+              Cancel
+            </button>
+            <button
               type="submit"
               disabled={loading}
               className="btn-primary flex-1"
@@ -245,7 +253,7 @@ export default function PasswordResetModal({ isOpen, userEmail, onClose }: Passw
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
           <p className="text-xs text-blue-800 text-center">
-            <strong>Required Action:</strong> You must reset your password to continue using the system.
+            <strong>Note:</strong> You can continue with your current password, but this reminder will appear again on your next login until you reset your password.
           </p>
         </div>
       </div>
