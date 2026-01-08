@@ -215,6 +215,7 @@ export default function Login() {
                     {role === 'MINISTRY' && 'I am a Ministry/Organization'}
                     {role === 'SCHOOL' && 'I am a School Administrator'}
                     {role === 'TEACHER' && 'I am a Teacher'}
+                    {role === 'SUPER_ADMIN' && 'I am a Super Admin'}
                   </span>
                 </div>
                 <button
@@ -319,6 +320,17 @@ export default function Login() {
             </div>
           )}
         </form>
+        
+        {/* Super Admin Login Link - Footer */}
+        <div className="mt-6 pt-6 border-t border-gray-200 text-center">
+          <button
+            type="button"
+            onClick={() => handleRoleSelect('SUPER_ADMIN')}
+            className="text-sm text-gray-500 hover:text-primary-600 transition-colors"
+          >
+            Super Admin Login
+          </button>
+        </div>
       </div>
     </div>
   );
