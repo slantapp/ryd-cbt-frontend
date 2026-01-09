@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { themeAPI } from '../../services/api';
 import { applyTheme } from '../../utils/themeUtils';
+import PasswordResetModal from '../PasswordResetModal';
 
 interface StudentLayoutProps {
   children: React.ReactNode;
@@ -24,6 +25,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [theme, setTheme] = useState<any>(null);
+  const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -53,6 +55,15 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       loadTheme();
     }
   }, [account]);
+
+  // Show password reset modal when mustResetPassword is true
+  useEffect(() => {
+    if (account?.mustResetPassword && account?.role === 'STUDENT') {
+      setShowPasswordResetModal(true);
+    } else {
+      setShowPasswordResetModal(false);
+    }
+  }, [account?.mustResetPassword, account?.role]);
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--theme-background, #f9fafb)' }}>
@@ -207,6 +218,15 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
           </div>
         </div>
       </footer>
+
+      {/* Password Reset Modal */}
+      {account?.mustResetPassword && account?.role === 'STUDENT' && (
+        <PasswordResetModal
+          isOpen={showPasswordResetModal}
+          userEmail={account.email || account.username || ''}
+          onClose={() => setShowPasswordResetModal(false)}
+        />
+      )}
     </div>
   );
 }

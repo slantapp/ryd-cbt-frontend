@@ -38,6 +38,7 @@ import TeacherTests from './pages/institution/TeacherTests';
 import ClassTests from './pages/institution/ClassTests';
 import SchoolAdmin from './pages/institution/SchoolAdmin';
 import QuestionBank from './pages/institution/QuestionBank';
+import Help from './pages/institution/Help';
 
 // Student pages
 import StudentTestPage from './pages/student/StudentTestPage';
@@ -468,6 +469,16 @@ function App() {
               <PrivateRoute>
                 <InstitutionLayout>
                   <GradingSchemes />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/help"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <Help />
                 </InstitutionLayout>
               </PrivateRoute>
             }

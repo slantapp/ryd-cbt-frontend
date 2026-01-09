@@ -72,11 +72,6 @@ export default function SchoolLogin() {
         schoolId: data?.institution.id,
       });
 
-      if (response.data.requiresPasswordReset) {
-        toast.error('Please reset your password first. Contact your administrator.');
-        return;
-      }
-
       if (!response.data.token || !response.data.institution) {
         toast.error('Login failed: Invalid response from server');
         return;
@@ -88,8 +83,15 @@ export default function SchoolLogin() {
         return;
       }
 
-      setAuth(response.data.token, response.data.institution);
-      toast.success('Login successful!');
+      // Set mustResetPassword flag in institution object (same as normal login)
+      const requiresPasswordReset = response.data.requiresPasswordReset === true;
+      const institutionWithResetFlag = {
+        ...response.data.institution,
+        mustResetPassword: requiresPasswordReset || response.data.institution.mustResetPassword || false,
+      };
+
+      setAuth(response.data.token, institutionWithResetFlag);
+      toast.success(requiresPasswordReset ? 'Login successful! Please reset your password.' : 'Login successful!');
       navigate('/dashboard');
     } catch (error: any) {
       const errorMsg = error?.response?.data?.error || 'Login failed';
@@ -106,12 +108,6 @@ export default function SchoolLogin() {
     try {
       const response = await authAPI.studentLogin(studentForm);
 
-      if (response.data.requiresPasswordReset) {
-        // Handle password reset flow
-        toast.error('Please reset your password first');
-        return;
-      }
-
       if (!response.data.token || !response.data.student) {
         toast.error('Login failed: Invalid response from server');
         return;
@@ -122,6 +118,9 @@ export default function SchoolLogin() {
         toast.error('You do not belong to this school');
         return;
       }
+
+      // Set mustResetPassword flag (same as normal login)
+      const requiresPasswordReset = response.data.requiresPasswordReset === true || response.data.student.mustResetPassword === true;
 
       // Convert student to account format
       const studentAccount = {
@@ -136,10 +135,11 @@ export default function SchoolLogin() {
         institution: response.data.student.institution,
         createdAt: new Date().toISOString(),
         status: 'ACTIVE' as const,
+        mustResetPassword: requiresPasswordReset || false,
       };
 
       setAuth(response.data.token, studentAccount as any);
-      toast.success('Login successful!');
+      toast.success(requiresPasswordReset ? 'Login successful! Please reset your password.' : 'Login successful!');
       navigate('/student/dashboard');
     } catch (error: any) {
       const errorMsg = error?.response?.data?.error || 'Login failed';

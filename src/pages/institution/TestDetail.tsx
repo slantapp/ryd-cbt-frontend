@@ -625,12 +625,47 @@ export default function TestDetail() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file type
+    const validExtensions = ['.xlsx', '.xls', '.csv'];
+    const fileName = file.name.toLowerCase();
+    const isValidFile = validExtensions.some(ext => fileName.endsWith(ext));
+    
+    if (!isValidFile) {
+      toast.error('Invalid file type. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.');
+      e.target.value = ''; // Reset file input
+      return;
+    }
+
     try {
       await questionAPI.bulkUpload(id!, file);
-      toast.success('Questions uploaded');
+      toast.success('Questions uploaded successfully');
       loadQuestions();
+      e.target.value = ''; // Reset file input
     } catch (error: any) {
-      toast.error('Failed to upload questions');
+      toast.error(error?.response?.data?.error || 'Failed to upload questions');
+      e.target.value = ''; // Reset file input
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await questionAPI.downloadTemplate();
+      // Create blob from response
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'question-upload-template.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success('Template downloaded successfully');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to download template');
     }
   };
 
@@ -1744,25 +1779,17 @@ export default function TestDetail() {
               Bulk Upload
               <input
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.csv"
                 className="hidden"
                 onChange={handleBulkUpload}
               />
             </label>
-            <a
-              href="/sample-questions.csv"
-              download
+            <button
+              onClick={handleDownloadTemplate}
               className="btn-secondary text-sm"
             >
-              Download Sample CSV
-            </a>
-            <a
-              href="/sample-questions-template.md"
-              target="_blank"
-              className="btn-secondary text-sm"
-            >
-              View Template Guide
-            </a>
+              Download Excel Template
+            </button>
             <button
               onClick={() => setShowAIGenerator(!showAIGenerator)}
               className="btn-secondary text-sm"

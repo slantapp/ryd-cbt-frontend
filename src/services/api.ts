@@ -207,6 +207,7 @@ export const questionAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+  downloadTemplate: () => api.get('/questions/template', { responseType: 'blob' }),
   generateAI: (data: any) => api.post('/questions/generate-ai', data),
   getByTest: (testId: string) => api.get(`/questions/test/${testId}`),
   update: (id: string, data: any) => api.put(`/questions/${id}`, data),
@@ -214,6 +215,16 @@ export const questionAPI = {
   // Question Bank
   addToBank: (data: { questionId: string; subjectId: string; grade: string }) => api.post('/questions/bank/add', data),
   createInBank: (data: { questionText: string; questionType: string; options?: any; correctAnswer: string; points: number; subjectId: string; grade: string }) => api.post('/questions/bank/create', data),
+  bulkUploadToBank: (subjectId: string, grade: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('subjectId', subjectId);
+    formData.append('grade', grade);
+    return api.post('/questions/bank/bulk-upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  downloadBankTemplate: () => api.get('/questions/bank/template', { responseType: 'blob' }),
   getBankQuestions: (params?: { subjectId?: string; grade?: string }) => api.get('/questions/bank', { params }),
   addFromBankToTest: (data: { testId: string; questionIds: string[] }) => api.post('/questions/bank/add-to-test', data),
 };
@@ -372,6 +383,7 @@ export const teacherAPI = {
   list: () => api.get('/teachers'),
   update: (id: string, data: { name?: string; email?: string; phone?: string; isActive?: boolean }) =>
     api.put(`/teachers/${id}`, data),
+  delete: (id: string) => api.delete(`/teachers/${id}`),
   dashboard: () => api.get('/teachers/dashboard/me'),
   downloadTemplate: () => api.get('/teachers/template', { responseType: 'blob' }),
   bulkUpload: (formData: FormData) => api.post('/teachers/bulk-upload', formData, {
@@ -410,9 +422,9 @@ export const subjectAPI = {
 export const gradingSchemeAPI = {
   getAll: () => api.get('/grading-schemes'),
   getOne: (id: string) => api.get(`/grading-schemes/${id}`),
-  create: (data: { subjectId: string; sessionClassId: string; weights: Array<{ testGroupId: string; weight: number }> }) =>
+  create: (data: { subjectId: string; classroomId: string; sessionId: string; weights: Array<{ testGroupId: string; weight: number }> }) =>
     api.post('/grading-schemes', data),
-  bulkCreate: (data: { subjectIds: string[]; sessionClassIds: string[]; weights: Array<{ testGroupId: string; weight: number }> }) =>
+  bulkCreate: (data: { subjectIds: string[]; classroomIds: string[]; sessionIds: string[]; weights: Array<{ testGroupId: string; weight: number }> }) =>
     api.post('/grading-schemes/bulk', data),
   update: (id: string, data: { weights: Array<{ testGroupId: string; weight: number }> }) =>
     api.put(`/grading-schemes/${id}`, data),

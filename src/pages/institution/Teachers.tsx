@@ -47,6 +47,7 @@ export default function Teachers() {
     username: string;
     password: string;
   } | null>(null);
+  const [deletingTeacher, setDeletingTeacher] = useState<any>(null);
 
   const isSchool = useMemo(() => {
     return account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN';
@@ -261,6 +262,19 @@ export default function Teachers() {
       loadTeachers();
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to remove teacher from class');
+    }
+  };
+
+  const handleDeleteTeacher = async () => {
+    if (!deletingTeacher) return;
+
+    try {
+      await teacherAPI.delete(deletingTeacher.id);
+      toast.success('Teacher deleted successfully');
+      setDeletingTeacher(null);
+      loadTeachers();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to delete teacher');
     }
   };
 
@@ -771,6 +785,22 @@ export default function Teachers() {
                                 >
                                   {teacher.isActive ? '🚫 Deactivate' : '✅ Activate'}
                                 </button>
+                                <button
+                                  onClick={() => setDeletingTeacher(teacher)}
+                                  className={`px-3 py-1 text-xs font-semibold rounded text-white ${
+                                    (teacher.assignedClasses && teacher.assignedClasses.length > 0)
+                                      ? 'bg-gray-400 cursor-not-allowed'
+                                      : 'bg-red-600 hover:bg-red-700'
+                                  }`}
+                                  title={
+                                    (teacher.assignedClasses && teacher.assignedClasses.length > 0)
+                                      ? 'Cannot delete teacher assigned to classes'
+                                      : 'Delete teacher'
+                                  }
+                                  disabled={teacher.assignedClasses && teacher.assignedClasses.length > 0}
+                                >
+                                  🗑️ Delete
+                                </button>
                               </>
                             )}
                             {(isSchool || isSuperAdmin) && (
@@ -1085,6 +1115,43 @@ export default function Teachers() {
             >
               Close
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Teacher Confirmation Modal */}
+      {deletingTeacher && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <h3 className="text-xl font-semibold mb-4">Delete Teacher</h3>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete <strong>{deletingTeacher.name}</strong>? This action cannot be undone.
+              </p>
+              {deletingTeacher.assignedClasses && deletingTeacher.assignedClasses.length > 0 && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-800">
+                    <strong>Warning:</strong> This teacher is currently assigned to {deletingTeacher.assignedClasses.length} class(es). 
+                    Please remove the teacher from all classes before deleting.
+                  </p>
+                </div>
+              )}
+              <div className="flex space-x-2">
+                <button
+                  onClick={handleDeleteTeacher}
+                  className="btn-primary flex-1 bg-red-600 hover:bg-red-700"
+                  disabled={deletingTeacher.assignedClasses && deletingTeacher.assignedClasses.length > 0}
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={() => setDeletingTeacher(null)}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

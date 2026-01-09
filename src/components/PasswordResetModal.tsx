@@ -71,33 +71,73 @@ export default function PasswordResetModal({ isOpen, userEmail, onClose }: Passw
 
     setLoading(true);
     try {
-      const response = await authAPI.resetPasswordFirstLogin({
-        institutionId: account?.id, // Use account ID for more accurate lookup
-        email: userEmail, // Keep as fallback
-        currentPassword,
-        newPassword,
-      });
+      // Handle student vs teacher/institution password reset differently
+      if (account?.role === 'STUDENT') {
+        // Student password reset
+        const response = await authAPI.resetStudentPassword({
+          username: account.username || userEmail,
+          currentPassword,
+          newPassword,
+        });
 
-      if (response.data.token && response.data.institution) {
-        // Update auth with new token and updated institution (mustResetPassword should be false now)
-        const updatedInstitution = {
-          ...response.data.institution,
-          mustResetPassword: false,
-        };
-        setAuth(response.data.token, updatedInstitution);
-        toast.success('Password reset successfully!');
-        
-        // Clear form and close modal
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        onClose();
-        
-        // Clear temporary password from session storage
-        sessionStorage.removeItem('temp_current_password');
-        sessionStorage.removeItem('temp_user_email');
+        if (response.data.token && response.data.student) {
+          // Convert student object to account format
+          const studentAccount = {
+            id: response.data.student.id,
+            name: `${response.data.student.firstName} ${response.data.student.lastName}`,
+            email: response.data.student.email || response.data.student.username,
+            role: 'STUDENT' as const,
+            username: response.data.student.username,
+            firstName: response.data.student.firstName,
+            lastName: response.data.student.lastName,
+            institutionId: response.data.student.institutionId,
+            institution: response.data.student.institution,
+            createdAt: new Date().toISOString(),
+            status: 'ACTIVE' as const,
+            mustResetPassword: false,
+          };
+          
+          setAuth(response.data.token, studentAccount as any);
+          toast.success('Password reset successfully!');
+          
+          // Clear form and close modal
+          setCurrentPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+          onClose();
+        } else {
+          toast.error('Password reset failed: Invalid response');
+        }
       } else {
-        toast.error('Password reset failed: Invalid response');
+        // Teacher/institution password reset
+        const response = await authAPI.resetPasswordFirstLogin({
+          institutionId: account?.id, // Use account ID for more accurate lookup
+          email: userEmail, // Keep as fallback
+          currentPassword,
+          newPassword,
+        });
+
+        if (response.data.token && response.data.institution) {
+          // Update auth with new token and updated institution (mustResetPassword should be false now)
+          const updatedInstitution = {
+            ...response.data.institution,
+            mustResetPassword: false,
+          };
+          setAuth(response.data.token, updatedInstitution);
+          toast.success('Password reset successfully!');
+          
+          // Clear form and close modal
+          setCurrentPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+          onClose();
+          
+          // Clear temporary password from session storage
+          sessionStorage.removeItem('temp_current_password');
+          sessionStorage.removeItem('temp_user_email');
+        } else {
+          toast.error('Password reset failed: Invalid response');
+        }
       }
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to reset password');
