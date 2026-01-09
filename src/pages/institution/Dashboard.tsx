@@ -188,7 +188,7 @@ export default function Dashboard() {
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
         <div className="relative z-10">
-          <h1 className="text-4xl font-bold mb-2">Dashboard</h1>
+        <h1 className="text-4xl font-bold mb-2">Dashboard</h1>
           <p className="text-white/80 text-lg">Welcome back, {account?.name}</p>
         {account?.uniqueSlug && (
           <div className="mt-4 bg-white/10 backdrop-blur-sm rounded-lg p-4">
@@ -231,9 +231,9 @@ export default function Dashboard() {
             style={{ color: theme?.primaryColor || '#A8518A' }}
           >
             {totalTests}
-          </div>
+                </div>
           <div className="text-sm text-gray-600">Total Tests</div>
-        </div>
+              </div>
         <div 
           className="card border-2"
           style={{
@@ -246,9 +246,9 @@ export default function Dashboard() {
             style={{ color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8' }}
           >
             {totalClasses}
-          </div>
+              </div>
           <div className="text-sm text-gray-600">Total Classes</div>
-        </div>
+            </div>
         <div 
           className="card border-2"
           style={{
@@ -277,10 +277,10 @@ export default function Dashboard() {
                   <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                </div>
+        </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">No Active Session</h3>
                 <p className="text-gray-500 text-sm">There is currently no active session running.</p>
-              </div>
+      </div>
             </div>
           );
         }
@@ -310,11 +310,11 @@ export default function Dashboard() {
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                </div>
+        </div>
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">Active Session</h2>
                   <p className="text-sm text-gray-600">Current ongoing session</p>
-                </div>
+          </div>
               </div>
               <span 
                 className="px-3 py-1 text-xs font-semibold rounded-full"
@@ -324,22 +324,22 @@ export default function Dashboard() {
                 }}
               >
                 Active Now
-              </span>
-            </div>
+                        </span>
+                    </div>
             <div className="space-y-3">
               <div>
                 <h3 className="font-semibold text-gray-900 text-lg mb-1">{activeSession.name}</h3>
                 {activeSession.description && (
                   <p className="text-sm text-gray-600">{activeSession.description}</p>
-                )}
-              </div>
+                      )}
+                    </div>
               <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-200">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Start Date</p>
                   <p className="text-sm font-medium text-gray-900">
                     {format(new Date(activeSession.startDate), 'MMM dd, yyyy')}
                   </p>
-                </div>
+                  </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">End Date</p>
                   <p className="text-sm font-medium text-gray-900">
@@ -357,7 +357,7 @@ export default function Dashboard() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
             </Link>
-        </div>
+                      </div>
       </div>
           </div>
         );
@@ -377,7 +377,7 @@ export default function Dashboard() {
                   <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                   </svg>
-                </div>
+                  </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary transition-colors">
                     Test by Teacher
@@ -400,8 +400,8 @@ export default function Dashboard() {
                   d="M9 5l7 7-7 7"
                 />
               </svg>
-            </div>
-          </Link>
+                </div>
+              </Link>
 
           {/* Class Tests Quick Action */}
           <Link
@@ -414,7 +414,7 @@ export default function Dashboard() {
                   <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                   </svg>
-                </div>
+          </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary transition-colors">
                     Test by Class
@@ -422,7 +422,7 @@ export default function Dashboard() {
                   <p className="text-sm text-gray-500 mt-1">
                     View all tests assigned to each class
                   </p>
-                </div>
+      </div>
               </div>
               <svg
                 className="w-6 h-6 text-gray-400 group-hover:text-primary transition-colors"
@@ -733,28 +733,37 @@ export default function Dashboard() {
 
     return (
       <>
-        <div className="bg-gradient-to-r from-emerald-600 to-teal-500 rounded-xl shadow-lg p-8 text-white">
-          <div className="flex items-center justify-between">
+        {/* Header with theme gradient */}
+        <div 
+          className="rounded-2xl shadow-2xl p-8 text-white relative overflow-hidden"
+          style={{
+            background: `linear-gradient(to right, ${theme?.primaryColor || '#A8518A'}, ${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}, ${theme?.accentColor || theme?.primaryColor || '#facc15'})`
+          }}
+        >
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h1 className="text-4xl font-bold mb-2">Teacher Workspace</h1>
-              <p className="text-emerald-100 text-lg">
+                <p className="text-white/80 text-lg">
                 {school?.name || 'Welcome to your dashboard'}
               </p>
             </div>
             {school && (
               <div className="text-right">
-                <p className="text-sm text-emerald-100 mb-1">School</p>
+                  <p className="text-sm text-white/80 mb-1">School</p>
                 <p className="text-xl font-semibold">{school.name}</p>
               </div>
             )}
           </div>
           {school?.uniqueSlug && (
-            <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-4">
+              <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm font-medium">Student Registration URL</p>
                 <button
                   onClick={() => copyToClipboard(`${window.location.origin}/${school.uniqueSlug}`)}
-                  className="text-white hover:text-emerald-100 transition-colors p-1 rounded hover:bg-white/20"
+                    className="text-white hover:text-white/80 transition-colors p-1 rounded hover:bg-white/20"
                   title="Copy URL"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -772,44 +781,60 @@ export default function Dashboard() {
               </code>
             </div>
           )}
+          </div>
         </div>
 
-        {/* Stats Cards */}
+        {/* Stats Cards with theme colors */}
         <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="card-hover">
+          <div 
+            className="card-hover rounded-xl shadow-lg p-6 text-white"
+            style={{
+              background: `linear-gradient(135deg, ${theme?.primaryColor || '#A8518A'} 0%, ${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'} 100%)`
+            }}
+          >
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-500">Assigned Classes</p>
-                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-2">{stats.classCount}</p>
+                <p className="text-sm text-white/80">Assigned Classes</p>
+                <p className="text-2xl sm:text-3xl font-bold text-white mt-2">{stats.classCount}</p>
               </div>
-              <div className="p-2 sm:p-3 bg-blue-100 rounded-full flex-shrink-0">
-                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-2 sm:p-3 bg-white/20 rounded-full flex-shrink-0">
+                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
               </div>
             </div>
           </div>
-          <div className="card-hover">
+          <div 
+            className="card-hover rounded-xl shadow-lg p-6 text-white"
+            style={{
+              background: `linear-gradient(135deg, ${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'} 0%, ${theme?.accentColor || theme?.primaryColor || '#facc15'} 100%)`
+            }}
+          >
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-500">Tests</p>
-                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-2">{stats.testCount}</p>
+                <p className="text-sm text-white/80">Tests</p>
+                <p className="text-2xl sm:text-3xl font-bold text-white mt-2">{stats.testCount}</p>
               </div>
-              <div className="p-2 sm:p-3 bg-green-100 rounded-full flex-shrink-0">
-                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-2 sm:p-3 bg-white/20 rounded-full flex-shrink-0">
+                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
             </div>
           </div>
-          <div className="card-hover">
+          <div 
+            className="card-hover rounded-xl shadow-lg p-6 text-white"
+            style={{
+              background: `linear-gradient(135deg, ${theme?.accentColor || theme?.primaryColor || '#facc15'} 0%, ${theme?.primaryColor || '#A8518A'} 100%)`
+            }}
+          >
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-500">Total Assignments</p>
-                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-2">{assignments.length}</p>
+                <p className="text-sm text-white/80">Total Assignments</p>
+                <p className="text-2xl sm:text-3xl font-bold text-white mt-2">{assignments.length}</p>
               </div>
-              <div className="p-2 sm:p-3 bg-purple-100 rounded-full flex-shrink-0">
-                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-2 sm:p-3 bg-white/20 rounded-full flex-shrink-0">
+                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
@@ -838,7 +863,16 @@ export default function Dashboard() {
               {assignments.map((assignment) => (
                 <div
                   key={assignment.id}
-                  className="p-4 border rounded-lg hover:border-primary hover:shadow-md transition-all"
+                  className="p-4 border rounded-lg hover:shadow-md transition-all"
+                  style={{
+                    borderColor: 'rgba(0, 0, 0, 0.1)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = theme?.primaryColor || '#A8518A';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                  }}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="font-semibold text-gray-900 text-lg">{assignment.classroom?.name}</h3>

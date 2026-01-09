@@ -329,10 +329,12 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
     });
   }, []);
 
-    const loadTheme = async () => {
-      try {
-        const { data } = await themeAPI.get();
-        if (data) {
+  // Load theme function
+  const loadTheme = async () => {
+    try {
+      console.log('Loading theme for account:', account?.role, account?.id);
+      const { data } = await themeAPI.get();
+      if (data) {
         const loadedTheme = {
           primaryColor: data.primaryColor || '#A8518A',
           secondaryColor: data.secondaryColor || '#1d4ed8',
@@ -342,20 +344,37 @@ export default function InstitutionLayout({ children }: InstitutionLayoutProps) 
           logoUrl: data.logoUrl || '',
           bannerUrl: data.bannerUrl || '',
         };
+        console.log('Theme loaded:', loadedTheme.primaryColor);
         setTheme(loadedTheme);
         applyTheme(loadedTheme);
         setLogoKey(prev => prev + 1); // Force logo refresh
-        }
-      } catch (error) {
-        console.error('Failed to load theme:', error);
+      } else {
+        console.warn('No theme data received from API');
       }
-    };
+    } catch (error: any) {
+      console.error('Failed to load theme:', error);
+      // Apply default theme on error to ensure something is displayed
+      const defaultTheme = {
+        primaryColor: '#A8518A',
+        secondaryColor: '#1d4ed8',
+        accentColor: '#facc15',
+        backgroundColor: '#ffffff',
+        textColor: '#0f172a',
+        logoUrl: '',
+        bannerUrl: '',
+      };
+      setTheme(defaultTheme);
+      applyTheme(defaultTheme);
+    }
+  };
 
+  // Load theme when account changes
   useEffect(() => {
     if (account && (account.role === 'SCHOOL' || account.role === 'TEACHER' || account.role === 'SCHOOL_ADMIN')) {
+      console.log('Account detected, loading theme for:', account.role);
       loadTheme();
     }
-  }, [account]);
+  }, [account?.id, account?.role]);
 
   // Listen for theme updates
   useEffect(() => {

@@ -108,6 +108,8 @@ export const institutionAPI = {
   createSchoolAdmin: (data: { name: string; email: string; password: string; phone?: string }) =>
     api.post('/institution/school-admins', data),
   getSchoolAdmins: () => api.get('/institution/school-admins'),
+  updateSchoolAdminStatus: (id: string, isActive: boolean) =>
+    api.put(`/institution/school-admins/${id}/status`, { isActive }),
 };
 
 // Tests

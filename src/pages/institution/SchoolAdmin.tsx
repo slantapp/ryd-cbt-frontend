@@ -8,6 +8,7 @@ export default function SchoolAdmin() {
   const [schoolAdmins, setSchoolAdmins] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -27,7 +28,7 @@ export default function SchoolAdmin() {
     try {
       setLoading(true);
       const { data } = await institutionAPI.getSchoolAdmins();
-      setSchoolAdmins(data.admins || []);
+      setSchoolAdmins(Array.isArray(data) ? data : []);
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to load school admins');
     } finally {
@@ -47,6 +48,20 @@ export default function SchoolAdmin() {
       toast.error(error?.response?.data?.error || 'Failed to create school admin');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleToggleStatus = async (adminId: string, currentIsActive: boolean) => {
+    const newIsActive = !currentIsActive;
+    setUpdatingStatus(adminId);
+    try {
+      await institutionAPI.updateSchoolAdminStatus(adminId, newIsActive);
+      toast.success(`School admin ${newIsActive ? 'activated' : 'deactivated'} successfully`);
+      loadSchoolAdmins();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to update school admin status');
+    } finally {
+      setUpdatingStatus(null);
     }
   };
 
@@ -136,13 +151,19 @@ export default function SchoolAdmin() {
                     Phone
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Created At
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {schoolAdmins.map((admin) => (
-                  <tr key={admin.id}>
+                  <tr key={admin.id} className={!admin.isActive ? 'bg-gray-50 opacity-75' : ''}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {admin.name}
                     </td>
@@ -152,8 +173,36 @@ export default function SchoolAdmin() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {admin.phone || '-'}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          admin.isActive
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}
+                      >
+                        {admin.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(admin.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button
+                        onClick={() => handleToggleStatus(admin.id, admin.isActive)}
+                        disabled={updatingStatus === admin.id}
+                        className={`${
+                          admin.isActive
+                            ? 'text-red-600 hover:text-red-900'
+                            : 'text-green-600 hover:text-green-900'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {updatingStatus === admin.id
+                          ? 'Updating...'
+                          : admin.isActive
+                          ? 'Deactivate'
+                          : 'Activate'}
+                      </button>
                     </td>
                   </tr>
                 ))}
