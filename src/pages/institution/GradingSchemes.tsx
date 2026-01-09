@@ -329,8 +329,8 @@ export default function GradingSchemes() {
         return;
       }
 
-      if (bulkFormData.sessionClassIds.length === 0) {
-        toast.error('Please select at least one class-session combination');
+      if (bulkFormData.classroomIds.length === 0 || bulkFormData.sessionIds.length === 0) {
+        toast.error('Please select at least one class and one session');
         return;
       }
 
@@ -352,7 +352,8 @@ export default function GradingSchemes() {
       try {
         const response = await gradingSchemeAPI.bulkCreate({
           subjectIds: bulkFormData.subjectIds,
-          sessionClassIds: bulkFormData.sessionClassIds,
+          classroomIds: bulkFormData.classroomIds,
+          sessionIds: bulkFormData.sessionIds,
           weights: nonZeroWeights,
         });
         
@@ -362,7 +363,7 @@ export default function GradingSchemes() {
         );
         
         setShowForm(false);
-        setBulkFormData({ subjectIds: [], sessionClassIds: [], weights: [] });
+        setBulkFormData({ subjectIds: [], classroomIds: [], sessionIds: [], weights: [] });
         loadGradingSchemes();
       } catch (error: any) {
         toast.error(error?.response?.data?.error || 'Failed to create grading schemes');
@@ -552,8 +553,8 @@ export default function GradingSchemes() {
                   type="button"
                   onClick={() => {
                     setIsBulkMode(false);
-                    setFormData({ subjectId: '', sessionClassId: '', weights: [] });
-                    setBulkFormData({ subjectIds: [], sessionClassIds: [], weights: [] });
+                    setFormData({ subjectId: '', classroomId: '', sessionId: '', weights: [] });
+                    setBulkFormData({ subjectIds: [], classroomIds: [], sessionIds: [], weights: [] });
                   }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     !isBulkMode
@@ -567,8 +568,8 @@ export default function GradingSchemes() {
                   type="button"
                   onClick={() => {
                     setIsBulkMode(true);
-                    setFormData({ subjectId: '', sessionClassId: '', weights: [] });
-                    setBulkFormData({ subjectIds: [], sessionClassIds: [], weights: [] });
+                    setFormData({ subjectId: '', classroomId: '', sessionId: '', weights: [] });
+                    setBulkFormData({ subjectIds: [], classroomIds: [], sessionIds: [], weights: [] });
                   }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     isBulkMode
@@ -647,53 +648,113 @@ export default function GradingSchemes() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Class-Sessions <span className="text-red-500">*</span>
+                    Classes <span className="text-red-500">*</span>
                   </label>
                   <select
                     className="input-field"
                     value=""
                     onChange={(e) => {
                       const selectedId = e.target.value;
-                      if (selectedId && !bulkFormData.sessionClassIds.includes(selectedId)) {
+                      if (selectedId && !bulkFormData.classroomIds.includes(selectedId)) {
                         setBulkFormData({ 
                           ...bulkFormData, 
-                          sessionClassIds: [...bulkFormData.sessionClassIds, selectedId] 
+                          classroomIds: [...bulkFormData.classroomIds, selectedId] 
                         });
                         e.target.value = ''; // Reset dropdown
                       }
                     }}
                   >
-                    <option value="">Select a class-session to add...</option>
-                    {sessionClasses.filter(sc => !bulkFormData.sessionClassIds.includes(sc.id)).map((sc) => (
-                      <option key={sc.id} value={sc.id}>
-                        {sc.classroom.name} - {sc.session.name}
+                    <option value="">Select a class to add...</option>
+                    {classrooms.filter(c => !bulkFormData.classroomIds.includes(c.id)).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
                       </option>
                     ))}
                   </select>
                   
-                  {/* Selected Class-Sessions Display */}
-                  {bulkFormData.sessionClassIds.length > 0 && (
+                  {/* Selected Classes Display */}
+                  {bulkFormData.classroomIds.length > 0 && (
                     <div className="mt-3 space-y-2">
-                      <p className="text-xs text-gray-600 font-medium">Selected Class-Sessions:</p>
+                      <p className="text-xs text-gray-600 font-medium">Selected Classes:</p>
                       <div className="flex flex-wrap gap-2">
-                        {bulkFormData.sessionClassIds.map((sessionClassId) => {
-                          const sc = sessionClasses.find(s => s.id === sessionClassId);
-                          if (!sc) return null;
+                        {bulkFormData.classroomIds.map((classroomId: string) => {
+                          const c = classrooms.find(cl => cl.id === classroomId);
+                          if (!c) return null;
                           return (
                             <span
-                              key={sessionClassId}
+                              key={classroomId}
                               className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800"
                             >
-                              {sc.classroom.name} - {sc.session.name}
+                              {c.name}
                               <button
                                 type="button"
                                 onClick={() => {
                                   setBulkFormData({
                                     ...bulkFormData,
-                                    sessionClassIds: bulkFormData.sessionClassIds.filter(id => id !== sessionClassId)
+                                    classroomIds: bulkFormData.classroomIds.filter((id: string) => id !== classroomId)
                                   });
                                 }}
                                 className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-green-200 focus:outline-none"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Sessions <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className="input-field"
+                    value=""
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      if (selectedId && !bulkFormData.sessionIds.includes(selectedId)) {
+                        setBulkFormData({ 
+                          ...bulkFormData, 
+                          sessionIds: [...bulkFormData.sessionIds, selectedId] 
+                        });
+                        e.target.value = ''; // Reset dropdown
+                      }
+                    }}
+                  >
+                    <option value="">Select a session to add...</option>
+                    {sessions.filter(s => !bulkFormData.sessionIds.includes(s.id)).map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  {/* Selected Sessions Display */}
+                  {bulkFormData.sessionIds.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs text-gray-600 font-medium">Selected Sessions:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {bulkFormData.sessionIds.map((sessionId: string) => {
+                          const s = sessions.find(se => se.id === sessionId);
+                          if (!s) return null;
+                          return (
+                            <span
+                              key={sessionId}
+                              className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
+                            >
+                              {s.name}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBulkFormData({
+                                    ...bulkFormData,
+                                    sessionIds: bulkFormData.sessionIds.filter((id: string) => id !== sessionId)
+                                  });
+                                }}
+                                className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-blue-200 focus:outline-none"
                               >
                                 ×
                               </button>
@@ -778,7 +839,7 @@ export default function GradingSchemes() {
               </div>
             )}
 
-            {((!isBulkMode && formData.subjectId) || (isBulkMode && (bulkFormData.subjectIds.length > 0 || bulkFormData.sessionClassIds.length > 0))) && (
+            {((!isBulkMode && formData.subjectId) || (isBulkMode && (bulkFormData.subjectIds.length > 0 || (bulkFormData.classroomIds.length > 0 && bulkFormData.sessionIds.length > 0)))) && (
               <div className="border-t border-gray-200 pt-6">
                 <div className="flex justify-between items-center mb-4">
                   <label className="block text-sm font-medium text-gray-700">
@@ -852,10 +913,10 @@ export default function GradingSchemes() {
                     Total weight must equal 100%. Current: {totalWeight.toFixed(2)}%
                   </p>
                 )}
-                {isBulkMode && bulkFormData.subjectIds.length > 0 && bulkFormData.sessionClassIds.length > 0 && (
+                {isBulkMode && bulkFormData.subjectIds.length > 0 && bulkFormData.classroomIds.length > 0 && bulkFormData.sessionIds.length > 0 && (
                   <p className="mt-3 text-sm text-blue-600">
-                    This will create {bulkFormData.subjectIds.length * bulkFormData.sessionClassIds.length} grading scheme(s) 
-                    for all combinations of selected subjects and class-sessions.
+                    This will create {bulkFormData.subjectIds.length * bulkFormData.classroomIds.length * bulkFormData.sessionIds.length} grading scheme(s) 
+                    for all combinations of selected subjects, classes, and sessions.
                   </p>
                 )}
               </div>
