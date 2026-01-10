@@ -98,17 +98,35 @@ export default function Dashboard() {
           throw new Error('Invalid response structure');
         }
       } else {
+        // For SCHOOL and SCHOOL_ADMIN roles
         const [testsRes, sessionsRes] = await Promise.all([
           testAPI.getAll(),
           sessionAPI.getAll(),
         ]);
-        setTests(testsRes.data);
-        setSessions(sessionsRes.data);
+        const testsData = Array.isArray(testsRes.data) ? testsRes.data : [];
+        const sessionsData = Array.isArray(sessionsRes.data) ? sessionsRes.data : [];
+        console.log('Dashboard data loaded:', {
+          testsCount: testsData.length,
+          sessionsCount: sessionsData.length,
+          tests: testsData,
+          sessions: sessionsData,
+        });
+        setTests(testsData);
+        setSessions(sessionsData);
       }
     } catch (error: any) {
       console.error('Dashboard load error:', error);
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to load dashboard data';
+      console.error('Error details:', {
+        message: errorMessage,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        role: account?.role,
+      });
+      // Don't show toast in production to avoid noise, but log the error
+      if (import.meta.env.MODE === 'development') {
       toast.error(errorMessage);
+      }
       // Set default values to prevent UI crashes
       if (account?.role === 'TEACHER') {
         setTeacherStats({
@@ -117,6 +135,10 @@ export default function Dashboard() {
           school: undefined,
           stats: { classCount: 0, testCount: 0 },
         });
+      } else if (account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN') {
+        // Ensure tests and sessions are arrays even on error
+        setTests([]);
+        setSessions([]);
       }
     } finally {
       setLoading(false);
@@ -142,10 +164,17 @@ export default function Dashboard() {
     return s.isActive && start <= new Date() && end >= new Date();
   });
 
-  // Calculate metrics based on active session
+  // Calculate metrics - use active session if available, otherwise use all data
   let totalTests = 0;
   let totalClasses = 0;
   let totalStudents = 0;
+
+  console.log('Calculating metrics:', {
+    hasActiveSession: !!activeSession,
+    testsCount: Array.isArray(tests) ? tests.length : 0,
+    sessionsCount: Array.isArray(sessions) ? sessions.length : 0,
+    activeSession,
+  });
 
   if (activeSession) {
     // Get tests assigned to the active session
@@ -174,7 +203,30 @@ export default function Dashboard() {
     
     // Count students in active session classes (if we have student data)
     // For now, we'll leave this as 0 or calculate from student assignments if available
+  } else {
+    // Fallback: show all tests and classes if no active session
+    totalTests = Array.isArray(tests) ? tests.length : 0;
+    
+    // Count unique classes from all sessions
+    const allClassIds = new Set<string>();
+    sessions.forEach((session: any) => {
+      if (session.classAssignments && Array.isArray(session.classAssignments)) {
+        session.classAssignments.forEach((ca: any) => {
+          if (ca.classroomId) {
+            allClassIds.add(ca.classroomId);
+          } else if (ca.classroom?.id) {
+            allClassIds.add(ca.classroom.id);
+          }
+        });
+      }
+    });
+    totalClasses = allClassIds.size;
+    
+    // Total students - would need to be fetched from API or calculated from student data
+    // For now, leave as 0 or fetch separately if needed
   }
+
+  console.log('Final metrics:', { totalTests, totalClasses, totalStudents });
 
   const renderSchoolDashboard = () => (
     <>

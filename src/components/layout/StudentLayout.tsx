@@ -17,6 +17,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', path: '/student/dashboard', icon: '📊' },
+  { label: 'Announcements', path: '/student/announcements', icon: '📢' },
 ];
 
 export default function StudentLayout({ children }: StudentLayoutProps) {

@@ -39,6 +39,9 @@ import ClassTests from './pages/institution/ClassTests';
 import SchoolAdmin from './pages/institution/SchoolAdmin';
 import QuestionBank from './pages/institution/QuestionBank';
 import Help from './pages/institution/Help';
+import PromoProgram from './pages/institution/PromoProgram';
+import ManageParent from './pages/institution/ManageParent';
+import Announcements from './pages/institution/Announcements';
 
 // Student pages
 import StudentTestPage from './pages/student/StudentTestPage';
@@ -48,6 +51,7 @@ import StudentTestReview from './pages/student/StudentTestReview';
 import StudentRegister from './pages/student/StudentRegister';
 import StudentLogin from './pages/student/StudentLogin';
 import StudentDashboard from './pages/student/StudentDashboard';
+import StudentAnnouncements from './pages/student/StudentAnnouncements';
 import SchoolLogin from './pages/student/SchoolLogin';
 
 // Parent pages
@@ -136,6 +140,16 @@ function App() {
               </PrivateRoute>
             }
           />
+          <Route
+            path="/student/announcements"
+            element={
+              <PrivateRoute>
+                <StudentLayout>
+                  <StudentAnnouncements />
+                </StudentLayout>
+              </PrivateRoute>
+            }
+          />
 
           {/* Parent authenticated routes - MUST come before /:slug */}
           <Route
@@ -165,6 +179,18 @@ function App() {
                 <ParentLayout>
                   <ReportCard />
                 </ParentLayout>
+              </PrivateRoute>
+            }
+          />
+
+          {/* Promotion program routes - MUST come before /:slug */}
+          <Route
+            path="/promo/manage-parent/:id"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <ManageParent />
+                </InstitutionLayout>
               </PrivateRoute>
             }
           />
@@ -484,6 +510,16 @@ function App() {
             }
           />
           <Route
+            path="/announcements"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <Announcements />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
             path="/teacher-tests"
             element={
               <PrivateRoute>
@@ -513,7 +549,16 @@ function App() {
               </PrivateRoute>
             }
           />
-
+          <Route
+            path="/manage-promo-program"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <PromoProgram />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>

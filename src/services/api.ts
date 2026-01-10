@@ -433,6 +433,18 @@ export const gradingSchemeAPI = {
   delete: (id: string) => api.delete(`/grading-schemes/${id}`),
 };
 
+// Announcements
+export const announcementAPI = {
+  getAll: () => api.get('/announcements'),
+  getStudent: () => api.get('/announcements/student'),
+  getOne: (id: string) => api.get(`/announcements/${id}`),
+  create: (data: { title: string; description?: string; youtubeUrl?: string; scope: 'SCHOOL' | 'TEACHER'; classroomIds?: string[] }) =>
+    api.post('/announcements', data),
+  update: (id: string, data: { title?: string; description?: string; youtubeUrl?: string; isActive?: boolean; classroomIds?: string[] }) =>
+    api.put(`/announcements/${id}`, data),
+  delete: (id: string) => api.delete(`/announcements/${id}`),
+};
+
 export const themeAPI = {
   get: () => api.get('/theme'),
   update: (data: {
