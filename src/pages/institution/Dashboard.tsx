@@ -157,11 +157,66 @@ export default function Dashboard() {
     );
   }
 
-  // Get active session
+  // Helper function to parse dates consistently (matches Sessions.tsx logic)
+  const parseDate = (dateStr: string | Date) => {
+    if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      const [year, month, day] = dateStr.split('-').map(Number);
+      return new Date(Date.UTC(year, month - 1, day));
+    }
+    return new Date(dateStr);
+  };
+
+  // Get active session (matches Sessions.tsx logic for determining active sessions)
+  // A session is "active" if it's isActive=true, not archived, and current date is between start and end
   const activeSession = sessions.find(s => {
-    const start = new Date(s.startDate);
-    const end = new Date(s.endDate);
-    return s.isActive && start <= new Date() && end >= new Date();
+    // Skip if not active or explicitly archived
+    if (!s.isActive || s.isArchived === true) {
+      return false;
+    }
+    
+    const startDate = parseDate(s.startDate);
+    const endDate = parseDate(s.endDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    
+    // Session is active if current date is between start and end (inclusive)
+    // This matches Sessions.tsx logic: session.isActive && start <= today && end >= today
+    const isCurrentlyActive = start <= today && end >= today;
+    
+    // Debug logging for sessions that should be checked
+    console.log('Checking session for active status:', {
+      sessionName: s.name,
+      sessionId: s.id,
+      isActive: s.isActive,
+      isArchived: s.isArchived,
+      startDate: s.startDate,
+      endDate: s.endDate,
+      parsedStart: start.toISOString(),
+      parsedEnd: end.toISOString(),
+      today: today.toISOString(),
+      startCompare: `${start.toISOString()} <= ${today.toISOString()} = ${start <= today}`,
+      endCompare: `${end.toISOString()} >= ${today.toISOString()} = ${end >= today}`,
+      result: isCurrentlyActive,
+    });
+    
+    return isCurrentlyActive;
+  });
+  
+  console.log('Dashboard active session result:', activeSession ? {
+    id: activeSession.id,
+    name: activeSession.name,
+    startDate: activeSession.startDate,
+    endDate: activeSession.endDate,
+    isActive: activeSession.isActive,
+    isArchived: activeSession.isArchived,
+  } : 'No active session found', {
+    totalSessions: sessions.length,
+    activeSessions: sessions.filter(s => s.isActive).length,
   });
 
   // Calculate metrics - use active session if available, otherwise use all data
@@ -1136,7 +1191,7 @@ export default function Dashboard() {
       {account?.role === 'SUPER_ADMIN' && renderAdminDashboard()}
       {account?.role === 'MINISTRY' && renderMinistryDashboard()}
       {account?.role === 'TEACHER' && renderTeacherDashboard()}
-      {(account?.role === 'SCHOOL' || !account?.role) && renderSchoolDashboard()}
+      {(account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN' || !account?.role) && renderSchoolDashboard()}
     </div>
   );
 }

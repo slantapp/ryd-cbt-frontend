@@ -110,6 +110,10 @@ export const institutionAPI = {
   getSchoolAdmins: () => api.get('/institution/school-admins'),
   updateSchoolAdminStatus: (id: string, isActive: boolean) =>
     api.put(`/institution/school-admins/${id}/status`, { isActive }),
+  resetSchoolAdminPassword: (id: string, newPassword: string) =>
+    api.post(`/institution/school-admins/${id}/reset-password`, { newPassword }),
+  deleteSchoolAdmin: (id: string) =>
+    api.delete(`/institution/school-admins/${id}`),
 };
 
 // Tests

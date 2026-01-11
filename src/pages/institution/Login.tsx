@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'SUPER_ADMIN' | 'MINISTRY' | 'SCHOOL' | 'TEACHER' | null>(null);
+  const [role, setRole] = useState<'SUPER_ADMIN' | 'MINISTRY' | 'SCHOOL' | 'SCHOOL_ADMIN' | 'TEACHER' | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -33,7 +33,7 @@ export default function Login() {
     return () => clearTimeout(timer);
   }, [password]);
 
-  const handleRoleSelect = (selectedRole: 'SUPER_ADMIN' | 'MINISTRY' | 'SCHOOL' | 'TEACHER' | 'STUDENT') => {
+  const handleRoleSelect = (selectedRole: 'SUPER_ADMIN' | 'MINISTRY' | 'SCHOOL' | 'SCHOOL_ADMIN' | 'TEACHER' | 'STUDENT') => {
     if (selectedRole === 'STUDENT') {
       navigate('/student/login');
       return;
@@ -55,7 +55,30 @@ export default function Login() {
     setError(null);
 
     try {
-      const response = await authAPI.login({ email, password, role });
+      // If "I am a School Administrator" is selected, try both SCHOOL and SCHOOL_ADMIN roles
+      let response;
+      
+      if (role === 'SCHOOL_ADMIN') {
+        // Try SCHOOL_ADMIN first, then SCHOOL if it fails with 401/404 (authentication errors)
+        try {
+          response = await authAPI.login({ email, password, role: 'SCHOOL_ADMIN' });
+        } catch (error: any) {
+          // If SCHOOL_ADMIN fails with authentication error, try SCHOOL role
+          if (error.response?.status === 401 || error.response?.status === 404) {
+            try {
+              response = await authAPI.login({ email, password, role: 'SCHOOL' });
+            } catch (schoolError: any) {
+              // Both failed, throw the school error (it will be handled below)
+              throw schoolError;
+            }
+          } else {
+            // Other errors (403, 500, etc.) should be thrown immediately
+            throw error;
+          }
+        }
+      } else {
+        response = await authAPI.login({ email, password, role });
+      }
       
       // Extract token and institution from response
       const token = response.data?.token;
@@ -187,7 +210,7 @@ export default function Login() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleRoleSelect('SCHOOL')}
+                    onClick={() => handleRoleSelect('SCHOOL_ADMIN')}
                     className="w-full flex items-center px-4 py-3 rounded-lg border-2 border-gray-200 hover:border-primary hover:bg-primary-50 text-gray-700 transition-all hover:shadow-md"
                   >
                     <svg className="w-5 h-5 mr-3 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -213,7 +236,7 @@ export default function Login() {
                 <div className="flex items-center">
                   <span className="text-primary font-semibold">
                     {role === 'MINISTRY' && 'I am a Ministry/Organization'}
-                    {role === 'SCHOOL' && 'I am a School Administrator'}
+                    {(role === 'SCHOOL' || role === 'SCHOOL_ADMIN') && 'I am a School Administrator'}
                     {role === 'TEACHER' && 'I am a Teacher'}
                     {role === 'SUPER_ADMIN' && 'I am a Super Admin'}
                   </span>
