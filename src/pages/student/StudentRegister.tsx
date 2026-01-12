@@ -1,14 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { publicAPI } from '../../services/api';
+import { publicAPI, authAPI } from '../../services/api';
+import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { generateUsername } from '../../utils/usernameUtils';
+import UsernameModal from '../../components/UsernameModal';
 
 export default function StudentRegister() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const { setAuth } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [schoolInfo, setSchoolInfo] = useState<any>(null);
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [registeredUsername, setRegisteredUsername] = useState('');
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -85,7 +90,8 @@ export default function StudentRegister() {
         return;
       }
 
-      await publicAPI.registerStudent({
+      // Register the student
+      const registerResponse = await publicAPI.registerStudent({
         schoolSlug: slug!,
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -97,23 +103,62 @@ export default function StudentRegister() {
         classroomId: formData.classroomId || undefined,
         sessionId: formData.sessionId || undefined,
       });
-      toast.success(formData.classroomId ? 'Registration successful! You have been assigned to your selected class. Please log in to continue.' : 'Registration successful! Please wait for class assignment from your school. Please log in to continue.');
-      setFormData({
-        firstName: '',
-        lastName: '',
-        username: '',
-        password: '',
-        confirmPassword: '',
-        email: '',
-        phone: '',
-        dateOfBirth: '',
-        classroomId: '',
-        sessionId: '',
-      });
-      // Redirect to login page after registration
-      setTimeout(() => {
-        navigate('/student/login');
-      }, 2000);
+
+      // Get the registered username (from response or form data)
+      const username = registerResponse.data?.username || formData.username;
+      setRegisteredUsername(username);
+
+      // Immediately log in the student
+      try {
+        const loginResponse = await authAPI.studentLogin({
+          username: username,
+          password: formData.password,
+        });
+
+        if (!loginResponse.data.token || !loginResponse.data.student) {
+          toast.error('Registration successful, but login failed. Please log in manually.');
+          navigate(`/${slug}/login`);
+          return;
+        }
+
+        // Validate student belongs to this school
+        if (loginResponse.data.student.institutionId !== schoolInfo?.id) {
+          toast.error('Registration successful, but there was an issue with your account. Please contact your school.');
+          navigate(`/${slug}/login`);
+          return;
+        }
+
+        // Set mustResetPassword flag
+        const requiresPasswordReset = loginResponse.data.requiresPasswordReset === true || loginResponse.data.student.mustResetPassword === true;
+
+        // Convert student to account format
+        const studentAccount = {
+          id: loginResponse.data.student.id,
+          name: `${loginResponse.data.student.firstName} ${loginResponse.data.student.lastName}`,
+          email: loginResponse.data.student.email || loginResponse.data.student.username,
+          role: 'STUDENT' as const,
+          username: loginResponse.data.student.username,
+          firstName: loginResponse.data.student.firstName,
+          lastName: loginResponse.data.student.lastName,
+          institutionId: loginResponse.data.student.institutionId,
+          institution: loginResponse.data.student.institution,
+          createdAt: new Date().toISOString(),
+          status: 'ACTIVE' as const,
+          mustResetPassword: requiresPasswordReset || false,
+        };
+
+        // Set auth and show username modal
+        setAuth(loginResponse.data.token, studentAccount as any);
+        
+        // Show username modal
+        setShowUsernameModal(true);
+        
+        toast.success('Registration successful! Welcome!');
+      } catch (loginError: any) {
+        // Registration succeeded but login failed
+        toast.error('Registration successful, but automatic login failed. Please log in manually.');
+        navigate(`/${slug}/login`);
+      }
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Registration failed');
     } finally {
@@ -337,6 +382,17 @@ export default function StudentRegister() {
           </form>
         </div>
       </div>
+
+      {/* Username Modal */}
+      <UsernameModal
+        isOpen={showUsernameModal}
+        username={registeredUsername}
+        onClose={() => {
+          setShowUsernameModal(false);
+          // Navigate to dashboard after closing modal
+          navigate('/student/dashboard');
+        }}
+      />
     </div>
   );
 }
