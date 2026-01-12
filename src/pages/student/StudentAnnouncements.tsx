@@ -8,7 +8,6 @@ interface Announcement {
   title: string;
   description?: string;
   youtubeUrl?: string;
-  scope: 'SCHOOL' | 'TEACHER';
   createdAt: string;
   createdBy: {
     id: string;
@@ -68,9 +67,9 @@ export default function StudentAnnouncements() {
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
         <div className="relative z-10">
-          <h1 className="text-4xl font-bold mb-2">📢 Announcements</h1>
+          <h1 className="text-4xl font-bold mb-2">💡 Educational Insights</h1>
           <p className="text-white/80 text-lg">
-            Important updates and information from your school and teachers
+            Educational content and insights shared by your school and teachers
           </p>
         </div>
       </div>
@@ -78,10 +77,10 @@ export default function StudentAnnouncements() {
       {/* Announcements List */}
       {announcements.length === 0 ? (
         <div className="card text-center py-16">
-          <div className="text-6xl mb-4">📭</div>
-          <h3 className="text-2xl font-bold text-gray-900 mb-2">No Announcements</h3>
+          <div className="text-6xl mb-4">💡</div>
+          <h3 className="text-2xl font-bold text-gray-900 mb-2">No Educational Insights</h3>
           <p className="text-gray-600">
-            You don't have any announcements at the moment. Check back later!
+            You don't have any educational insights at the moment. Check back later!
           </p>
         </div>
       ) : (
@@ -96,15 +95,6 @@ export default function StudentAnnouncements() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-3">
                         <h3 className="text-2xl font-bold text-gray-900">{announcement.title}</h3>
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            announcement.scope === 'SCHOOL'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-purple-100 text-purple-800'
-                          }`}
-                        >
-                          {announcement.scope === 'SCHOOL' ? 'School-Wide' : 'From Teacher'}
-                        </span>
                       </div>
                       
                       {announcement.description && (
@@ -126,11 +116,6 @@ export default function StudentAnnouncements() {
                         <div className="flex items-center gap-2">
                           <span className="font-medium">By:</span>
                           <span>{announcement.createdBy.name}</span>
-                          {announcement.scope === 'TEACHER' && (
-                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
-                              Teacher
-                            </span>
-                          )}
                         </div>
                         <span>•</span>
                         <span>{format(new Date(announcement.createdAt), 'MMMM d, yyyy • h:mm a')}</span>

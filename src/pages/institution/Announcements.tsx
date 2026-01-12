@@ -9,7 +9,6 @@ interface Announcement {
   title: string;
   description?: string;
   youtubeUrl?: string;
-  scope: 'SCHOOL' | 'TEACHER';
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -24,7 +23,7 @@ interface Announcement {
   }>;
 }
 
-export default function Announcements() {
+export default function EducationalInsights() {
   const { account } = useAuthStore();
   const [theme, setTheme] = useState<any>({
     primaryColor: '#A8518A',
@@ -40,7 +39,6 @@ export default function Announcements() {
     title: '',
     description: '',
     youtubeUrl: '',
-    scope: 'SCHOOL' as 'SCHOOL' | 'TEACHER',
     classroomIds: [] as string[],
   });
   const [submitting, setSubmitting] = useState(false);
@@ -76,19 +74,10 @@ export default function Announcements() {
     loadAnnouncements();
   }, []);
 
-  // Load classrooms for teachers
+  // Load classrooms for all users
   useEffect(() => {
-    if (isTeacher) {
-      loadClassrooms();
-    }
-  }, [isTeacher]);
-
-  // Load classrooms when scope changes to TEACHER
-  useEffect(() => {
-    if (formData.scope === 'TEACHER' && isTeacher && classrooms.length === 0) {
-      loadClassrooms();
-    }
-  }, [formData.scope]);
+    loadClassrooms();
+  }, []);
 
   const loadAnnouncements = async () => {
     setLoading(true);
@@ -96,8 +85,8 @@ export default function Announcements() {
       const { data } = await announcementAPI.getAll();
       setAnnouncements(Array.isArray(data) ? data : []);
     } catch (error: any) {
-      console.error('Failed to load announcements:', error);
-      toast.error(error?.response?.data?.error || 'Failed to load announcements');
+      console.error('Failed to load educational insights:', error);
+      toast.error(error?.response?.data?.error || 'Failed to load educational insights');
       setAnnouncements([]);
     } finally {
       setLoading(false);
@@ -120,7 +109,6 @@ export default function Announcements() {
       title: '',
       description: '',
       youtubeUrl: '',
-      scope: isTeacher ? 'TEACHER' : 'SCHOOL',
       classroomIds: [],
     });
     setShowForm(true);
@@ -132,7 +120,6 @@ export default function Announcements() {
       title: announcement.title,
       description: announcement.description || '',
       youtubeUrl: announcement.youtubeUrl || '',
-      scope: announcement.scope,
       classroomIds: announcement.classrooms.map(c => c.id),
     });
     setShowForm(true);
@@ -149,19 +136,18 @@ export default function Announcements() {
           title: formData.title,
           description: formData.description || undefined,
           youtubeUrl: formData.youtubeUrl || undefined,
-          classroomIds: formData.scope === 'TEACHER' ? formData.classroomIds : undefined,
+          classroomIds: formData.classroomIds,
         });
-        toast.success('Announcement updated successfully');
+        toast.success('Educational Insight updated successfully');
       } else {
         // Create
         await announcementAPI.create({
           title: formData.title,
           description: formData.description || undefined,
           youtubeUrl: formData.youtubeUrl || undefined,
-          scope: formData.scope,
-          classroomIds: formData.scope === 'TEACHER' ? formData.classroomIds : undefined,
+          classroomIds: formData.classroomIds,
         });
-        toast.success('Announcement created successfully');
+        toast.success('Educational Insight created successfully');
       }
       setShowForm(false);
       setEditingAnnouncement(null);
@@ -169,31 +155,30 @@ export default function Announcements() {
         title: '',
         description: '',
         youtubeUrl: '',
-        scope: isTeacher ? 'TEACHER' : 'SCHOOL',
         classroomIds: [],
       });
       loadAnnouncements();
     } catch (error: any) {
-      console.error('Failed to save announcement:', error);
-      toast.error(error?.response?.data?.error || 'Failed to save announcement');
+      console.error('Failed to save educational insight:', error);
+      toast.error(error?.response?.data?.error || 'Failed to save educational insight');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this announcement?')) {
+    if (!confirm('Are you sure you want to delete this educational insight?')) {
       return;
     }
 
     setDeletingId(id);
     try {
       await announcementAPI.delete(id);
-      toast.success('Announcement deleted successfully');
+      toast.success('Educational Insight deleted successfully');
       loadAnnouncements();
     } catch (error: any) {
-      console.error('Failed to delete announcement:', error);
-      toast.error(error?.response?.data?.error || 'Failed to delete announcement');
+      console.error('Failed to delete educational insight:', error);
+      toast.error(error?.response?.data?.error || 'Failed to delete educational insight');
     } finally {
       setDeletingId(null);
     }
@@ -204,11 +189,11 @@ export default function Announcements() {
       await announcementAPI.update(announcement.id, {
         isActive: !announcement.isActive,
       });
-      toast.success(`Announcement ${!announcement.isActive ? 'activated' : 'deactivated'} successfully`);
+      toast.success(`Educational Insight ${!announcement.isActive ? 'activated' : 'deactivated'} successfully`);
       loadAnnouncements();
     } catch (error: any) {
-      console.error('Failed to update announcement:', error);
-      toast.error(error?.response?.data?.error || 'Failed to update announcement');
+      console.error('Failed to update educational insight:', error);
+      toast.error(error?.response?.data?.error || 'Failed to update educational insight');
     }
   };
 
@@ -242,16 +227,16 @@ export default function Announcements() {
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
         <div className="relative z-10 flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold mb-2">Announcements</h1>
+            <h1 className="text-4xl font-bold mb-2">Educational Insights</h1>
             <p className="text-white/80 text-lg">
-              {isSchool ? 'Manage school-wide announcements' : 'Manage announcements for your classes'}
+              Share educational content and insights with selected classes
             </p>
           </div>
           <button
             onClick={handleCreate}
             className="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-lg font-semibold transition-colors backdrop-blur-sm"
           >
-            + Create Announcement
+            + Create Insight
           </button>
         </div>
       </div>
@@ -265,7 +250,7 @@ export default function Announcements() {
           }}
         >
           <div className="text-3xl font-bold mb-2">{announcements.length}</div>
-          <div className="text-white/80">Total Announcements</div>
+          <div className="text-white/80">Total Insights</div>
         </div>
         <div 
           className="card p-6 text-white"
@@ -274,9 +259,9 @@ export default function Announcements() {
           }}
         >
           <div className="text-3xl font-bold mb-2">
-            {announcements.filter(a => a.scope === 'SCHOOL').length}
+            {announcements.reduce((sum, a) => sum + a.classrooms.length, 0)}
           </div>
-          <div className="text-white/80">School-Wide</div>
+          <div className="text-white/80">Class Assignments</div>
         </div>
         <div 
           className="card p-6 text-white"
@@ -297,7 +282,7 @@ export default function Announcements() {
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b">
               <h2 className="text-2xl font-bold">
-                {editingAnnouncement ? 'Edit Announcement' : 'Create Announcement'}
+                {editingAnnouncement ? 'Edit Educational Insight' : 'Create Educational Insight'}
               </h2>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -311,7 +296,7 @@ export default function Announcements() {
                   className="input-field"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="Enter announcement title"
+                  placeholder="Enter insight title"
                 />
               </div>
 
@@ -324,7 +309,7 @@ export default function Announcements() {
                   className="input-field"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Enter announcement description"
+                  placeholder="Enter insight description"
                 />
               </div>
 
@@ -344,47 +329,68 @@ export default function Announcements() {
                 </p>
               </div>
 
-              {isSchool && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Scope
-                  </label>
-                  <select
-                    className="input-field"
-                    value={formData.scope}
-                    onChange={(e) => setFormData({ ...formData, scope: e.target.value as 'SCHOOL' | 'TEACHER', classroomIds: [] })}
-                  >
-                    <option value="SCHOOL">School-Wide (All Students)</option>
-                  </select>
-                </div>
-              )}
-
-              {isTeacher && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Assigned Classes *
-                  </label>
-                  <select
-                    multiple
-                    required={formData.scope === 'TEACHER'}
-                    className="input-field min-h-[120px]"
-                    value={formData.classroomIds}
-                    onChange={(e) => {
-                      const selected = Array.from(e.target.selectedOptions, option => option.value);
-                      setFormData({ ...formData, classroomIds: selected });
-                    }}
-                  >
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Classes *
+                </label>
+                <div className="border border-gray-300 rounded-lg p-4 max-h-64 overflow-y-auto bg-gray-50">
+                  {/* Select All Checkbox */}
+                  <div className="mb-3 pb-3 border-b border-gray-300">
+                    <label className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded">
+                      <input
+                        type="checkbox"
+                        checked={formData.classroomIds.length === classrooms.length && classrooms.length > 0}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormData({ ...formData, classroomIds: classrooms.map(c => c.id) });
+                          } else {
+                            setFormData({ ...formData, classroomIds: [] });
+                          }
+                        }}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="ml-3 text-sm font-semibold text-gray-700">
+                        Select All ({classrooms.length} classes)
+                      </span>
+                    </label>
+                  </div>
+                  
+                  {/* Individual Class Checkboxes */}
+                  <div className="space-y-2">
                     {classrooms.map((classroom) => (
-                      <option key={classroom.id} value={classroom.id}>
-                        {classroom.name}
-                      </option>
+                      <label key={classroom.id} className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded">
+                        <input
+                          type="checkbox"
+                          checked={formData.classroomIds.includes(classroom.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData({ ...formData, classroomIds: [...formData.classroomIds, classroom.id] });
+                            } else {
+                              setFormData({ ...formData, classroomIds: formData.classroomIds.filter(id => id !== classroom.id) });
+                            }
+                          }}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="ml-3 text-sm text-gray-700">{classroom.name}</span>
+                      </label>
                     ))}
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Select one or more classes (hold Ctrl/Cmd to select multiple)
-                  </p>
+                  </div>
+                  
+                  {classrooms.length === 0 && (
+                    <div className="text-sm text-gray-500 text-center py-4">
+                      No classes available
+                    </div>
+                  )}
                 </div>
-              )}
+                <p className="text-xs text-gray-500 mt-2">
+                  Select one or more classes that should see this insight. You can add or remove classes when editing.
+                </p>
+                {formData.classroomIds.length > 0 && (
+                  <p className="text-xs text-blue-600 mt-1 font-medium">
+                    {formData.classroomIds.length} {formData.classroomIds.length === 1 ? 'class' : 'classes'} selected
+                  </p>
+                )}
+              </div>
 
               <div className="flex gap-4 pt-4">
                 <button
@@ -406,7 +412,6 @@ export default function Announcements() {
                       title: '',
                       description: '',
                       youtubeUrl: '',
-                      scope: isTeacher ? 'TEACHER' : 'SCHOOL',
                       classroomIds: [],
                     });
                   }}
@@ -423,13 +428,13 @@ export default function Announcements() {
       {/* Announcements List */}
       {announcements.length === 0 ? (
         <div className="card text-center py-16">
-          <div className="text-6xl mb-4">📢</div>
-          <h3 className="text-2xl font-bold text-gray-900 mb-2">No Announcements Yet</h3>
+          <div className="text-6xl mb-4">💡</div>
+          <h3 className="text-2xl font-bold text-gray-900 mb-2">No Educational Insights Yet</h3>
           <p className="text-gray-600 mb-6">
-            Create your first announcement to share important information with students
+            Create your first educational insight to share content with selected classes
           </p>
           <button onClick={handleCreate} className="btn-primary">
-            Create Announcement
+            Create Insight
           </button>
         </div>
       ) : (
@@ -446,15 +451,6 @@ export default function Announcements() {
                         <h3 className="text-xl font-bold text-gray-900">{announcement.title}</h3>
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            announcement.scope === 'SCHOOL'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-purple-100 text-purple-800'
-                          }`}
-                        >
-                          {announcement.scope === 'SCHOOL' ? 'School-Wide' : 'Teacher'}
-                        </span>
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
                             announcement.isActive
                               ? 'bg-green-100 text-green-800'
                               : 'bg-gray-100 text-gray-800'
@@ -466,12 +462,16 @@ export default function Announcements() {
                       {announcement.description && (
                         <p className="text-gray-700 mb-3">{announcement.description}</p>
                       )}
-                      {announcement.classrooms.length > 0 && (
+                      {announcement.classrooms.length > 0 ? (
                         <div className="mb-3">
-                          <span className="text-sm text-gray-600">Classes: </span>
-                          <span className="text-sm font-medium">
+                          <span className="text-sm text-gray-600 font-medium">Visible to classes: </span>
+                          <span className="text-sm font-medium text-blue-600">
                             {announcement.classrooms.map(c => c.name).join(', ')}
                           </span>
+                        </div>
+                      ) : (
+                        <div className="mb-3 text-sm text-orange-600">
+                          No classes selected - this insight is not visible to any students
                         </div>
                       )}
                       <div className="flex items-center gap-4 text-sm text-gray-500">

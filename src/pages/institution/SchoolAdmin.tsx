@@ -20,8 +20,8 @@ export default function SchoolAdmin() {
     phone: '',
   });
 
-  const isAuthorized = account?.role === 'SCHOOL'; // Only SCHOOL can access this page
-  const canCreateAdmin = account?.role === 'SCHOOL'; // Only SCHOOL can create, delete, and reset passwords
+  const isAuthorized = account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN'; // SCHOOL and SCHOOL_ADMIN can access this page
+  const canCreateAdmin = account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN'; // SCHOOL and SCHOOL_ADMIN can create, delete, and reset passwords
 
   useEffect(() => {
     if (isAuthorized) {

@@ -442,7 +442,7 @@ export const announcementAPI = {
   getAll: () => api.get('/announcements'),
   getStudent: () => api.get('/announcements/student'),
   getOne: (id: string) => api.get(`/announcements/${id}`),
-  create: (data: { title: string; description?: string; youtubeUrl?: string; scope: 'SCHOOL' | 'TEACHER'; classroomIds?: string[] }) =>
+  create: (data: { title: string; description?: string; youtubeUrl?: string; classroomIds?: string[] }) =>
     api.post('/announcements', data),
   update: (id: string, data: { title?: string; description?: string; youtubeUrl?: string; isActive?: boolean; classroomIds?: string[] }) =>
     api.put(`/announcements/${id}`, data),

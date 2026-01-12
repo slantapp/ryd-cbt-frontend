@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { themeAPI } from '../../services/api';
 import { applyTheme } from '../../utils/themeUtils';
 import PasswordResetModal from '../PasswordResetModal';
+import UsernameModal from '../UsernameModal';
 
 interface StudentLayoutProps {
   children: React.ReactNode;
@@ -17,7 +18,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', path: '/student/dashboard', icon: '📊' },
-  { label: 'Announcements', path: '/student/announcements', icon: '📢' },
+  { label: 'Educational Insights', path: '/student/announcements', icon: '💡' },
 ];
 
 export default function StudentLayout({ children }: StudentLayoutProps) {
@@ -27,6 +28,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [theme, setTheme] = useState<any>(null);
   const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -65,6 +67,17 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       setShowPasswordResetModal(false);
     }
   }, [account?.mustResetPassword, account?.role]);
+
+  // Show username modal when student first lands on dashboard after login
+  useEffect(() => {
+    if (account?.role === 'STUDENT' && account?.username && location.pathname === '/student/dashboard' && !showPasswordResetModal) {
+      // Show modal once when dashboard loads (after password reset modal if needed)
+      const timer = setTimeout(() => {
+        setShowUsernameModal(true);
+      }, 500); // Small delay to ensure password reset modal appears first if needed
+      return () => clearTimeout(timer);
+    }
+  }, [account?.role, account?.username, location.pathname, showPasswordResetModal]);
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--theme-background, #f9fafb)' }}>
@@ -226,6 +239,15 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
           isOpen={showPasswordResetModal}
           userEmail={account.email || account.username || ''}
           onClose={() => setShowPasswordResetModal(false)}
+        />
+      )}
+
+      {/* Username Modal */}
+      {showUsernameModal && account?.username && (
+        <UsernameModal
+          isOpen={showUsernameModal}
+          username={account.username}
+          onClose={() => setShowUsernameModal(false)}
         />
       )}
     </div>

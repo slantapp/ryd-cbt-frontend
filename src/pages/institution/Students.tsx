@@ -179,7 +179,33 @@ export default function Students() {
     }
   };
 
-
+  // Helper function to check username availability and set it
+  const checkAndSetUsername = async (generatedUsername: string) => {
+    try {
+      const { data } = await studentAPI.checkUsernameAvailability(generatedUsername);
+      if (data.available) {
+        setCreateFormData((prev) => ({ ...prev, username: generatedUsername }));
+      } else {
+        // If not available, try with number suffix
+        let suffix = 1;
+        let uniqueUsername = `${generatedUsername}${suffix.toString().padStart(2, '0')}`;
+        while (suffix < 100) {
+          const checkResult = await studentAPI.checkUsernameAvailability(uniqueUsername);
+          if (checkResult.data.available) {
+            setCreateFormData((prev) => ({ ...prev, username: uniqueUsername }));
+            return;
+          }
+          suffix++;
+          uniqueUsername = `${generatedUsername}${suffix.toString().padStart(2, '0')}`;
+        }
+        // If still not found after 100 attempts, use generated one (backend will handle uniqueness)
+        setCreateFormData((prev) => ({ ...prev, username: generatedUsername }));
+      }
+    } catch (error) {
+      // If check fails, just use generated username (backend will handle uniqueness)
+      setCreateFormData((prev) => ({ ...prev, username: generatedUsername }));
+    }
+  };
 
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1384,7 +1410,8 @@ export default function Students() {
                         if (newFirstName && prev.lastName && !prev.username) {
                           const generatedUsername = generateUsername(newFirstName, prev.lastName);
                           if (generatedUsername) {
-                            updated.username = generatedUsername;
+                            // Check username availability asynchronously
+                            checkAndSetUsername(generatedUsername);
                           }
                         }
                         return updated;
@@ -1409,7 +1436,8 @@ export default function Students() {
                         if (prev.firstName && newLastName && !prev.username) {
                           const generatedUsername = generateUsername(prev.firstName, newLastName);
                           if (generatedUsername) {
-                            updated.username = generatedUsername;
+                            // Check username availability asynchronously
+                            checkAndSetUsername(generatedUsername);
                           }
                         }
                         return updated;

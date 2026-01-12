@@ -24,6 +24,13 @@ export default function Teachers() {
   const [selectedClassroomId, setSelectedClassroomId] = useState<string>('');
   const [assigning, setAssigning] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showUploadResults, setShowUploadResults] = useState(false);
+  const [uploadResults, setUploadResults] = useState<{
+    success: string[];
+    errors: string[];
+    successful: number;
+    failed: number;
+  } | null>(null);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -151,10 +158,21 @@ export default function Teachers() {
       const formData = new FormData();
       formData.append('file', file);
       const response = await teacherAPI.bulkUpload(formData);
-      toast.success(`Uploaded: ${response.data.successful} successful, ${response.data.failed} failed`);
-      if (response.data.errors && response.data.errors.length > 0) {
-        console.error('Upload errors:', response.data.errors);
+      
+      setUploadResults({
+        success: response.data.success || [],
+        errors: response.data.errors || [],
+        successful: response.data.successful || 0,
+        failed: response.data.failed || 0,
+      });
+      
+      toast.success(`Upload completed: ${response.data.successful || 0} successful, ${response.data.failed || 0} failed`);
+      
+      // Show results modal if there are errors or successes to display
+      if ((response.data.errors && response.data.errors.length > 0) || (response.data.success && response.data.success.length > 0)) {
+        setShowUploadResults(true);
       }
+      
       loadTeachers();
       setShowBulkUpload(false);
     } catch (error: any) {
@@ -1115,6 +1133,84 @@ export default function Teachers() {
             >
               Close
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Results Modal */}
+      {showUploadResults && uploadResults && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-2xl font-semibold text-gray-900">Bulk Upload Results</h3>
+                <button
+                  onClick={() => {
+                    setShowUploadResults(false);
+                    setUploadResults(null);
+                  }}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Summary */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-green-600">{uploadResults.successful}</div>
+                  <div className="text-sm text-green-700">Successful</div>
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-red-600">{uploadResults.failed}</div>
+                  <div className="text-sm text-red-700">Failed</div>
+                </div>
+              </div>
+
+              {/* Success List */}
+              {uploadResults.success.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-lg font-semibold text-green-700 mb-3">✅ Successful Uploads</h4>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-h-60 overflow-y-auto">
+                    <div className="space-y-2">
+                      {uploadResults.success.map((item, index) => (
+                        <div key={index} className="text-sm text-green-800 font-mono">
+                          {item}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Errors List */}
+              {uploadResults.errors.length > 0 && (
+                <div>
+                  <h4 className="text-lg font-semibold text-red-700 mb-3">❌ Failed Uploads</h4>
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-h-60 overflow-y-auto">
+                    <div className="space-y-2">
+                      {uploadResults.errors.map((error, index) => (
+                        <div key={index} className="text-sm text-red-800">
+                          {typeof error === 'string' ? error : String(error)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => {
+                    setShowUploadResults(false);
+                    setUploadResults(null);
+                  }}
+                  className="btn-primary"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
