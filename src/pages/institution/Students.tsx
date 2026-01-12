@@ -1402,21 +1402,21 @@ export default function Students() {
                     type="text"
                     className="input-field w-full"
                     value={createFormData.firstName}
-                    onChange={(e) => {
-                      const newFirstName = e.target.value;
-                      setCreateFormData((prev) => {
-                        const updated = { ...prev, firstName: newFirstName };
-                        // Auto-generate username if both names are present and username is empty
-                        if (newFirstName && prev.lastName && !prev.username) {
-                          const generatedUsername = generateUsername(newFirstName, prev.lastName);
-                          if (generatedUsername) {
-                            // Check username availability asynchronously
-                            checkAndSetUsername(generatedUsername);
+                      onChange={(e) => {
+                        const newFirstName = e.target.value;
+                        setCreateFormData((prev) => {
+                          const updated = { ...prev, firstName: newFirstName };
+                          // Auto-generate username if both names are present
+                          if (newFirstName && prev.lastName) {
+                            const generatedUsername = generateUsername(newFirstName, prev.lastName);
+                            if (generatedUsername) {
+                              // Check username availability asynchronously
+                              checkAndSetUsername(generatedUsername);
+                            }
                           }
-                        }
-                        return updated;
-                      });
-                    }}
+                          return updated;
+                        });
+                      }}
                     required
                   />
                 </div>
@@ -1432,8 +1432,8 @@ export default function Students() {
                       const newLastName = e.target.value;
                       setCreateFormData((prev) => {
                         const updated = { ...prev, lastName: newLastName };
-                        // Auto-generate username if both names are present and username is empty
-                        if (prev.firstName && newLastName && !prev.username) {
+                        // Auto-generate username if both names are present
+                        if (prev.firstName && newLastName) {
                           const generatedUsername = generateUsername(prev.firstName, newLastName);
                           if (generatedUsername) {
                             // Check username availability asynchronously

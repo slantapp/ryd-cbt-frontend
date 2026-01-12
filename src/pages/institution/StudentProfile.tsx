@@ -376,8 +376,8 @@ export default function StudentProfile() {
                       onChange={(e) => {
                         const newFirstName = e.target.value;
                         const updated = { ...editForm, firstName: newFirstName };
-                        // Auto-generate username if both names are present and username is empty
-                        if (newFirstName && editForm.lastName && !editForm.username) {
+                        // Auto-generate username if both names are present
+                        if (newFirstName && editForm.lastName) {
                           const generatedUsername = generateUsername(newFirstName, editForm.lastName);
                           if (generatedUsername) {
                             updated.username = generatedUsername;
@@ -399,8 +399,8 @@ export default function StudentProfile() {
                       onChange={(e) => {
                         const newLastName = e.target.value;
                         const updated = { ...editForm, lastName: newLastName };
-                        // Auto-generate username if both names are present and username is empty
-                        if (editForm.firstName && newLastName && !editForm.username) {
+                        // Auto-generate username if both names are present
+                        if (editForm.firstName && newLastName) {
                           const generatedUsername = generateUsername(editForm.firstName, newLastName);
                           if (generatedUsername) {
                             updated.username = generatedUsername;

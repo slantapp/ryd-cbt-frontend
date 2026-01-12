@@ -1,7 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
-import { themeAPI } from '../../services/api';
+import { themeAPI, helpAPI } from '../../services/api';
 import { applyTheme } from '../../utils/themeUtils';
+
+interface HelpContent {
+  id: string;
+  title: string;
+  description?: string;
+  youtubeUrl?: string;
+  order: number;
+}
 
 export default function Help() {
   const { account } = useAuthStore();
@@ -12,6 +20,8 @@ export default function Help() {
     backgroundColor: '#ffffff',
     textColor: '#0f172a',
   });
+  const [helpContent, setHelpContent] = useState<HelpContent[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     // Apply default theme immediately
@@ -36,7 +46,23 @@ export default function Help() {
       }
     };
     loadTheme();
+
+    // Load help content
+    loadHelpContent();
   }, []);
+
+  const loadHelpContent = async () => {
+    setLoading(true);
+    try {
+      const { data } = await helpAPI.getPublic();
+      setHelpContent(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to load help content:', error);
+      setHelpContent([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const primaryColor = theme?.primaryColor || '#A8518A';
   const secondaryColor = theme?.secondaryColor || '#1d4ed8';
@@ -121,43 +147,47 @@ export default function Help() {
         </div>
       </div>
 
-      {/* Video Section */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-2xl font-bold mb-4" style={{ color: primaryColor }}>
-          Video Tutorials
-        </h2>
-        <div className="space-y-4">
-          <div className="bg-gray-50 rounded-lg p-6 border-2 border-dashed border-gray-300">
-            <div className="text-center">
-              <svg
-                className="w-16 h-16 mx-auto mb-4 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <p className="text-gray-600 mb-2">
-                Video tutorials will be available here soon.
-              </p>
-              <p className="text-sm text-gray-500">
-                YouTube links can be added later to embed tutorial videos.
-              </p>
-            </div>
+      {/* Published Help Content */}
+      {loading ? (
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <p className="text-gray-500">Loading help content...</p>
+        </div>
+      ) : helpContent.length > 0 ? (
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-2xl font-bold mb-4" style={{ color: primaryColor }}>
+            Help Resources
+          </h2>
+          <div className="space-y-6">
+            {helpContent.map((item) => (
+              <div key={item.id} className="border-l-4 pl-4" style={{ borderColor: primaryColor }}>
+                <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
+                {item.description && (
+                  <p className="text-gray-700 mb-3">{item.description}</p>
+                )}
+                {item.youtubeUrl && (
+                  <div className="mt-3">
+                    <a
+                      href={item.youtubeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      <svg
+                        className="w-5 h-5 mr-2"
+                        fill="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                      </svg>
+                      Watch Video Tutorial
+                    </a>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      ) : null}
 
       {/* Additional Resources */}
       <div className="bg-white rounded-lg shadow-md p-6">

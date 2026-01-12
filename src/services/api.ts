@@ -476,6 +476,18 @@ export const themeAPI = {
   },
 };
 
+// Help Content
+export const helpAPI = {
+  getPublic: () => api.get('/help/public'),
+  getAll: () => api.get('/help'),
+  getOne: (id: string) => api.get(`/help/${id}`),
+  create: (data: { title: string; description?: string; youtubeUrl?: string; userTypes?: string[]; isActive?: boolean }) =>
+    api.post('/help', data),
+  update: (id: string, data: { title?: string; description?: string; youtubeUrl?: string; userTypes?: string[]; isActive?: boolean }) =>
+    api.put(`/help/${id}`, data),
+  delete: (id: string) => api.delete(`/help/${id}`),
+};
+
 export const impersonationAPI = {
   start: (targetId: string, reason?: string) =>
     api.post('/impersonation/start', { targetId, reason }),

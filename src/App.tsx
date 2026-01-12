@@ -39,6 +39,7 @@ import ClassTests from './pages/institution/ClassTests';
 import SchoolAdmin from './pages/institution/SchoolAdmin';
 import QuestionBank from './pages/institution/QuestionBank';
 import Help from './pages/institution/Help';
+import ManageHelp from './pages/institution/ManageHelp';
 import PromoProgram from './pages/institution/PromoProgram';
 import ManageParent from './pages/institution/ManageParent';
 import Announcements from './pages/institution/Announcements';
@@ -505,6 +506,16 @@ function App() {
               <PrivateRoute>
                 <InstitutionLayout>
                   <Help />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/manage-help"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <ManageHelp />
                 </InstitutionLayout>
               </PrivateRoute>
             }

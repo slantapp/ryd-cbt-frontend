@@ -44,13 +44,13 @@ export default function StudentRegister() {
     if (name === 'firstName' || name === 'lastName') {
       const newData = { ...formData, [name]: value };
       
-      // Auto-generate username if both names are present and username is empty
-      if (name === 'firstName' && value && formData.lastName && !formData.username) {
+      // Auto-generate username if both names are present
+      if (name === 'firstName' && value && formData.lastName) {
         const generatedUsername = generateUsername(value, formData.lastName);
         if (generatedUsername) {
           newData.username = generatedUsername;
         }
-      } else if (name === 'lastName' && value && formData.firstName && !formData.username) {
+      } else if (name === 'lastName' && value && formData.firstName) {
         const generatedUsername = generateUsername(formData.firstName, value);
         if (generatedUsername) {
           newData.username = generatedUsername;
