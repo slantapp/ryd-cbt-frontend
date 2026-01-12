@@ -4,6 +4,7 @@ import { studentAPI, sessionAPI, classroomAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { generateUsername } from '../../utils/usernameUtils';
 
 export default function StudentProfile() {
   const { id } = useParams<{ id: string }>();
@@ -372,7 +373,18 @@ export default function StudentProfile() {
                       type="text"
                       className="input-field"
                       value={editForm.firstName}
-                      onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                      onChange={(e) => {
+                        const newFirstName = e.target.value;
+                        const updated = { ...editForm, firstName: newFirstName };
+                        // Auto-generate username if both names are present and username is empty
+                        if (newFirstName && editForm.lastName && !editForm.username) {
+                          const generatedUsername = generateUsername(newFirstName, editForm.lastName);
+                          if (generatedUsername) {
+                            updated.username = generatedUsername;
+                          }
+                        }
+                        setEditForm(updated);
+                      }}
                       required
                     />
                   </div>
@@ -384,13 +396,24 @@ export default function StudentProfile() {
                       type="text"
                       className="input-field"
                       value={editForm.lastName}
-                      onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                      onChange={(e) => {
+                        const newLastName = e.target.value;
+                        const updated = { ...editForm, lastName: newLastName };
+                        // Auto-generate username if both names are present and username is empty
+                        if (editForm.firstName && newLastName && !editForm.username) {
+                          const generatedUsername = generateUsername(editForm.firstName, newLastName);
+                          if (generatedUsername) {
+                            updated.username = generatedUsername;
+                          }
+                        }
+                        setEditForm(updated);
+                      }}
                       required
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Username *
+                      Username <span className="text-gray-500 text-xs font-normal">(Auto-generated if empty)</span>
                     </label>
                     <div className="relative">
                       <input
@@ -403,6 +426,7 @@ export default function StudentProfile() {
                             : ''
                         }`}
                         value={editForm.username}
+                        placeholder="Will be auto-generated from name"
                         onChange={(e) => {
                           setEditForm({ ...editForm, username: e.target.value });
                           setUsernameStatus({ checking: false, available: null, message: '' });

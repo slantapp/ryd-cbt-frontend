@@ -4,6 +4,7 @@ import { studentAPI, sessionAPI, classroomAPI, institutionAPI, themeAPI } from '
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { generateUsername } from '../../utils/usernameUtils';
 
 export default function Students() {
   const { account } = useAuthStore();
@@ -178,26 +179,6 @@ export default function Students() {
     }
   };
 
-  // Auto-generate username from firstName and lastName
-  const generateUsername = (firstName: string, lastName: string): string => {
-    if (!firstName || !lastName) return '';
-    
-    // Normalize: lowercase, remove special characters, replace spaces with dots
-    const normalize = (name: string): string => {
-      return name
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, '') // Remove special characters
-        .replace(/\s+/g, '.') // Replace spaces with dots
-        .replace(/\.+/g, '.') // Replace multiple dots with single dot
-        .replace(/^\.|\.$/g, ''); // Remove leading/trailing dots
-    };
-    
-    const normalizedFirst = normalize(firstName);
-    const normalizedLast = normalize(lastName);
-    
-    return normalizedFirst && normalizedLast ? `${normalizedFirst}.${normalizedLast}` : '';
-  };
 
 
   const handleCreateStudent = async (e: React.FormEvent) => {

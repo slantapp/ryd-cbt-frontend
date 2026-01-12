@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { publicAPI } from '../../services/api';
 import toast from 'react-hot-toast';
+import { generateUsername } from '../../utils/usernameUtils';
 
 export default function StudentRegister() {
   const { slug } = useParams<{ slug: string }>();
@@ -38,7 +39,28 @@ export default function StudentRegister() {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    
+    if (name === 'firstName' || name === 'lastName') {
+      const newData = { ...formData, [name]: value };
+      
+      // Auto-generate username if both names are present and username is empty
+      if (name === 'firstName' && value && formData.lastName && !formData.username) {
+        const generatedUsername = generateUsername(value, formData.lastName);
+        if (generatedUsername) {
+          newData.username = generatedUsername;
+        }
+      } else if (name === 'lastName' && value && formData.firstName && !formData.username) {
+        const generatedUsername = generateUsername(formData.firstName, value);
+        if (generatedUsername) {
+          newData.username = generatedUsername;
+        }
+      }
+      
+      setFormData(newData);
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -154,17 +176,20 @@ export default function StudentRegister() {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Username *
+                Username <span className="text-gray-500 text-xs font-normal">(Auto-generated if empty)</span>
               </label>
               <input
                 name="username"
                 type="text"
                 required
                 className="input-field"
-                placeholder="Choose a username"
+                placeholder="Will be auto-generated from name"
                 value={formData.username}
                 onChange={handleChange}
               />
+              <p className="text-xs text-gray-500 mt-1">
+                {formData.username ? 'You can edit this username' : 'Username will be generated automatically when you enter your name'}
+              </p>
             </div>
 
             <div>
