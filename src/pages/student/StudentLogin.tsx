@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { authAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
+import studentImage from '../../assets/student.jpg';
 
 export default function StudentLogin() {
   const [formData, setFormData] = useState({
@@ -163,17 +164,49 @@ export default function StudentLogin() {
     }
   };
 
+  const themeColor = '#a8518a'; // Primary color
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 via-purple-600 to-pink-600 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="bg-white rounded-2xl shadow-2xl p-10 border border-blue-100">
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-4xl">🎓</span>
+    <div className="min-h-screen flex bg-gray-50">
+      {/* Left Side - Image with Overlay and Quote */}
+      <div className="hidden lg:flex lg:w-1/2 relative">
+        <div 
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${studentImage})` }}
+        />
+        <div 
+          className="absolute inset-0"
+          style={{ 
+            backgroundColor: themeColor,
+            opacity: 0.75,
+            mixBlendMode: 'multiply'
+          }}
+        />
+        <div className="relative z-10 flex flex-col justify-center items-center p-12 text-white">
+          <div className="max-w-md">
+            <h2 className="text-4xl font-bold mb-6 leading-tight">
+              "Education is the most powerful weapon which you can use to change the world."
+            </h2>
+            <p className="text-xl text-white/90 font-medium">
+              - Nelson Mandela
+            </p>
+            <div className="mt-8 pt-8 border-t border-white/30">
+              <p className="text-lg text-white/80">
+                Every great achievement begins with a single step. Your journey to excellence starts here.
+              </p>
             </div>
-            <h2 className="text-4xl font-extrabold text-gray-900 mb-2">Student Login</h2>
-            <p className="text-gray-500 text-sm mt-2">Access your tests and assignments</p>
           </div>
+        </div>
+      </div>
+
+      {/* Right Side - Login Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-2xl shadow-2xl p-10 border border-gray-100">
+            <div className="text-center mb-8">
+              <h2 className="text-4xl font-extrabold mb-2" style={{ color: themeColor }}>Student Login</h2>
+              <p className="text-gray-500 text-sm mt-2">Access your tests and assignments</p>
+            </div>
 
           {!requiresPasswordReset ? (
             <form onSubmit={handleLogin} className="space-y-6">
@@ -231,7 +264,8 @@ export default function StudentLogin() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full btn-primary py-3 text-lg font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg disabled:opacity-50"
+                className="w-full py-3 text-lg font-semibold text-white shadow-lg disabled:opacity-50 transition-opacity hover:opacity-90 rounded-lg"
+                style={{ backgroundColor: themeColor }}
               >
                 {loading ? 'Logging in...' : 'Login'}
               </button>
@@ -361,7 +395,8 @@ export default function StudentLogin() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full btn-primary py-3 text-lg font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg disabled:opacity-50"
+                className="w-full py-3 text-lg font-semibold text-white shadow-lg disabled:opacity-50 transition-opacity hover:opacity-90 rounded-lg"
+                style={{ backgroundColor: themeColor }}
               >
                 {loading ? 'Resetting...' : 'Reset Password'}
               </button>
@@ -381,6 +416,7 @@ export default function StudentLogin() {
               </button>
             </form>
           )}
+          </div>
         </div>
       </div>
     </div>

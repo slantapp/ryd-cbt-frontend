@@ -4,6 +4,7 @@ import { publicAPI, authAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { ThemeConfig } from '../../types';
+import uniqueAuthImage from '../../assets/uniqueauth.jpg';
 
 interface InstitutionData {
   institution: {
@@ -187,54 +188,78 @@ export default function SchoolLogin() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8"
+      className="min-h-screen flex overflow-hidden"
       style={{ backgroundColor: theme.backgroundColor, color: theme.textColor }}
     >
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
-          {/* Header with Logo */}
-          <div
-            className="px-8 py-6 text-center"
-            style={{ 
-              background: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
-              color: 'white',
-            }}
-          >
-            {theme.logoUrl && !theme.logoUrl.startsWith('http') ? (
-              <img
-                src={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${theme.logoUrl}`}
-                alt={data.institution.name}
-                className="h-20 w-auto mx-auto mb-4 object-contain"
-                onError={(e) => {
-                  // Fallback to ui-avatars if image fails to load
-                  const target = e.target as HTMLImageElement;
-                  const schoolName = encodeURIComponent(data.institution.name);
-                  const themeColor = theme.primaryColor?.replace('#', '') || '1d4ed8';
-                  target.src = `https://ui-avatars.com/api/?name=${schoolName}&background=${themeColor}&color=fff&size=128&bold=true`;
-                }}
-              />
-            ) : theme.logoUrl && theme.logoUrl.startsWith('http') ? (
-              <img
-                src={theme.logoUrl}
-                alt={data.institution.name}
-                className="h-20 w-auto mx-auto mb-4 object-contain"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  const schoolName = encodeURIComponent(data.institution.name);
-                  const themeColor = theme.primaryColor?.replace('#', '') || '1d4ed8';
-                  target.src = `https://ui-avatars.com/api/?name=${schoolName}&background=${themeColor}&color=fff&size=128&bold=true`;
-                }}
-              />
-            ) : (
-              <img
-                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(data.institution.name)}&background=${theme.primaryColor?.replace('#', '') || '1d4ed8'}&color=fff&size=128&bold=true`}
-                alt={data.institution.name}
-                className="h-20 w-20 mx-auto mb-4 rounded-full object-cover"
-              />
-            )}
-            <h1 className="text-3xl font-bold mb-2">{data.institution.name}</h1>
-            <p className="text-white/90 text-sm">Login to your account</p>
+      {/* Left Side - Image with Overlay and Quote (Fixed) */}
+      <div className="hidden lg:flex lg:w-1/2 fixed left-0 top-0 bottom-0 overflow-y-auto">
+        <div 
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${uniqueAuthImage})` }}
+        />
+        <div 
+          className="absolute inset-0"
+          style={{ 
+            backgroundColor: theme.primaryColor,
+            opacity: 0.75,
+            mixBlendMode: 'multiply'
+          }}
+        />
+        <div className="relative z-10 flex flex-col justify-center items-center p-12 text-white">
+          <div className="max-w-md">
+            <h2 className="text-4xl font-bold mb-6 leading-tight">
+              "The beautiful thing about learning is that no one can take it away from you."
+            </h2>
+            <p className="text-xl text-white/90 font-medium">
+              - B.B. King
+            </p>
+            <div className="mt-8 pt-8 border-t border-white/30">
+              <p className="text-lg text-white/80">
+                Welcome to {data.institution.name}. Your path to knowledge and success begins with a single login.
+              </p>
+            </div>
           </div>
+        </div>
+      </div>
+
+      {/* Right Side - Login Form */}
+      <div className="w-full lg:w-1/2 lg:ml-[50%] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full">
+          <div className="p-8">
+            {/* Header with Logo */}
+            {theme.logoUrl && (
+              <div className="text-center mb-8">
+                {theme.logoUrl.startsWith('http') ? (
+                  <img
+                    src={theme.logoUrl}
+                    alt={data.institution.name}
+                    className="h-20 w-auto mx-auto mb-4 object-contain"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <img
+                    src={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${theme.logoUrl}`}
+                    alt={data.institution.name}
+                    className="h-20 w-auto mx-auto mb-4 object-contain"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                )}
+                <h1 className="text-3xl font-bold mb-2" style={{ color: theme.primaryColor }}>{data.institution.name}</h1>
+                <p className="text-gray-600 text-sm">Login to your account</p>
+              </div>
+            )}
+            {!theme.logoUrl && (
+              <div className="text-center mb-8">
+                <h1 className="text-3xl font-bold mb-2" style={{ color: theme.primaryColor }}>{data.institution.name}</h1>
+                <p className="text-gray-600 text-sm">Login to your account</p>
+              </div>
+            )}
 
           {/* Tabs */}
           <div className="flex border-b border-gray-200">
@@ -325,16 +350,9 @@ export default function SchoolLogin() {
                 <button
                   type="submit"
                   disabled={studentLoading}
-                  className="w-full btn-primary py-3 text-lg font-semibold shadow-lg disabled:opacity-50"
+                  className="w-full py-3 text-lg font-semibold text-white shadow-lg disabled:opacity-50 transition-opacity hover:opacity-90"
                   style={{
                     backgroundColor: theme.primaryColor,
-                    color: 'white',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.opacity = '0.9';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.opacity = '1';
                   }}
                 >
                   {studentLoading ? 'Logging in...' : 'Login as Student'}
@@ -393,22 +411,16 @@ export default function SchoolLogin() {
                 <button
                   type="submit"
                   disabled={teacherLoading}
-                  className="w-full btn-primary py-3 text-lg font-semibold shadow-lg disabled:opacity-50"
+                  className="w-full py-3 text-lg font-semibold text-white shadow-lg disabled:opacity-50 transition-opacity hover:opacity-90"
                   style={{
                     backgroundColor: theme.primaryColor,
-                    color: 'white',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.opacity = '0.9';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.opacity = '1';
                   }}
                 >
                   {teacherLoading ? 'Logging in...' : 'Login as Teacher'}
                 </button>
               </form>
             )}
+          </div>
           </div>
         </div>
       </div>

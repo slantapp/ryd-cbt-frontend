@@ -29,6 +29,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
   const [theme, setTheme] = useState<any>(null);
   const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [registeredUsername, setRegisteredUsername] = useState<string>('');
 
   const handleLogout = () => {
     logout();
@@ -68,16 +69,31 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
     }
   }, [account?.mustResetPassword, account?.role]);
 
-  // Show username modal when student first lands on dashboard after login
+  // Show username modal when student first lands on dashboard after registration
   useEffect(() => {
-    if (account?.role === 'STUDENT' && account?.username && location.pathname === '/student/dashboard' && !showPasswordResetModal) {
-      // Show modal once when dashboard loads (after password reset modal if needed)
-      const timer = setTimeout(() => {
-        setShowUsernameModal(true);
-      }, 500); // Small delay to ensure password reset modal appears first if needed
-      return () => clearTimeout(timer);
+    if (
+      account?.role === 'STUDENT' && 
+      location.pathname === '/student/dashboard' && 
+      !showPasswordResetModal
+    ) {
+      // Check if this is a newly registered student
+      const shouldShowModal = localStorage.getItem('showUsernameModal') === 'true';
+      const storedUsername = localStorage.getItem('registeredUsername');
+      
+      if (shouldShowModal && storedUsername) {
+        // Store username in state before clearing localStorage
+        setRegisteredUsername(storedUsername);
+        // Show modal once when dashboard loads (after password reset modal if needed)
+        const timer = setTimeout(() => {
+          setShowUsernameModal(true);
+          // Clear the flag so it doesn't show again
+          localStorage.removeItem('showUsernameModal');
+          localStorage.removeItem('registeredUsername');
+        }, 500); // Small delay to ensure password reset modal appears first if needed
+        return () => clearTimeout(timer);
+      }
     }
-  }, [account?.role, account?.username, location.pathname, showPasswordResetModal]);
+  }, [account?.role, location.pathname, showPasswordResetModal]);
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--theme-background, #f9fafb)' }}>
@@ -243,11 +259,14 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       )}
 
       {/* Username Modal */}
-      {showUsernameModal && account?.username && (
+      {showUsernameModal && (
         <UsernameModal
           isOpen={showUsernameModal}
-          username={account.username}
-          onClose={() => setShowUsernameModal(false)}
+          username={registeredUsername || account?.username || ''}
+          onClose={() => {
+            setShowUsernameModal(false);
+            setRegisteredUsername('');
+          }}
         />
       )}
     </div>

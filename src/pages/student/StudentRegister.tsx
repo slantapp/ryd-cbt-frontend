@@ -4,7 +4,7 @@ import { publicAPI, authAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { generateUsername } from '../../utils/usernameUtils';
-import UsernameModal from '../../components/UsernameModal';
+import studentImage from '../../assets/student.jpg';
 
 export default function StudentRegister() {
   const { slug } = useParams<{ slug: string }>();
@@ -12,8 +12,6 @@ export default function StudentRegister() {
   const { setAuth } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [schoolInfo, setSchoolInfo] = useState<any>(null);
-  const [showUsernameModal, setShowUsernameModal] = useState(false);
-  const [registeredUsername, setRegisteredUsername] = useState('');
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -106,7 +104,6 @@ export default function StudentRegister() {
 
       // Get the registered username (from response or form data)
       const username = registerResponse.data?.username || formData.username;
-      setRegisteredUsername(username);
 
       // Immediately log in the student
       try {
@@ -122,7 +119,7 @@ export default function StudentRegister() {
         }
 
         // Validate student belongs to this school
-        if (loginResponse.data.student.institutionId !== schoolInfo?.id) {
+        if (loginResponse.data.student.institutionId !== schoolInfo?.institution?.id) {
           toast.error('Registration successful, but there was an issue with your account. Please contact your school.');
           navigate(`/${slug}/login`);
           return;
@@ -147,13 +144,17 @@ export default function StudentRegister() {
           mustResetPassword: requiresPasswordReset || false,
         };
 
-        // Set auth and show username modal
+        // Set auth and mark as newly registered
         setAuth(loginResponse.data.token, studentAccount as any);
         
-        // Show username modal
-        setShowUsernameModal(true);
+        // Store flag to show username modal on dashboard
+        localStorage.setItem('showUsernameModal', 'true');
+        localStorage.setItem('registeredUsername', username);
         
-        toast.success('Registration successful! Welcome!');
+        toast.success('Registration successful! Redirecting to dashboard...');
+        
+        // Navigate to dashboard (modal will show there)
+        navigate('/student/dashboard');
       } catch (loginError: any) {
         // Registration succeeded but login failed
         toast.error('Registration successful, but automatic login failed. Please log in manually.');
@@ -174,18 +175,78 @@ export default function StudentRegister() {
     );
   }
 
+  // Get theme from school info
+  const theme = schoolInfo?.theme || schoolInfo?.institution?.themeConfig || {};
+  const themeColor = theme.primaryColor || '#1d4ed8';
+  const logoUrl = theme.logoUrl;
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 via-purple-600 to-pink-600 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="bg-white rounded-2xl shadow-2xl p-10 border border-blue-100">
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-4xl">🎓</span>
+    <div className="min-h-screen flex overflow-hidden">
+      {/* Left Side - Image with Overlay and Quote (Fixed) */}
+      <div className="hidden lg:flex lg:w-1/2 fixed left-0 top-0 bottom-0 overflow-y-auto">
+        <div 
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${studentImage})` }}
+        />
+        <div 
+          className="absolute inset-0"
+          style={{ 
+            backgroundColor: themeColor,
+            opacity: 0.75,
+            mixBlendMode: 'multiply'
+          }}
+        />
+        <div className="relative z-10 flex flex-col justify-center items-center p-12 text-white">
+          <div className="max-w-md">
+            <h2 className="text-4xl font-bold mb-6 leading-tight">
+              "Education is the most powerful weapon which you can use to change the world."
+            </h2>
+            <p className="text-xl text-white/90 font-medium">
+              - Nelson Mandela
+            </p>
+            <div className="mt-8 pt-8 border-t border-white/30">
+              <p className="text-lg text-white/80">
+                Every great achievement begins with a single step. Your journey to excellence starts here.
+              </p>
             </div>
-            <h2 className="text-4xl font-extrabold text-gray-900 mb-2">Student Registration</h2>
-            <p className="text-gray-600 text-lg">{schoolInfo.name}</p>
-            <p className="text-gray-500 text-sm mt-2">Create your student account</p>
           </div>
+        </div>
+      </div>
+
+      {/* Right Side - Registration Form */}
+      <div className="w-full lg:w-1/2 lg:ml-[50%] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-2xl w-full">
+          <div className="p-8 md:p-10">
+            <div className="text-center mb-8">
+              {logoUrl && (
+                <div className="mb-6">
+                  {logoUrl.startsWith('http') ? (
+                    <img
+                      src={logoUrl}
+                      alt={schoolInfo?.institution?.name || schoolInfo?.name || 'School'}
+                      className="h-20 w-auto mx-auto object-contain"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <img
+                      src={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${logoUrl}`}
+                      alt={schoolInfo?.institution?.name || schoolInfo?.name || 'School'}
+                      className="h-20 w-auto mx-auto object-contain"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+              <h2 className="text-3xl md:text-4xl font-extrabold mb-2" style={{ color: themeColor }}>Student Registration</h2>
+              <p className="text-gray-600 text-lg">{schoolInfo?.institution?.name || schoolInfo?.name || 'School'}</p>
+              <p className="text-gray-500 text-sm mt-2">Create your student account</p>
+            </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -369,7 +430,8 @@ export default function StudentRegister() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full btn-primary py-3 text-lg font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg disabled:opacity-50"
+              className="w-full py-3 text-lg font-semibold text-white shadow-lg disabled:opacity-50 transition-opacity hover:opacity-90"
+              style={{ backgroundColor: themeColor }}
             >
               {loading ? 'Registering...' : 'Create Account'}
             </button>
@@ -380,19 +442,9 @@ export default function StudentRegister() {
                 : 'You can select a class during registration, or your school will assign you to a class later. Class selection cannot be changed after registration.'}
             </p>
           </form>
+          </div>
         </div>
       </div>
-
-      {/* Username Modal */}
-      <UsernameModal
-        isOpen={showUsernameModal}
-        username={registeredUsername}
-        onClose={() => {
-          setShowUsernameModal(false);
-          // Navigate to dashboard after closing modal
-          navigate('/student/dashboard');
-        }}
-      />
     </div>
   );
 }

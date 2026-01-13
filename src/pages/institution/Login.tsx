@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { authAPI } from '../../services/api';
 import toast from 'react-hot-toast';
+import authImage from '../../assets/auth.jpg';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -139,23 +140,59 @@ export default function Login() {
     }
   };
 
+  const primaryColor = '#a8518a'; // Primary color
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-lg shadow-lg">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to your account
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
-            <Link
-              to="/register"
-              className="font-medium text-primary hover:text-primary-600"
-            >
-              create a new account
-            </Link>
-          </p>
+    <div className="min-h-screen flex overflow-hidden bg-gray-50">
+      {/* Left Side - Image with Overlay and Quote (Fixed) */}
+      <div className="hidden lg:flex lg:w-1/2 fixed left-0 top-0 bottom-0 overflow-y-auto">
+        <div 
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${authImage})` }}
+        />
+        <div 
+          className="absolute inset-0"
+          style={{ 
+            backgroundColor: primaryColor,
+            opacity: 0.75,
+            mixBlendMode: 'multiply'
+          }}
+        />
+        <div className="relative z-10 flex flex-col justify-center items-center p-12 text-white">
+          <div className="max-w-md">
+            <h2 className="text-4xl font-bold mb-6 leading-tight">
+              "Education is the most powerful weapon which you can use to change the world."
+            </h2>
+            <p className="text-xl text-white/90 font-medium">
+              - Nelson Mandela
+            </p>
+            <div className="mt-8 pt-8 border-t border-white/30">
+              <p className="text-lg text-white/80">
+                Every great achievement begins with a single step. Your journey to excellence starts here.
+              </p>
+            </div>
+          </div>
         </div>
+      </div>
+
+      {/* Right Side - Login Form */}
+      <div className="w-full lg:w-1/2 lg:ml-[50%] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8 p-8">
+          <div>
+            <h2 className="text-center text-3xl font-extrabold mb-2" style={{ color: primaryColor }}>
+              Sign in to your account
+            </h2>
+            <p className="mt-2 text-center text-sm text-gray-600">
+              Or{' '}
+              <Link
+                to="/register"
+                className="font-medium hover:underline"
+                style={{ color: primaryColor }}
+              >
+                create a new account
+              </Link>
+            </p>
+          </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -189,9 +226,22 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => handleRoleSelect('STUDENT')}
-                    className="w-full flex items-center px-4 py-3 rounded-lg border-2 border-gray-200 hover:border-primary hover:bg-primary-50 text-gray-700 transition-all hover:shadow-md"
+                    className="w-full flex items-center px-4 py-3 rounded-lg border-2 border-gray-200 hover:border-gray-300 text-gray-700 transition-all hover:shadow-md"
+                    style={{
+                      borderColor: 'currentColor',
+                      '--hover-border': primaryColor,
+                      '--hover-bg': `${primaryColor}10`,
+                    } as React.CSSProperties}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = primaryColor;
+                      e.currentTarget.style.backgroundColor = `${primaryColor}10`;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
                   >
-                    <svg className="w-5 h-5 mr-3 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: primaryColor }}>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14v7m0 0v-7m0 7H9m3 0h3" />
@@ -201,9 +251,20 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => handleRoleSelect('TEACHER')}
-                    className="w-full flex items-center px-4 py-3 rounded-lg border-2 border-gray-200 hover:border-primary hover:bg-primary-50 text-gray-700 transition-all hover:shadow-md"
+                    className="w-full flex items-center px-4 py-3 rounded-lg border-2 border-gray-200 text-gray-700 transition-all hover:shadow-md"
+                    style={{
+                      borderColor: '#e5e7eb',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = primaryColor;
+                      e.currentTarget.style.backgroundColor = `${primaryColor}10`;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
                   >
-                    <svg className="w-5 h-5 mr-3 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: primaryColor }}>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                     <span className="font-medium">I am a Teacher</span>
@@ -211,9 +272,20 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => handleRoleSelect('SCHOOL_ADMIN')}
-                    className="w-full flex items-center px-4 py-3 rounded-lg border-2 border-gray-200 hover:border-primary hover:bg-primary-50 text-gray-700 transition-all hover:shadow-md"
+                    className="w-full flex items-center px-4 py-3 rounded-lg border-2 border-gray-200 text-gray-700 transition-all hover:shadow-md"
+                    style={{
+                      borderColor: '#e5e7eb',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = primaryColor;
+                      e.currentTarget.style.backgroundColor = `${primaryColor}10`;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
                   >
-                    <svg className="w-5 h-5 mr-3 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: primaryColor }}>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                     <span className="font-medium">I am a School Administrator</span>
@@ -221,9 +293,20 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => handleRoleSelect('MINISTRY')}
-                    className="w-full flex items-center px-4 py-3 rounded-lg border-2 border-gray-200 hover:border-primary hover:bg-primary-50 text-gray-700 transition-all hover:shadow-md"
+                    className="w-full flex items-center px-4 py-3 rounded-lg border-2 border-gray-200 text-gray-700 transition-all hover:shadow-md"
+                    style={{
+                      borderColor: '#e5e7eb',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = primaryColor;
+                      e.currentTarget.style.backgroundColor = `${primaryColor}10`;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
                   >
-                    <svg className="w-5 h-5 mr-3 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: primaryColor }}>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                     <span className="font-medium">I am a Ministry/Organization</span>
@@ -232,9 +315,9 @@ export default function Login() {
               </>
             )}
             {role && (
-              <div className="flex items-center justify-between p-3 bg-primary-50 border-2 border-primary rounded-lg">
+              <div className="flex items-center justify-between p-3 rounded-lg" style={{ backgroundColor: `${primaryColor}10`, border: `2px solid ${primaryColor}` }}>
                 <div className="flex items-center">
-                  <span className="text-primary font-semibold">
+                  <span className="font-semibold" style={{ color: primaryColor }}>
                     {role === 'MINISTRY' && 'I am a Ministry/Organization'}
                     {(role === 'SCHOOL' || role === 'SCHOOL_ADMIN') && 'I am a School Administrator'}
                     {role === 'TEACHER' && 'I am a Teacher'}
@@ -249,7 +332,14 @@ export default function Login() {
                     setPassword('');
                     setError(null);
                   }}
-                  className="text-sm text-primary hover:text-primary-600 font-medium"
+                  className="text-sm font-medium transition-colors"
+                  style={{ color: primaryColor }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = '0.8';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = '1';
+                  }}
                 >
                   Change
                 </button>
@@ -324,7 +414,8 @@ export default function Login() {
             <div className="text-sm">
               <Link
                 to="/forgot-password"
-                className="font-medium text-primary hover:text-primary-600"
+                className="font-medium transition-colors hover:underline"
+                style={{ color: primaryColor }}
               >
                 Forgot your password?
               </Link>
@@ -335,7 +426,8 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full"
+              className="w-full py-3 text-lg font-semibold text-white shadow-lg disabled:opacity-50 transition-opacity hover:opacity-90 rounded-lg"
+              style={{ backgroundColor: primaryColor }}
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
@@ -344,15 +436,23 @@ export default function Login() {
           )}
         </form>
         
-        {/* Super Admin Login Link - Footer */}
-        <div className="mt-6 pt-6 border-t border-gray-200 text-center">
-          <button
-            type="button"
-            onClick={() => handleRoleSelect('SUPER_ADMIN')}
-            className="text-sm text-gray-500 hover:text-primary-600 transition-colors"
-          >
-            Super Admin Login
-          </button>
+          {/* Super Admin Login Link - Footer */}
+          <div className="mt-6 pt-6 border-t border-gray-200 text-center">
+            <button
+              type="button"
+              onClick={() => handleRoleSelect('SUPER_ADMIN')}
+              className="text-sm text-gray-500 transition-colors hover:underline"
+              style={{ '--hover-color': primaryColor } as React.CSSProperties}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = primaryColor;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#6b7280';
+              }}
+            >
+              Super Admin Login
+            </button>
+          </div>
         </div>
       </div>
     </div>
