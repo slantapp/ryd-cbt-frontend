@@ -21,7 +21,7 @@ export default function Teachers() {
   const [updating, setUpdating] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [assigningClassroomId, setAssigningClassroomId] = useState<string | null>(null);
-  const [selectedClassroomId, setSelectedClassroomId] = useState<string>('');
+  const [selectedClassroomIds, setSelectedClassroomIds] = useState<string[]>([]);
   const [assigning, setAssigning] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showUploadResults, setShowUploadResults] = useState(false);
@@ -247,23 +247,23 @@ export default function Teachers() {
   };
 
   const handleAssignClass = async () => {
-    if (!selectedClassroomId || !assigningClassroomId) {
-      toast.error('Please select a class');
+    if (!selectedClassroomIds.length || !assigningClassroomId) {
+      toast.error('Please select at least one class');
       return;
     }
 
     setAssigning(true);
     try {
-      await classroomAPI.assignTeacher({
-        classroomId: selectedClassroomId,
+      const response = await classroomAPI.bulkAssignTeacher({
+        classroomIds: selectedClassroomIds,
         teacherId: assigningClassroomId,
       });
-      toast.success('Teacher assigned to class successfully');
+      toast.success(response.data?.message || `Teacher assigned to ${selectedClassroomIds.length} class(es) successfully`);
       setAssigningClassroomId(null);
-      setSelectedClassroomId('');
+      setSelectedClassroomIds([]);
       loadTeachers();
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to assign teacher to class');
+      toast.error(error?.response?.data?.error || 'Failed to assign teacher to classes');
     } finally {
       setAssigning(false);
     }
@@ -517,9 +517,35 @@ export default function Teachers() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Assign to Classes (Optional)
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-semibold text-gray-700">
+                      Assign to Classes (Optional)
+                    </label>
+                    {classrooms.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const allSelected = form.classroomIds.length === classrooms.length;
+                          if (allSelected) {
+                            // Deselect all
+                            setForm({
+                              ...form,
+                              classroomIds: [],
+                            });
+                          } else {
+                            // Select all
+                            setForm({
+                              ...form,
+                              classroomIds: classrooms.map(c => c.id),
+                            });
+                          }
+                        }}
+                        className="text-xs font-medium text-primary hover:text-primary-600 transition-colors"
+                      >
+                        {form.classroomIds.length === classrooms.length ? 'Deselect All' : 'Select All'}
+                      </button>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-500 mb-2">
                     You can assign the teacher to classes now or later
                   </p>
@@ -853,63 +879,97 @@ export default function Teachers() {
       </div>
 
       {/* Assign Class Modal */}
-      {assigningClassroomId && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <h2 className="text-2xl font-bold mb-4">Assign Teacher to Class</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Select a class to assign to{' '}
-              <span className="font-semibold">
-                {teachers.find((t) => t.id === assigningClassroomId)?.name}
-              </span>
-            </p>
+      {assigningClassroomId && (() => {
+        const teacher = teachers.find((t) => t.id === assigningClassroomId);
+        const availableClassrooms = classrooms.filter((classroom) => {
+          // Filter out classes the teacher is already assigned to
+          return !teacher?.assignedClasses?.some(
+            (ac: any) => ac.classroom.id === classroom.id
+          );
+        });
+        const allSelected = availableClassrooms.length > 0 && selectedClassroomIds.length === availableClassrooms.length;
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Class
-              </label>
-              <select
-                className="input-field w-full"
-                value={selectedClassroomId}
-                onChange={(e) => setSelectedClassroomId(e.target.value)}
-              >
-                <option value="">Choose a class...</option>
-                {classrooms
-                  .filter((classroom) => {
-                    const teacher = teachers.find((t) => t.id === assigningClassroomId);
-                    // Filter out classes the teacher is already assigned to
-                    return !teacher?.assignedClasses?.some(
-                      (ac: any) => ac.classroom.id === classroom.id
-                    );
-                  })
-                  .map((classroom) => (
-                    <option key={classroom.id} value={classroom.id}>
-                      {classroom.name} {classroom.academicSession ? `(${classroom.academicSession})` : ''}
-                    </option>
-                  ))}
-              </select>
-              {classrooms.filter((classroom) => {
-                const teacher = teachers.find((t) => t.id === assigningClassroomId);
-                return !teacher?.assignedClasses?.some(
-                  (ac: any) => ac.classroom.id === classroom.id
-                );
-              }).length === 0 && (
-                <p className="text-sm text-gray-500 mt-2">
-                  All available classes are already assigned to this teacher
-                </p>
-              )}
-            </div>
+        return (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 max-h-[90vh] flex flex-col">
+              <h2 className="text-2xl font-bold mb-4">Assign Teacher to Classes</h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Select class(es) to assign to{' '}
+                <span className="font-semibold">
+                  {teacher?.name}
+                </span>
+              </p>
 
-            {/* Show already assigned classes */}
-            {teachers
-              .find((t) => t.id === assigningClassroomId)
-              ?.assignedClasses?.length > 0 && (
-              <div className="mb-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Currently Assigned Classes:</p>
-                <div className="flex flex-wrap gap-2">
-                  {teachers
-                    .find((t) => t.id === assigningClassroomId)
-                    ?.assignedClasses.map((assignment: any) => (
+              <div className="mb-4 flex-1 overflow-y-auto">
+                {availableClassrooms.length === 0 ? (
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-500">
+                      All available classes are already assigned to this teacher
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Select Classes
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (allSelected) {
+                            setSelectedClassroomIds([]);
+                          } else {
+                            setSelectedClassroomIds(availableClassrooms.map(c => c.id));
+                          }
+                        }}
+                        className="text-xs font-medium text-primary hover:text-primary-600 transition-colors"
+                      >
+                        {allSelected ? 'Deselect All' : 'Select All'}
+                      </button>
+                    </div>
+                    <div className="border border-gray-300 rounded-lg bg-gray-50 overflow-hidden">
+                      <div className="max-h-64 overflow-y-auto p-3">
+                        <div className="space-y-2">
+                          {availableClassrooms.map((classroom) => (
+                            <label
+                              key={classroom.id}
+                              className="flex items-center space-x-2 cursor-pointer hover:bg-white p-2 rounded transition-colors"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedClassroomIds.includes(classroom.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedClassroomIds([...selectedClassroomIds, classroom.id]);
+                                  } else {
+                                    setSelectedClassroomIds(selectedClassroomIds.filter(id => id !== classroom.id));
+                                  }
+                                }}
+                                className="rounded border-gray-300 text-primary focus:ring-primary"
+                              />
+                              <span className="text-sm text-gray-700 flex-1">
+                                {classroom.name} {classroom.academicSession ? `(${classroom.academicSession})` : ''}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    {selectedClassroomIds.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        {selectedClassroomIds.length} class{selectedClassroomIds.length !== 1 ? 'es' : ''} selected
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Show already assigned classes */}
+              {teacher?.assignedClasses?.length > 0 && (
+                <div className="mb-4 border-t pt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Currently Assigned Classes:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {teacher.assignedClasses.map((assignment: any) => (
                       <div
                         key={assignment.classroom.id}
                         className="flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs"
@@ -924,32 +984,33 @@ export default function Teachers() {
                         </button>
                       </div>
                     ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <div className="flex space-x-3 pt-4">
-              <button
-                onClick={() => {
-                  setAssigningClassroomId(null);
-                  setSelectedClassroomId('');
-                }}
-                className="btn-secondary flex-1"
-                disabled={assigning}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAssignClass}
-                disabled={assigning || !selectedClassroomId}
-                className="btn-primary flex-1"
-              >
-                {assigning ? 'Assigning...' : 'Assign Class'}
-              </button>
+              <div className="flex space-x-3 pt-4 border-t">
+                <button
+                  onClick={() => {
+                    setAssigningClassroomId(null);
+                    setSelectedClassroomIds([]);
+                  }}
+                  className="btn-secondary flex-1"
+                  disabled={assigning}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAssignClass}
+                  disabled={assigning || selectedClassroomIds.length === 0}
+                  className="btn-primary flex-1"
+                >
+                  {assigning ? 'Assigning...' : `Assign ${selectedClassroomIds.length > 0 ? `(${selectedClassroomIds.length})` : ''}`}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Reset Password Dialog */}
       {showResetPasswordDialog && selectedTeacher && !resetPasswordResult && (

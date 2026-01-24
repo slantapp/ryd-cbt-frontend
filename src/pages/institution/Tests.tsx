@@ -125,18 +125,21 @@ export default function Tests() {
       
       // Set sessions
       if (response.data.sessions && Array.isArray(response.data.sessions) && response.data.sessions.length > 0) {
-        setSessions(response.data.sessions);
+        const loadedSessions = response.data.sessions;
+        setSessions(loadedSessions);
         
-        // Auto-select first session and class for teacher
-        const firstSession = response.data.sessions[0];
-        // Get classroom from session's class assignments if available
-        const selectedClassroomId = firstSession.classAssignments?.[0]?.classroom?.id || '';
+        // Set default session: active first, then next scheduled
+        const activeSession = getActiveSession(loadedSessions);
+        const nextScheduled = getNextScheduledSession(loadedSessions);
+        const defaultSession = activeSession || nextScheduled;
         
-        setFormData(prev => ({
-          ...prev,
-          sessionId: firstSession.id,
-          classroomIds: selectedClassroomId ? [selectedClassroomId] : [],
-        }));
+        if (defaultSession) {
+          setFormData(prev => ({
+            ...prev,
+            sessionId: defaultSession.id,
+            classroomIds: [], // Don't auto-select classes
+          }));
+        }
       }
       
       // Set classrooms from assignments
@@ -146,13 +149,7 @@ export default function Tests() {
           .filter((c: any) => c && c.id);
         setClassrooms(classrooms);
         
-        // If no session was selected but we have classrooms, select first classroom
-        if (!formData.sessionId && classrooms.length > 0) {
-          setFormData(prev => ({
-            ...prev,
-            classroomIds: [classrooms[0].id],
-          }));
-        }
+        // Don't auto-select classes - let teacher choose
       } else {
         // No assignments - set empty array
         setClassrooms([]);
@@ -179,10 +176,101 @@ export default function Tests() {
     }
   };
 
+  // Helper function to check if a session is currently active
+  const isActiveSession = (session: Session): boolean => {
+    if (!session.isActive || session.isArchived) return false;
+    
+    const parseDate = (dateStr: string | Date) => {
+      if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        const [year, month, day] = dateStr.split('-').map(Number);
+        return new Date(Date.UTC(year, month - 1, day));
+      }
+      return new Date(dateStr);
+    };
+    
+    const startDate = parseDate(session.startDate);
+    const endDate = parseDate(session.endDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    
+    return start <= today && end >= today;
+  };
+
+  // Helper function to check if a session is scheduled (future)
+  const isScheduledSession = (session: Session): boolean => {
+    if (!session.isActive || session.isArchived) return false;
+    
+    const parseDate = (dateStr: string | Date) => {
+      if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        const [year, month, day] = dateStr.split('-').map(Number);
+        return new Date(Date.UTC(year, month - 1, day));
+      }
+      return new Date(dateStr);
+    };
+    
+    const startDate = parseDate(session.startDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    
+    return start > today;
+  };
+
+  // Get active session from sessions array
+  const getActiveSession = (sessionsList: Session[]): Session | null => {
+    return sessionsList.find(s => isActiveSession(s)) || null;
+  };
+
+  // Get next scheduled session (earliest startDate)
+  const getNextScheduledSession = (sessionsList: Session[]): Session | null => {
+    const scheduled = sessionsList.filter(s => isScheduledSession(s));
+    if (scheduled.length === 0) return null;
+    
+    // Sort by startDate and return the earliest
+    return scheduled.sort((a, b) => {
+      const parseDate = (dateStr: string | Date) => {
+        if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+          const [year, month, day] = dateStr.split('-').map(Number);
+          return new Date(Date.UTC(year, month - 1, day));
+        }
+        return new Date(dateStr);
+      };
+      return parseDate(a.startDate).getTime() - parseDate(b.startDate).getTime();
+    })[0];
+  };
+
+  // Get filtered sessions (only active or scheduled)
+  const getAvailableSessions = (): Session[] => {
+    return sessions.filter(s => isActiveSession(s) || isScheduledSession(s));
+  };
+
   const loadSessions = async () => {
     try {
       const response = await sessionAPI.getAll();
-      setSessions(response.data);
+      const loadedSessions = response.data;
+      setSessions(loadedSessions);
+      
+      // Set default session: active first, then next scheduled
+      if (loadedSessions && loadedSessions.length > 0) {
+        const activeSession = getActiveSession(loadedSessions);
+        const nextScheduled = getNextScheduledSession(loadedSessions);
+        const defaultSession = activeSession || nextScheduled;
+        
+        if (defaultSession && !formData.sessionId) {
+          setFormData(prev => ({
+            ...prev,
+            sessionId: defaultSession.id,
+            classroomIds: [], // Don't auto-select classes
+          }));
+        }
+      }
     } catch (error: any) {
       console.error('Failed to load sessions');
     }
@@ -467,51 +555,42 @@ export default function Tests() {
               <select
                 className="input-field"
                 value={formData.sessionId}
-                  onChange={(e) => {
-                    const sessionId = e.target.value;
-                    const selectedSession = sessions.find(s => s.id === sessionId);
-                    // For teachers, auto-select first available classroom from the session
-                    let autoSelectedClassroomId = '';
-                    if (account && account.role === 'TEACHER' && selectedSession) {
-                      const availableClassrooms = getAvailableClassroomsForSession(sessionId);
-                      autoSelectedClassroomId = availableClassrooms[0]?.id || '';
-                    } else if (selectedSession?.classAssignments?.[0]) {
-                      autoSelectedClassroomId = selectedSession.classAssignments[0].classroomId || '';
-                    }
-                    
-                    setFormData({ 
-                      ...formData, 
-                      sessionId: sessionId,
-                      classroomIds: autoSelectedClassroomId ? [autoSelectedClassroomId] : []
-                    });
-                  }}
+                onChange={(e) => {
+                  const sessionId = e.target.value;
+                  // Don't auto-select classes - let teacher choose manually
+                  setFormData({ 
+                    ...formData, 
+                    sessionId: sessionId,
+                    classroomIds: [] // Clear classes when session changes
+                  });
+                }}
                 required
-                  disabled={sessions.filter((s) => s.isActive).length === 0}
               >
                 <option value="">Select a session</option>
-                {sessions
-                  .filter((s) => s.isActive)
-                    .map((session) => (
+                {getAvailableSessions().map((session) => {
+                  const status = isActiveSession(session) ? 'Active' : 'Scheduled';
+                  return (
                     <option key={session.id} value={session.id}>
-                      {session.name}
+                      {session.name} ({status})
                     </option>
-                    ))}
+                  );
+                })}
               </select>
-                {sessions.filter((s) => s.isActive).length === 0 && account && account.role !== 'TEACHER' && (
+                {getAvailableSessions().length === 0 && account && account.role !== 'TEACHER' && (
                 <p className="text-sm text-red-600 mt-2 flex items-center">
                   <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
-                  No active sessions. Please{' '}
+                  No active or scheduled sessions. Please{' '}
                   <Link to="/sessions" className="text-primary underline font-medium ml-1">
                     create a session
                   </Link>{' '}
                   first.
                 </p>
               )}
-                {account && account.role === 'TEACHER' && sessions.filter((s) => s.isActive).length === 0 && (
+                {account && account.role === 'TEACHER' && getAvailableSessions().length === 0 && (
                   <p className="text-sm text-amber-600 mt-2">
-                    No active sessions available for your assigned classes. Please contact your school administrator.
+                    No active or scheduled sessions available for your assigned classes. Please contact your school administrator.
                   </p>
                 )}
               </div>
