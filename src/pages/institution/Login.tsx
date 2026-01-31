@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { authAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-import authImage from '../../assets/auth.jpg';
+import heroImage from '../../assets/hero.jpg';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -144,35 +144,12 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex overflow-hidden bg-gray-50">
-      {/* Left Side - Image with Overlay and Quote (Fixed) */}
-      <div className="hidden lg:flex lg:w-1/2 fixed left-0 top-0 bottom-0 overflow-y-auto">
-        <div 
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${authImage})` }}
+      {/* Left Side - Hero image only */}
+      <div className="hidden lg:flex lg:w-1/2 fixed left-0 top-0 bottom-0 overflow-hidden">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${heroImage})` }}
         />
-        <div 
-          className="absolute inset-0"
-          style={{ 
-            backgroundColor: primaryColor,
-            opacity: 0.75,
-            mixBlendMode: 'multiply'
-          }}
-        />
-        <div className="relative z-10 flex flex-col justify-center items-center p-12 text-white">
-          <div className="max-w-md">
-            <h2 className="text-4xl font-bold mb-6 leading-tight">
-              "Education is the most powerful weapon which you can use to change the world."
-            </h2>
-            <p className="text-xl text-white/90 font-medium">
-              - Nelson Mandela
-            </p>
-            <div className="mt-8 pt-8 border-t border-white/30">
-              <p className="text-lg text-white/80">
-                Every great achievement begins with a single step. Your journey to excellence starts here.
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Right Side - Login Form */}
