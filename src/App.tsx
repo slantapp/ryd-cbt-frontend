@@ -38,6 +38,8 @@ import TeacherTests from './pages/institution/TeacherTests';
 import ClassTests from './pages/institution/ClassTests';
 import SchoolAdmin from './pages/institution/SchoolAdmin';
 import QuestionBank from './pages/institution/QuestionBank';
+import Practice from './pages/institution/Practice';
+import PracticeDetail from './pages/institution/PracticeDetail';
 import Help from './pages/institution/Help';
 import ManageHelp from './pages/institution/ManageHelp';
 import PromoProgram from './pages/institution/PromoProgram';
@@ -53,6 +55,9 @@ import StudentRegister from './pages/student/StudentRegister';
 import StudentLogin from './pages/student/StudentLogin';
 import StudentDashboard from './pages/student/StudentDashboard';
 import StudentAnnouncements from './pages/student/StudentAnnouncements';
+import StudentPractice from './pages/student/StudentPractice';
+import StudentPracticeTake from './pages/student/StudentPracticeTake';
+import StudentPracticeResult from './pages/student/StudentPracticeResult';
 import SchoolLogin from './pages/student/SchoolLogin';
 
 // Parent pages
@@ -147,6 +152,36 @@ function App() {
               <PrivateRoute>
                 <StudentLayout>
                   <StudentAnnouncements />
+                </StudentLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/student/practice"
+            element={
+              <PrivateRoute>
+                <StudentLayout>
+                  <StudentPractice />
+                </StudentLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/student/practice/:id/take"
+            element={
+              <PrivateRoute>
+                <StudentLayout>
+                  <StudentPracticeTake />
+                </StudentLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/student/practice/result/:attemptId"
+            element={
+              <PrivateRoute>
+                <StudentLayout>
+                  <StudentPracticeResult />
                 </StudentLayout>
               </PrivateRoute>
             }
@@ -486,6 +521,26 @@ function App() {
               <PrivateRoute>
                 <InstitutionLayout>
                   <QuestionBank />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/practice"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <Practice />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/practice/:id"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <PracticeDetail />
                 </InstitutionLayout>
               </PrivateRoute>
             }

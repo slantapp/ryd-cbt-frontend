@@ -91,6 +91,42 @@ export interface Question {
   gradedById?: string | null;
 }
 
+export interface Practice {
+  id: string;
+  name: string;
+  subjectName: string;
+  classLabel: string;
+  isVisible?: boolean;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: { id: string; name: string };
+  _count?: { questions: number; attempts?: number };
+  studentsTaken?: number;
+  questions?: Array<{ id: string; questionId: string; order: number; question: Question }>;
+}
+
+export interface PracticeAttempt {
+  id: string;
+  practiceId: string;
+  studentId: string;
+  startedAt: string;
+  submittedAt?: string | null;
+  practice?: Practice;
+  answers?: PracticeAttemptAnswer[];
+  summary?: { total: number; correct: number; wrong: number; score: number };
+}
+
+export interface PracticeAttemptAnswer {
+  id: string;
+  attemptId: string;
+  questionId: string;
+  selectedAnswer: string;
+  isCorrect: boolean | null;
+  shownAnswerAt?: string | null;
+  question?: Question;
+}
+
 export interface Session {
   id: string;
   institutionId: string;

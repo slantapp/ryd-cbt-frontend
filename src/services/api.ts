@@ -119,7 +119,7 @@ export const institutionAPI = {
 // Tests
 export const testAPI = {
   create: (data: any) => api.post('/tests', data),
-  getAll: () => api.get('/tests'),
+  getAll: (params?: { schoolId?: string }) => api.get('/tests', { params }),
   getOne: (id: string) => api.get(`/tests/${id}`),
   update: (id: string, data: any) => api.put(`/tests/${id}`, data),
   delete: (id: string) => api.delete(`/tests/${id}`),
@@ -221,17 +221,18 @@ export const questionAPI = {
   // Question Bank
   addToBank: (data: { questionId: string; subjectId: string; grade: string }) => api.post('/questions/bank/add', data),
   createInBank: (data: { questionText: string; questionType: string; options?: any; correctAnswer: string; points: number; subjectId: string; grade: string }) => api.post('/questions/bank/create', data),
-  bulkUploadToBank: (subjectId: string, grade: string, file: File) => {
+  bulkUploadToBank: (subjectId: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('subjectId', subjectId);
-    formData.append('grade', grade);
     return api.post('/questions/bank/bulk-upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
   downloadBankTemplate: () => api.get('/questions/bank/template', { responseType: 'blob' }),
-  getBankQuestions: (params?: { subjectId?: string; grade?: string }) => api.get('/questions/bank', { params }),
+  getBankQuestions: (params?: { subjectId?: string; grade?: string; search?: string; page?: number; limit?: number }) =>
+    api.get('/questions/bank', { params }).then((res) => res.data),
+  bulkDeleteFromBank: (questionIds: string[]) => api.post('/questions/bank/bulk-delete', { questionIds }),
   addFromBankToTest: (data: { testId: string; questionIds: string[] }) => api.post('/questions/bank/add-to-test', data),
 };
 
@@ -352,6 +353,7 @@ export const adminAPI = {
   }) => api.post('/admin/super-admins', data),
   getSuperAdmins: () => api.get('/admin/super-admins'),
   getStats: () => api.get('/admin/dashboard'),
+  getSchools: () => api.get('/admin/schools'),
 };
 
 export const ministryAPI = {
@@ -416,7 +418,7 @@ export const testGroupAPI = {
 
 // Subjects
 export const subjectAPI = {
-  getAll: () => api.get('/subjects'),
+  getAll: (params?: { schoolId?: string }) => api.get('/subjects', { params }),
   getOne: (id: string) => api.get(`/subjects/${id}`),
   create: (data: { name: string; description?: string }) => api.post('/subjects', data),
   update: (id: string, data: { name?: string; description?: string; isActive?: boolean }) =>
@@ -493,6 +495,46 @@ export const impersonationAPI = {
     api.post('/impersonation/start', { targetId, reason }),
   stop: () => api.post('/impersonation/stop'),
   listChildren: () => api.get('/impersonation/children'),
+};
+
+// Practice (SUPER_ADMIN create/manage; students take)
+export const practiceAPI = {
+  list: () => api.get('/practices').then((r) => r.data),
+  create: (data: { name: string; subjectName: string; classLabel: string }) =>
+    api.post('/practices', data).then((r) => r.data),
+  getOne: (id: string) => api.get(`/practices/${id}`).then((r) => r.data),
+  update: (id: string, data: { name?: string; subjectName?: string; classLabel?: string; isVisible?: boolean }) =>
+    api.put(`/practices/${id}`, data).then((r) => r.data),
+  delete: (id: string) => api.delete(`/practices/${id}`),
+  addQuestionsFromBank: (practiceId: string, questionIds: string[]) =>
+    api.post(`/practices/${practiceId}/questions/from-bank`, { questionIds }),
+  addQuestionsFromTest: (practiceId: string, testId: string, questionIds: string[]) =>
+    api.post(`/practices/${practiceId}/questions/from-test`, { testId, questionIds }),
+  createQuestion: (practiceId: string, data: { questionText: string; questionType: string; options?: string; correctAnswer: string; points?: string; grade?: string }) =>
+    api.post(`/practices/${practiceId}/questions`, data).then((r) => r.data),
+  bulkUpload: (practiceId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post(`/practices/${practiceId}/questions/bulk-upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  removeQuestion: (practiceId: string, questionId: string) =>
+    api.delete(`/practices/${practiceId}/questions/${questionId}`),
+  downloadTemplate: () => api.get('/practices/template', { responseType: 'blob' }),
+  // Student
+  studentList: (params?: { class?: string; subject?: string }) =>
+    api.get('/practices/student', { params }).then((r) => r.data),
+  studentGet: (id: string) => api.get(`/practices/student/${id}`).then((r) => r.data),
+  studentGetQuestions: (id: string) => api.get(`/practices/student/${id}/questions`).then((r) => r.data),
+  studentStartAttempt: (practiceId: string) =>
+    api.post(`/practices/student/${practiceId}/attempts`).then((r) => r.data),
+  studentSubmitAnswer: (attemptId: string, data: { questionId: string; selectedAnswer: string; showAnswer?: boolean }) =>
+    api.put(`/practices/student/attempts/${attemptId}/answer`, data).then((r) => r.data),
+  studentSubmitAttempt: (attemptId: string) =>
+    api.post(`/practices/student/attempts/${attemptId}/submit`).then((r) => r.data),
+  studentGetAttempt: (attemptId: string) => api.get(`/practices/student/attempts/${attemptId}`).then((r) => r.data),
+  studentListAttempts: () => api.get('/practices/student/my-attempts').then((r) => r.data),
 };
 
 export default api;

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { questionAPI, subjectAPI, testAPI } from '../../services/api';
 import { Question, Test } from '../../types';
 import { useAuthStore } from '../../store/authStore';
@@ -6,10 +7,20 @@ import toast from 'react-hot-toast';
 
 export default function QuestionBank() {
   const { account } = useAuthStore();
+  const navigate = useNavigate();
+  const isSuperAdmin = account?.role === 'SUPER_ADMIN';
+
+  // Only SUPER_ADMIN can access the Question Bank page; school/teacher use "Add from Question Bank" on test detail
+  useEffect(() => {
+    if (account && !isSuperAdmin) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [account, isSuperAdmin, navigate]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [tests, setTests] = useState<Test[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [filters, setFilters] = useState({
     subjectId: '',
     grade: '',
@@ -67,9 +78,10 @@ export default function QuestionBank() {
   const [useEditVisualBuilder, setUseEditVisualBuilder] = useState(true);
   const [bulkUploadForm, setBulkUploadForm] = useState({
     subjectId: '',
-    grade: '',
   });
   const [bulkUploading, setBulkUploading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deletingSelected, setDeletingSelected] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -77,7 +89,12 @@ export default function QuestionBank() {
 
   useEffect(() => {
     loadQuestions();
-  }, [filters]);
+  }, [filters.subjectId, filters.grade, filters.search, pagination.page]);
+
+  // Clear selection when page or filters change so "Select all" doesn't carry over
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [pagination.page, filters.subjectId, filters.grade, filters.search]);
 
   // Initialize edit form when editingQuestion changes
   useEffect(() => {
@@ -126,25 +143,21 @@ export default function QuestionBank() {
 
   const loadQuestions = async () => {
     try {
-      const params: any = {};
-      if (filters.subjectId) {
-        params.subjectId = filters.subjectId;
-      }
-      if (filters.grade) {
-        params.grade = filters.grade;
-      }
-      const response = await questionAPI.getBankQuestions(params);
-      let filtered = response.data || [];
-      
-      // Apply search filter
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        filtered = filtered.filter((q: Question) =>
-          q.questionText.toLowerCase().includes(searchLower)
-        );
-      }
-      
-      setQuestions(filtered);
+      const params: any = {
+        page: pagination.page,
+        limit: pagination.limit,
+      };
+      if (filters.subjectId) params.subjectId = filters.subjectId;
+      if (filters.grade) params.grade = filters.grade;
+      if (filters.search?.trim()) params.search = filters.search.trim();
+      const data = await questionAPI.getBankQuestions(params);
+      const list = data?.questions ?? [];
+      setQuestions(list);
+      setPagination((p) => ({
+        ...p,
+        total: data?.total ?? 0,
+        totalPages: data?.totalPages ?? 1,
+      }));
     } catch (error: any) {
       console.error('Failed to load questions:', error);
       toast.error(error.response?.data?.error || 'Failed to load questions');
@@ -226,7 +239,6 @@ export default function QuestionBank() {
         }
       }
 
-      // Create question directly in the bank
       await questionAPI.createInBank({
         questionText: createForm.questionText,
         questionType: createForm.questionType,
@@ -249,7 +261,16 @@ export default function QuestionBank() {
         grade: '',
       });
       setOptionInputs({ A: '', B: '', C: '', D: '', E: '' });
-      await loadQuestions();
+      // Refetch current page so new question may appear (or stay on page 1)
+      const data = await questionAPI.getBankQuestions({
+        subjectId: filters.subjectId || undefined,
+        grade: filters.grade || undefined,
+        search: filters.search?.trim() || undefined,
+        page: pagination.page,
+        limit: pagination.limit,
+      });
+      setQuestions(data?.questions ?? []);
+      setPagination((p) => ({ ...p, total: data?.total ?? p.total, totalPages: data?.totalPages ?? p.totalPages }));
     } catch (error: any) {
       console.error('Failed to create question:', error);
       toast.error(error.response?.data?.error || 'Failed to create question');
@@ -330,10 +351,59 @@ export default function QuestionBank() {
       await questionAPI.delete(deletingQuestion.id);
       toast.success('Question deleted from bank successfully');
       setDeletingQuestion(null);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(deletingQuestion.id);
+        return next;
+      });
       await loadQuestions();
     } catch (error: any) {
       console.error('Failed to delete question:', error);
       toast.error(error.response?.data?.error || 'Failed to delete question');
+    }
+  };
+
+  const allOnPageSelected = questions.length > 0 && questions.every((q) => selectedIds.has(q.id));
+  const toggleSelectAll = () => {
+    if (allOnPageSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        questions.forEach((q) => next.delete(q.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        questions.forEach((q) => next.add(q.id));
+        return next;
+      });
+    }
+  };
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkDeleteSelected = async () => {
+    if (selectedIds.size === 0) {
+      toast.error('Select at least one question to delete');
+      return;
+    }
+    setDeletingSelected(true);
+    try {
+      const ids = Array.from(selectedIds);
+      await questionAPI.bulkDeleteFromBank(ids);
+      toast.success(`${ids.length} question(s) deleted from the bank`);
+      setSelectedIds(new Set());
+      await loadQuestions();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to delete selected questions');
+    } finally {
+      setDeletingSelected(false);
     }
   };
 
@@ -360,8 +430,8 @@ export default function QuestionBank() {
     if (!file) return;
 
     // Validate required fields
-    if (!bulkUploadForm.subjectId || !bulkUploadForm.grade) {
-      toast.error('Please select a subject and enter a grade before uploading');
+    if (!bulkUploadForm.subjectId) {
+      toast.error('Please select a subject before uploading');
       e.target.value = ''; // Reset file input
       return;
     }
@@ -379,10 +449,11 @@ export default function QuestionBank() {
 
     setBulkUploading(true);
     try {
-      await questionAPI.bulkUploadToBank(bulkUploadForm.subjectId, bulkUploadForm.grade, file);
+      await questionAPI.bulkUploadToBank(bulkUploadForm.subjectId, file);
       toast.success('Questions uploaded to bank successfully');
       setShowBulkUploadModal(false);
-      setBulkUploadForm({ subjectId: '', grade: '' });
+      setBulkUploadForm({ subjectId: '' });
+      setPagination((p) => ({ ...p, page: 1 }));
       await loadQuestions();
       e.target.value = ''; // Reset file input
     } catch (error: any) {
@@ -425,11 +496,17 @@ export default function QuestionBank() {
     );
   }
 
+  const canManageQuestionBank = isSuperAdmin;
+
   return (
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold mb-2">Question Bank</h1>
-        <p className="text-gray-600">Manage your question bank - add, edit, and organize questions for reuse across tests</p>
+        <p className="text-gray-600">
+          {canManageQuestionBank
+            ? 'Create and manage the global question bank. All schools can use these questions in their tests.'
+            : 'Browse the question bank and add questions to your tests when creating or editing a test.'}
+        </p>
       </div>
 
       {/* Filters and Actions */}
@@ -442,7 +519,10 @@ export default function QuestionBank() {
             <select
               className="input-field"
               value={filters.subjectId}
-              onChange={(e) => setFilters({ ...filters, subjectId: e.target.value })}
+              onChange={(e) => {
+                setFilters({ ...filters, subjectId: e.target.value });
+                setPagination((p) => ({ ...p, page: 1 }));
+              }}
             >
               <option value="">All Subjects</option>
               {subjects.map((subject) => (
@@ -473,84 +553,163 @@ export default function QuestionBank() {
               className="input-field"
               placeholder="Search questions..."
               value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              onChange={(e) => {
+                setFilters({ ...filters, search: e.target.value });
+                setPagination((p) => ({ ...p, page: 1 }));
+              }}
             />
           </div>
         </div>
-        <div className="pt-2 border-t border-gray-200">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="btn-primary text-sm"
-            >
-              Create New Question
-            </button>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="btn-secondary text-sm"
-            >
-              Add from Test
-            </button>
-            <button
-              onClick={() => setShowBulkUploadModal(true)}
-              className="btn-secondary text-sm"
-            >
-              Bulk Upload
-            </button>
-            <button
-              onClick={handleDownloadBankTemplate}
-              className="btn-secondary text-sm"
-            >
-              Download Template
-            </button>
+        {canManageQuestionBank && (
+          <div className="pt-2 border-t border-gray-200">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="btn-primary text-sm"
+              >
+                Create New Question
+              </button>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="btn-secondary text-sm"
+              >
+                Add from Test
+              </button>
+              <button
+                onClick={() => setShowBulkUploadModal(true)}
+                className="btn-secondary text-sm"
+              >
+                Bulk Upload
+              </button>
+              <button
+                onClick={handleDownloadBankTemplate}
+                className="btn-secondary text-sm"
+              >
+                Download Template
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Questions List */}
       <div className="card">
-        <h2 className="text-lg font-semibold mb-4">Questions ({questions.length})</h2>
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <h2 className="text-lg font-semibold">
+            Questions {pagination.total > 0 && `(${pagination.total} total)`}
+          </h2>
+          {canManageQuestionBank && questions.length > 0 && (
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={allOnPageSelected}
+                  onChange={toggleSelectAll}
+                  className="rounded border-gray-300"
+                />
+                Select all on page
+              </label>
+              {selectedIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={handleBulkDeleteSelected}
+                  disabled={deletingSelected}
+                  className="btn-secondary text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                >
+                  {deletingSelected ? 'Deleting…' : `Delete selected (${selectedIds.size})`}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
         {questions.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-gray-500">No questions found. Create your first question or add one from an existing test.</p>
+            <p className="text-gray-500">
+              {canManageQuestionBank
+                ? 'No questions found. Create your first question or add one from an existing test.'
+                : 'No questions in the bank yet. Ask your super administrator to add questions.'}
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
             {questions.map((question) => (
-              <div key={question.id} className="p-4 border border-gray-200 rounded-lg">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900 mb-2">{question.questionText}</p>
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span>Type: {question.questionType}</span>
-                      <span>Points: {question.points}</span>
-                      {question.questionBankGrade && (
-                        <span>Grade: {question.questionBankGrade}</span>
-                      )}
-                      {question.questionBankSubjectId && (
-                        <span>
-                          Subject: {subjects.find(s => s.id === question.questionBankSubjectId)?.name || 'N/A'}
-                        </span>
-                      )}
-                    </div>
+              <div key={question.id} className="p-4 border border-gray-200 rounded-lg flex items-start gap-3">
+                {canManageQuestionBank && (
+                  <label className="flex items-start pt-0.5 cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(question.id)}
+                      onChange={() => toggleSelectOne(question.id)}
+                      className="rounded border-gray-300 mt-1"
+                    />
+                  </label>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-900 mb-2">{question.questionText}</p>
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                    <span>Type: {question.questionType}</span>
+                    <span>Points: {question.points}</span>
+                    {question.questionBankGrade && (
+                      <span>Grade: {question.questionBankGrade}</span>
+                    )}
+                    {question.questionBankSubjectId && (
+                      <span>
+                        Subject: {subjects.find(s => s.id === question.questionBankSubjectId)?.name || 'N/A'}
+                      </span>
+                    )}
                   </div>
-                  <div className="flex space-x-2">
+                </div>
+                {canManageQuestionBank && (
+                  <div className="flex space-x-2 shrink-0">
                     <button
+                      type="button"
                       onClick={() => setEditingQuestion(question)}
                       className="text-blue-600 hover:text-blue-800 text-sm"
                     >
                       Edit
                     </button>
                     <button
+                      type="button"
                       onClick={() => setDeletingQuestion(question)}
                       className="text-red-600 hover:text-red-800 text-sm"
                     >
                       Delete
                     </button>
                   </div>
-                </div>
+                )}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {pagination.total > 0 && (
+          <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-gray-600">
+              Page <span className="font-medium">{pagination.page}</span> of <span className="font-medium">{pagination.totalPages}</span>
+              <span className="ml-2 text-gray-500">
+                (showing {(pagination.page - 1) * pagination.limit + 1}–
+                {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total})
+              </span>
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPagination((p) => ({ ...p, page: Math.max(1, p.page - 1) }))}
+                disabled={pagination.page <= 1}
+                className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => setPagination((p) => ({ ...p, page: Math.min(p.totalPages, p.page + 1) }))}
+                disabled={pagination.page >= pagination.totalPages}
+                className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -1056,7 +1215,7 @@ export default function QuestionBank() {
             <div className="p-6">
               <h3 className="text-xl font-semibold mb-4">Bulk Upload Questions to Bank</h3>
               <p className="text-gray-600 mb-4 text-sm">
-                Upload an Excel file (.xlsx, .xls) or CSV file (.csv) with questions. The file should include columns: questionText, questionType, options, correctAnswer, points, subjectId (optional), grade (optional).
+                Select the subject, then upload an Excel (.xlsx, .xls) or CSV file. Each row must include: questionText, questionType, options, correctAnswer, points, and grade (each question can have a different grade).
               </p>
               <div className="space-y-4">
                 <div>
@@ -1079,19 +1238,6 @@ export default function QuestionBank() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Grade <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="input-field"
-                    placeholder="e.g., Grade 1, Grade 2"
-                    value={bulkUploadForm.grade}
-                    onChange={(e) => setBulkUploadForm({ ...bulkUploadForm, grade: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Upload File <span className="text-red-500">*</span>
                   </label>
                   <label className="block w-full cursor-pointer">
@@ -1100,9 +1246,9 @@ export default function QuestionBank() {
                       accept=".xlsx,.xls,.csv"
                       className="hidden"
                       onChange={handleBulkUploadToBank}
-                      disabled={bulkUploading || !bulkUploadForm.subjectId || !bulkUploadForm.grade}
+                      disabled={bulkUploading || !bulkUploadForm.subjectId}
                     />
-                    <div className={`flex items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg hover:bg-gray-50 ${(bulkUploading || !bulkUploadForm.subjectId || !bulkUploadForm.grade) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                    <div className={`flex items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg hover:bg-gray-50 ${(bulkUploading || !bulkUploadForm.subjectId) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                       <div className="text-center">
                         <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
                           <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -1111,17 +1257,12 @@ export default function QuestionBank() {
                           <span className="font-semibold">Click to upload</span> or drag and drop
                         </p>
                         <p className="text-xs text-gray-500 mt-1">Excel (.xlsx, .xls) or CSV (.csv)</p>
-                        {(!bulkUploadForm.subjectId || !bulkUploadForm.grade) && (
-                          <p className="text-xs text-red-500 mt-1">Please select subject and enter grade first</p>
+                        {!bulkUploadForm.subjectId && (
+                          <p className="text-xs text-red-500 mt-1">Please select a subject first</p>
                         )}
                       </div>
                     </div>
                   </label>
-                </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs text-blue-800">
-                    <strong>Note:</strong> If subjectId and grade are provided in the file, they will override the values selected above.
-                  </p>
                 </div>
               </div>
               <div className="flex space-x-2 pt-4">
@@ -1129,7 +1270,7 @@ export default function QuestionBank() {
                   type="button"
                   onClick={() => {
                     setShowBulkUploadModal(false);
-                    setBulkUploadForm({ subjectId: '', grade: '' });
+                    setBulkUploadForm({ subjectId: '' });
                   }}
                   className="btn-secondary flex-1"
                   disabled={bulkUploading}

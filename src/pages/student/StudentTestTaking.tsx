@@ -540,8 +540,8 @@ export default function StudentTestTaking() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <div>Loading...</div>
+          <div className="w-10 h-10 border-2 border-[var(--theme-primary,#A8518A)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading...</p>
         </div>
       </div>
     );
@@ -756,47 +756,46 @@ export default function StudentTestTaking() {
       style={{ backgroundColor: brand.backgroundColor, color: brand.textColor }}
     >
       {/* Header Bar */}
-      <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <h1 className="text-xl font-bold text-gray-900">{test.title}</h1>
-              <p className="text-sm text-gray-600">
+      <div className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{test.title}</h1>
+              <p className="text-sm text-gray-500">
                 Question {currentQuestionIndex + 1} of {questions.length}
               </p>
             </div>
             {timeRemaining !== null && (
-              <div className="text-right">
+              <div className="shrink-0 text-right">
                 <div
-                  className="text-2xl font-bold"
+                  className="text-xl sm:text-2xl font-bold tabular-nums"
                   style={{
                     color: timeRemaining < 300 ? '#dc2626' : brand.primaryColor,
                   }}
                 >
                   {formatTime(timeRemaining)}
                 </div>
-                <p className="text-xs text-gray-500">Time Remaining</p>
+                <p className="text-xs text-gray-500">Time left</p>
               </div>
             )}
           </div>
-          {/* Progress Bar */}
           <div className="mt-4">
-            <div className="flex justify-between text-xs text-gray-600 mb-1">
-              <span>Progress: {answeredCount} / {questions.length} answered</span>
+            <div className="flex justify-between text-xs text-gray-500 mb-1">
+              <span>{answeredCount} / {questions.length} answered</span>
               <span>{Math.round(progress)}%</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
               <div
-                className="h-2 rounded-full transition-all duration-300"
+                className="h-full rounded-full transition-all duration-300"
                 style={{ width: `${progress}%`, backgroundColor: brand.primaryColor }}
-              ></div>
+              />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {/* Question Navigation */}
+      <div className="max-w-3xl mx-auto py-6 px-4 sm:px-6">
+        {/* Question dots */}
         <div className="mb-6">
           <div className="flex flex-wrap gap-2 justify-center">
             {questions.map((q, index) => {
@@ -807,194 +806,182 @@ export default function StudentTestTaking() {
                 ? {
                     backgroundColor: brand.primaryColor,
                     color: brand.backgroundColor || '#ffffff',
-                    transform: 'scale(1.05)',
-                    boxShadow: '0 10px 15px rgba(0,0,0,0.1)',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
                   }
                 : isAnswered
-                ? { backgroundColor: '#16a34a', color: '#ffffff' } // Deeper green
-                : { backgroundColor: '#6b7280', color: '#ffffff' }; // Deeper grey
+                ? { backgroundColor: '#16a34a', color: '#ffffff' }
+                : { backgroundColor: '#94a3b8', color: '#ffffff' };
 
               return (
                 <button
                   key={q.id}
                   onClick={() => goToQuestion(index)}
-                  className="w-10 h-10 rounded-lg font-medium transition-all relative"
+                  className="w-9 h-9 rounded-xl font-medium transition-all relative text-sm"
                   style={style}
                   title={`Question ${index + 1}${isFlagged ? ' (Flagged)' : ''}${isAnswered ? ' (Answered)' : ''}`}
                 >
                   {index + 1}
                   {isFlagged && (
-                    <span className="absolute -top-1 -right-1 text-yellow-500 text-xs">🚩</span>
+                    <span className="absolute -top-0.5 -right-0.5 text-yellow-400 text-[10px]">🚩</span>
                   )}
                 </button>
               );
             })}
           </div>
-          <div className="flex justify-center mt-4 text-xs text-gray-600 space-x-4">
-            <span className="flex items-center">
-              <span className="w-3 h-3 rounded mr-1" style={{ backgroundColor: '#16a34a' }}></span>
-              Answered
-            </span>
-            <span className="flex items-center">
-              <span className="w-3 h-3 rounded mr-1" style={{ backgroundColor: '#6b7280' }}></span>
-              Not Answered
-            </span>
-            <span className="flex items-center">
-              <span className="text-xs mr-1">🚩</span>
-              Flagged
-            </span>
-            <span className="flex items-center">
-              <span className="w-3 h-3 rounded mr-1" style={{ backgroundColor: brand.primaryColor }}></span>
-              Current
-            </span>
+          <div className="flex justify-center mt-3 text-xs text-gray-500 gap-4 flex-wrap">
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded" style={{ backgroundColor: '#16a34a' }} /> Answered</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-slate-400" /> Not answered</span>
+            <span className="flex items-center gap-1">🚩 Flagged</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded" style={{ backgroundColor: brand.primaryColor }} /> Current</span>
           </div>
         </div>
 
         {/* Question Card */}
         {currentQuestion && (
-          <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
-            <div className="mb-6">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden mb-6">
+            <div className="p-6 sm:p-8">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-sm font-medium text-primary">
+                <span className="text-sm font-medium" style={{ color: brand.primaryColor }}>
                   Question {currentQuestionIndex + 1}
                 </span>
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center gap-3">
                   <button
                     onClick={() => toggleFlag(currentQuestion.id)}
-                    className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${
                       flaggedQuestions.has(currentQuestion.id)
-                        ? 'bg-yellow-100 text-yellow-800 border-2 border-yellow-400'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-2 border-transparent'
+                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-transparent'
                     }`}
-                    title={flaggedQuestions.has(currentQuestion.id) ? 'Unflag this question' : 'Flag this question for review'}
+                    title={flaggedQuestions.has(currentQuestion.id) ? 'Unflag' : 'Flag for review'}
                   >
-                    <span>🚩</span>
-                    <span>{flaggedQuestions.has(currentQuestion.id) ? 'Flagged' : 'Flag'}</span>
+                    🚩 {flaggedQuestions.has(currentQuestion.id) ? 'Flagged' : 'Flag'}
                   </button>
                   <span className="text-sm text-gray-500">
-                    {currentQuestion.points} point{currentQuestion.points !== 1 ? 's' : ''}
+                    {currentQuestion.points} pt{currentQuestion.points !== 1 ? 's' : ''}
                   </span>
                 </div>
               </div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 leading-snug mb-6">
                 {currentQuestion.questionText}
               </h2>
-            </div>
 
-            {currentQuestion.questionType === 'multiple_choice' && currentQuestion.options && (
-              <div className="space-y-3">
-                {Object.entries(currentQuestion.options).map(([key, value]) => (
-                  <label
-                    key={key}
-                    className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                      answers[currentQuestion.id] === key
-                        ? 'border-primary bg-primary-50'
-                        : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name={currentQuestion.id}
-                      value={key}
-                      checked={answers[currentQuestion.id] === key}
-                      onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                      className="mr-4 w-5 h-5 text-primary"
-                    />
-                    <span className="font-medium mr-2 text-gray-700">{key}:</span>
-                    <span className="text-gray-900">{value}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-
-            {currentQuestion.questionType === 'multiple_select' && currentQuestion.options && (
-              <div className="space-y-3">
-                <p className="text-sm text-gray-600 mb-4">Select all that apply:</p>
-                {Object.entries(currentQuestion.options).map(([key, value]) => {
-                  const currentAnswers = answers[currentQuestion.id] 
-                    ? answers[currentQuestion.id].split(',').map(a => a.trim()) 
-                    : [];
-                  const isChecked = currentAnswers.includes(key);
-                  return (
+              {currentQuestion.questionType === 'multiple_choice' && currentQuestion.options && (
+                <div className="space-y-3">
+                  {Object.entries(currentQuestion.options).map(([key, value]) => (
                     <label
                       key={key}
-                      className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                        isChecked
-                          ? 'border-primary bg-primary-50'
-                          : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
+                      className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                        answers[currentQuestion.id] === key
+                          ? 'border-[var(--theme-primary)] bg-[var(--theme-primary-50)]'
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                       }`}
+                      style={answers[currentQuestion.id] === key ? { borderColor: brand.primaryColor, backgroundColor: `${brand.primaryColor}12` } : {}}
                     >
                       <input
-                        type="checkbox"
+                        type="radio"
                         name={currentQuestion.id}
                         value={key}
-                        checked={isChecked}
-                        onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value, true)}
-                        className="mr-4 w-5 h-5 text-primary rounded"
+                        checked={answers[currentQuestion.id] === key}
+                        onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+                        className="w-5 h-5"
+                        style={{ accentColor: brand.primaryColor }}
                       />
-                      <span className="font-medium mr-2 text-gray-700">{key}:</span>
+                      <span className="font-medium text-gray-700">{key}.</span>
                       <span className="text-gray-900">{value}</span>
                     </label>
-                  );
-                })}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
 
-            {currentQuestion.questionType === 'true_false' && (
-              <div className="space-y-3">
-                {['true', 'false'].map((option) => (
-                  <label
-                    key={option}
-                    className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                      answers[currentQuestion.id] === option
-                        ? 'border-primary bg-primary-50'
-                        : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name={currentQuestion.id}
-                      value={option}
-                      checked={answers[currentQuestion.id] === option}
-                      onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                      className="mr-4 w-5 h-5 text-primary"
-                    />
-                    <span className="capitalize text-gray-900 font-medium">{option}</span>
-                  </label>
-                ))}
-              </div>
-            )}
+              {currentQuestion.questionType === 'multiple_select' && currentQuestion.options && (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-600 mb-3">Select all that apply:</p>
+                  {Object.entries(currentQuestion.options).map(([key, value]) => {
+                    const currentAnswers = answers[currentQuestion.id] 
+                      ? answers[currentQuestion.id].split(',').map(a => a.trim()) 
+                      : [];
+                    const isChecked = currentAnswers.includes(key);
+                    return (
+                      <label
+                        key={key}
+                        className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                          isChecked ? 'border-[var(--theme-primary)] bg-[var(--theme-primary-50)]' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                        style={isChecked ? { borderColor: brand.primaryColor, backgroundColor: `${brand.primaryColor}12` } : {}}
+                      >
+                        <input
+                          type="checkbox"
+                          name={currentQuestion.id}
+                          value={key}
+                          checked={isChecked}
+                          onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value, true)}
+                          className="w-5 h-5 rounded"
+                          style={{ accentColor: brand.primaryColor }}
+                        />
+                        <span className="font-medium text-gray-700">{key}.</span>
+                        <span className="text-gray-900">{value}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
 
-            {currentQuestion.questionType === 'short_answer' && (
-              <textarea
-                className="input-field w-full min-h-[150px]"
-                placeholder="Type your answer here..."
-                value={answers[currentQuestion.id] || ''}
-                onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-              />
-            )}
+              {currentQuestion.questionType === 'true_false' && (
+                <div className="space-y-3">
+                  {['true', 'false'].map((option) => (
+                    <label
+                      key={option}
+                      className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                        answers[currentQuestion.id] === option
+                          ? 'border-[var(--theme-primary)] bg-[var(--theme-primary-50)]'
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                      style={answers[currentQuestion.id] === option ? { borderColor: brand.primaryColor, backgroundColor: `${brand.primaryColor}12` } : {}}
+                    >
+                      <input
+                        type="radio"
+                        name={currentQuestion.id}
+                        value={option}
+                        checked={answers[currentQuestion.id] === option}
+                        onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+                        className="w-5 h-5"
+                        style={{ accentColor: brand.primaryColor }}
+                      />
+                      <span className="capitalize text-gray-900 font-medium">{option}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {currentQuestion.questionType === 'short_answer' && (
+                <textarea
+                  className="input-field w-full min-h-[140px] rounded-xl border-2 border-gray-200 px-4 py-3 focus:ring-2 focus:ring-offset-0"
+                  placeholder="Type your answer here..."
+                  value={answers[currentQuestion.id] || ''}
+                  onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+                />
+              )}
+            </div>
           </div>
         )}
 
-        {/* Navigation Buttons */}
-        <div className="flex justify-between items-center bg-white rounded-lg shadow-md p-4">
-          <div className="flex space-x-2">
-            <button
-              onClick={() => goToQuestion(currentQuestionIndex - 1)}
-              disabled={currentQuestionIndex === 0}
-              className="py-2 px-4 rounded-lg border font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ borderColor: brand.primaryColor, color: brand.primaryColor }}
-            >
-              ← Previous
-            </button>
-          </div>
-          <div className="text-sm text-gray-600">
+        {/* Navigation */}
+        <div className="flex justify-between items-center gap-4 flex-wrap bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <button
+            onClick={() => goToQuestion(currentQuestionIndex - 1)}
+            disabled={currentQuestionIndex === 0}
+            className="rounded-xl border-2 px-4 py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ borderColor: brand.primaryColor, color: brand.primaryColor }}
+          >
+            ← Previous
+          </button>
+          <span className="text-sm text-gray-500 order-last w-full sm:order-none sm:w-auto text-center">
             {currentQuestionIndex + 1} / {questions.length}
-          </div>
+          </span>
           {currentQuestionIndex < questions.length - 1 ? (
             <button
               onClick={() => goToQuestion(currentQuestionIndex + 1)}
-              className="font-semibold py-2 px-4 rounded-lg shadow"
+              className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md"
               style={primaryButtonStyle}
             >
               Next →
@@ -1003,20 +990,18 @@ export default function StudentTestTaking() {
             <button
               onClick={() => handleSubmit(false)}
               disabled={submitting}
-              className="font-semibold py-2 px-6 rounded-lg shadow disabled:opacity-50"
+              className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md disabled:opacity-50"
               style={{ backgroundColor: brand.secondaryColor, color: brand.backgroundColor }}
             >
               {submitting ? 'Submitting...' : 'Submit Test'}
             </button>
           )}
         </div>
-
-        {/* Quick Submit Button (always visible) */}
-        <div className="mt-4 text-center">
+        <div className="mt-3 text-center">
           <button
             onClick={() => handleSubmit(false)}
             disabled={submitting}
-            className="text-sm text-gray-600 hover:text-gray-900 underline"
+            className="text-sm text-gray-500 hover:text-gray-800"
           >
             Submit test now
           </button>

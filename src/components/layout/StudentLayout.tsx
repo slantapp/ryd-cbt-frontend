@@ -18,6 +18,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', path: '/student/dashboard', icon: '📊' },
+  { label: 'Practice', path: '/student/practice', icon: '📝' },
   { label: 'Educational Insights', path: '/student/announcements', icon: '💡' },
 ];
 
@@ -244,7 +245,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       <footer className="bg-white border-t border-gray-200 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="text-center text-sm text-gray-500">
-            <p>© 2024 {account?.institution?.name || 'CBT Platform'}. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} RYD Learning. All rights reserved.</p>
           </div>
         </div>
       </footer>
