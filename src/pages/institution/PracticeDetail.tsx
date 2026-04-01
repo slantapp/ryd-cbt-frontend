@@ -224,7 +224,7 @@ export default function PracticeDetail() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'practice-upload-template.xlsx';
+      a.download = 'practice-bulk-template.xlsx';
       a.click();
       window.URL.revokeObjectURL(url);
       toast.success('Template downloaded');
@@ -280,7 +280,7 @@ export default function PracticeDetail() {
           </button>
         </div>
         <p className="text-sm text-gray-500 mt-2">
-          Use the template for bulk upload. Columns: questionText, questionType, options, correctAnswer, points. The practice class is used as grade.
+          Use the template for bulk upload. Columns: questionText, questionType, optionA, optionB, optionC, optionD, correctAnswer, points. For multiple_select use comma-separated answers (e.g. A,B). The practice class is used as grade.
         </p>
       </div>
 
@@ -477,7 +477,7 @@ export default function PracticeDetail() {
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-1">Bulk upload</h3>
             <p className="text-sm text-gray-500 mb-4">
-              Use the practice template (no grade column). The practice class ({practice.classLabel}) is used as grade for all questions.
+              Use the practice template (no grade column): questionText, questionType, optionA–D, correctAnswer, points. The practice class ({practice.classLabel}) is used as grade for all questions.
             </p>
             <button type="button" onClick={handleDownloadTemplate} className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 mb-4 block">
               Download template

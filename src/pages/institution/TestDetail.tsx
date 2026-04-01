@@ -650,20 +650,35 @@ export default function TestDetail() {
   const handleDownloadTemplate = async () => {
     try {
       const response = await questionAPI.downloadTemplate();
-      // Create blob from response
+      const contentType = String(response.headers['content-type'] || '');
+      // With responseType: 'blob', error JSON still arrives as a blob — don't save it as .xlsx
+      if (contentType.includes('application/json')) {
+        const text = await (response.data as Blob).text();
+        try {
+          const j = JSON.parse(text) as { error?: string };
+          toast.error(j.error || 'Template download failed');
+        } catch {
+          toast.error('Template download failed');
+        }
+        return;
+      }
+      if (import.meta.env.DEV) {
+        // Helps verify which API you hit (localhost vs remote) when the file looks "old"
+        const cfg = response.config;
+        console.info('[question template] request:', cfg.baseURL, cfg.url, cfg.params);
+      }
       const blob = new Blob([response.data], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'question-upload-template.xlsx';
+      link.download = 'question-bulk-template.xlsx';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      toast.success('Template downloaded successfully');
+      toast.success('Template downloaded — open the Instructions sheet to confirm v2 (optionA–D).');
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to download template');
     }
@@ -1754,48 +1769,53 @@ export default function TestDetail() {
       </div>
 
       <div className="card">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start mb-4">
           <h2 className="text-xl font-semibold">Questions ({questions.length})</h2>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => {
-                setEditingQuestion(null);
-                setShowQuestionForm(!showQuestionForm);
-              }}
-              className="btn-secondary text-sm"
-            >
-              {showQuestionForm ? 'Cancel' : 'Add Question'}
-            </button>
-            <button
-              onClick={() => {
-                setShowQuestionBankModal(true);
-                loadQuestionBankQuestions();
-              }}
-              className="btn-secondary text-sm"
-            >
-              Add from Question Bank
-            </button>
-            <label className="btn-secondary text-sm cursor-pointer">
-              Bulk Upload
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                className="hidden"
-                onChange={handleBulkUpload}
-              />
-            </label>
-            <button
-              onClick={handleDownloadTemplate}
-              className="btn-secondary text-sm"
-            >
-              Download Excel Template
-            </button>
-            <button
-              onClick={() => setShowAIGenerator(!showAIGenerator)}
-              className="btn-secondary text-sm"
-            >
-              AI Generate
-            </button>
+          <div className="flex flex-col items-stretch sm:items-end gap-2">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  setEditingQuestion(null);
+                  setShowQuestionForm(!showQuestionForm);
+                }}
+                className="btn-secondary text-sm"
+              >
+                {showQuestionForm ? 'Cancel' : 'Add Question'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowQuestionBankModal(true);
+                  loadQuestionBankQuestions();
+                }}
+                className="btn-secondary text-sm"
+              >
+                Add from Question Bank
+              </button>
+              <label className="btn-secondary text-sm cursor-pointer">
+                Bulk Upload
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className="hidden"
+                  onChange={handleBulkUpload}
+                />
+              </label>
+              <button
+                onClick={handleDownloadTemplate}
+                className="btn-secondary text-sm"
+              >
+                Download Excel Template
+              </button>
+              <button
+                onClick={() => setShowAIGenerator(!showAIGenerator)}
+                className="btn-secondary text-sm"
+              >
+                AI Generate
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 max-w-md sm:text-right">
+              Template columns: questionText, questionType, optionA, optionB, optionC, optionD, correctAnswer, points. Multiple select: use A,B in correctAnswer.
+            </p>
           </div>
         </div>
 

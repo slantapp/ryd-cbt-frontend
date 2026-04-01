@@ -475,7 +475,7 @@ export default function QuestionBank() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'question-bank-upload-template.xlsx';
+      link.download = 'question-bank-bulk-template.xlsx';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1215,7 +1215,7 @@ export default function QuestionBank() {
             <div className="p-6">
               <h3 className="text-xl font-semibold mb-4">Bulk Upload Questions to Bank</h3>
               <p className="text-gray-600 mb-4 text-sm">
-                Select the subject, then upload an Excel (.xlsx, .xls) or CSV file. Each row must include: questionText, questionType, options, correctAnswer, points, and grade (each question can have a different grade).
+                Select the subject, then upload an Excel (.xlsx, .xls) or CSV file. Each row must include: questionText, questionType, optionA, optionB, optionC, optionD, correctAnswer, points, and grade. For multiple_select, use comma-separated answers in correctAnswer (for example: A,B).
               </p>
               <div className="space-y-4">
                 <div>

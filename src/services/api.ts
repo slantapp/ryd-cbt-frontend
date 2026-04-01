@@ -213,7 +213,8 @@ export const questionAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
-  downloadTemplate: () => api.get('/questions/template', { responseType: 'blob' }),
+  downloadTemplate: () =>
+    api.get('/questions/template', { responseType: 'blob', params: { t: Date.now() } }),
   generateAI: (data: any) => api.post('/questions/generate-ai', data),
   getByTest: (testId: string) => api.get(`/questions/test/${testId}`),
   update: (id: string, data: any) => api.put(`/questions/${id}`, data),
@@ -229,7 +230,8 @@ export const questionAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
-  downloadBankTemplate: () => api.get('/questions/bank/template', { responseType: 'blob' }),
+  downloadBankTemplate: () =>
+    api.get('/questions/bank/template', { responseType: 'blob', params: { t: Date.now() } }),
   getBankQuestions: (params?: { subjectId?: string; grade?: string; search?: string; page?: number; limit?: number }) =>
     api.get('/questions/bank', { params }).then((res) => res.data),
   bulkDeleteFromBank: (questionIds: string[]) => api.post('/questions/bank/bulk-delete', { questionIds }),
@@ -521,7 +523,8 @@ export const practiceAPI = {
   },
   removeQuestion: (practiceId: string, questionId: string) =>
     api.delete(`/practices/${practiceId}/questions/${questionId}`),
-  downloadTemplate: () => api.get('/practices/template', { responseType: 'blob' }),
+  downloadTemplate: () =>
+    api.get('/practices/template', { responseType: 'blob', params: { t: Date.now() } }),
   // Student
   studentList: (params?: { class?: string; subject?: string }) =>
     api.get('/practices/student', { params }).then((r) => r.data),
