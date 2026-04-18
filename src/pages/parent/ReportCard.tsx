@@ -31,19 +31,19 @@ export default function ReportCard() {
   const { studentId } = useParams();
   const [reportCard, setReportCard] = useState<ReportCardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedSession, setSelectedSession] = useState<string>('');
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string>('');
 
   useEffect(() => {
     if (studentId) {
       loadReportCard();
     }
-  }, [studentId, selectedSession]);
+  }, [studentId, selectedClassroomId]);
 
   const loadReportCard = async () => {
     try {
       const response = await parentAPI.getStudentReportCard(
         studentId!,
-        selectedSession || undefined
+        selectedClassroomId || undefined
       );
       setReportCard(response.data);
     } catch (error: any) {
@@ -119,19 +119,22 @@ export default function ReportCard() {
 
         <div className="no-print card">
           <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Filter by Session
+            Filter by class
           </label>
           <select
             className="input-field"
-            value={selectedSession}
-            onChange={(e) => setSelectedSession(e.target.value)}
+            value={selectedClassroomId}
+            onChange={(e) => setSelectedClassroomId(e.target.value)}
           >
-            <option value="">All Sessions</option>
-            {reportCard.classAssignments?.map((assignment) => (
-              <option key={assignment.session.id} value={assignment.session.id}>
-                {assignment.session.name} - {assignment.classroom.name}
-              </option>
-            ))}
+            <option value="">All classes</option>
+            {reportCard.classAssignments
+              ?.filter((a: any) => a.classroom?.id)
+              .map((assignment: any) => (
+                <option key={assignment.classroom.id} value={assignment.classroom.id}>
+                  {assignment.classroom.name}
+                  {assignment.classroom.academicSession ? ` (${assignment.classroom.academicSession})` : ''}
+                </option>
+              ))}
           </select>
         </div>
 

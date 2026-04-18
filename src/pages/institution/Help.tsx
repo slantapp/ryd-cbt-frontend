@@ -100,7 +100,7 @@ export default function Help() {
             <h3 className="text-lg font-semibold mb-2">2. Creating Classes</h3>
             <p className="text-gray-700">
               Go to Setup &gt; Classes to create your classes. Assign teachers to classes 
-              and link classes to academic sessions as needed.
+              and optionally set an academic year or term label on each class.
             </p>
           </div>
 

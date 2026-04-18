@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { studentAPI, sessionAPI, subjectAPI, themeAPI } from '../../services/api';
+import { studentAPI, subjectAPI, themeAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 
@@ -44,7 +44,6 @@ interface OverallScoreData {
 export default function StudentScores() {
   const { account } = useAuthStore();
   const [overallScores, setOverallScores] = useState<OverallScoreData[]>([]);
-  const [sessions, setSessions] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [theme, setTheme] = useState<any>({
     primaryColor: '#A8518A',
@@ -53,7 +52,6 @@ export default function StudentScores() {
   });
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSessionId, setSelectedSessionId] = useState<string>('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [selectedStudent, setSelectedStudent] = useState<OverallScoreData | null>(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
@@ -76,7 +74,6 @@ export default function StudentScores() {
   }, [account]);
 
   useEffect(() => {
-    loadSessions();
     loadSubjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -84,26 +81,7 @@ export default function StudentScores() {
   useEffect(() => {
     loadOverallScores();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSessionId, selectedSubjectId]);
-
-  const loadSessions = async () => {
-    try {
-      const { data } = await sessionAPI.getAll();
-      setSessions(data || []);
-      // Find active session and set it as default
-      const activeSession = data?.find((s: any) => 
-        s.isActive && 
-        new Date(s.startDate) <= new Date() && 
-        new Date(s.endDate) >= new Date()
-      );
-      if (activeSession) {
-        setSelectedSessionId(activeSession.id);
-      }
-    } catch (error: any) {
-      console.error('Failed to load sessions:', error);
-      setSessions([]);
-    }
-  };
+  }, [selectedSubjectId]);
 
   const loadSubjects = async () => {
     try {
@@ -118,10 +96,7 @@ export default function StudentScores() {
   const loadOverallScores = async () => {
     try {
       setLoading(true);
-      const params: { sessionId?: string; subjectId?: string } = {};
-      if (selectedSessionId) {
-        params.sessionId = selectedSessionId;
-      }
+      const params: { subjectId?: string } = {};
       if (selectedSubjectId) {
         params.subjectId = selectedSubjectId;
       }
@@ -250,24 +225,7 @@ export default function StudentScores() {
 
       {/* Filters */}
       <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Filter by Session
-            </label>
-            <select
-              className="input-field w-full"
-              value={selectedSessionId}
-              onChange={(e) => setSelectedSessionId(e.target.value)}
-            >
-              <option value="">All Sessions</option>
-              {sessions.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} {s.isActive && new Date(s.startDate) <= new Date() && new Date(s.endDate) >= new Date() ? '(Active)' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Filter by Subject

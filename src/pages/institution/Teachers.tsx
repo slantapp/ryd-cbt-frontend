@@ -710,7 +710,6 @@ export default function Teachers() {
                           {teacher.metrics ? (
                             <div className="flex flex-col gap-1">
                               <span className="text-xs">Classes: {teacher.metrics.classes}</span>
-                              <span className="text-xs">Sessions: {teacher.metrics.sessions}</span>
                               <span className="text-xs">Tests: {teacher.metrics.tests}</span>
                             </div>
                           ) : (
@@ -774,7 +773,6 @@ export default function Teachers() {
                           {teacher.metrics ? (
                             <div className="flex flex-col gap-1">
                               <span className="text-xs">Classes: {teacher.metrics.classes}</span>
-                              <span className="text-xs">Sessions: {teacher.metrics.sessions}</span>
                               <span className="text-xs">Tests: {teacher.metrics.tests}</span>
                             </div>
                           ) : (

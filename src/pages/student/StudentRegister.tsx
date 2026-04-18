@@ -22,7 +22,6 @@ export default function StudentRegister() {
     phone: '',
     dateOfBirth: '',
     classroomId: '',
-    sessionId: '',
   });
 
   useEffect(() => {
@@ -81,13 +80,6 @@ export default function StudentRegister() {
 
     setLoading(true);
     try {
-      // Validate that if one is selected, both must be selected
-      if ((formData.classroomId && !formData.sessionId) || (!formData.classroomId && formData.sessionId)) {
-        toast.error('Please select both session and class, or leave both empty');
-        setLoading(false);
-        return;
-      }
-
       // Register the student
       const registerResponse = await publicAPI.registerStudent({
         schoolSlug: slug!,
@@ -99,7 +91,6 @@ export default function StudentRegister() {
         phone: formData.phone || undefined,
         dateOfBirth: formData.dateOfBirth || undefined,
         classroomId: formData.classroomId || undefined,
-        sessionId: formData.sessionId || undefined,
       });
 
       // Get the registered username (from response or form data)
@@ -179,6 +170,7 @@ export default function StudentRegister() {
   const theme = schoolInfo?.theme || schoolInfo?.institution?.themeConfig || {};
   const themeColor = theme.primaryColor || '#1d4ed8';
   const logoUrl = theme.logoUrl;
+  const availableClassrooms = schoolInfo?.classes || schoolInfo?.classrooms || [];
 
   return (
     <div className="min-h-screen flex overflow-hidden">
@@ -336,26 +328,6 @@ export default function StudentRegister() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Session
-                  </label>
-                  <select
-                    name="sessionId"
-                    className="input-field"
-                    value={formData.sessionId}
-                    onChange={(e) => {
-                      setFormData({ ...formData, sessionId: e.target.value, classroomId: '' });
-                    }}
-                  >
-                    <option value="">Select session (optional)</option>
-                    {schoolInfo?.sessions?.map((s: any) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Class
                   </label>
                   <select
@@ -363,20 +335,14 @@ export default function StudentRegister() {
                     className="input-field"
                     value={formData.classroomId}
                     onChange={handleChange}
-                    disabled={!formData.sessionId}
                   >
                     <option value="">Select class (optional)</option>
-                    {formData.sessionId && schoolInfo?.sessions
-                      ?.find((s: any) => s.id === formData.sessionId)
-                      ?.classAssignments?.map((ca: any) => (
-                        <option key={ca.classroom.id} value={ca.classroom.id}>
-                          {ca.classroom.name}
-                        </option>
-                      ))}
+                    {availableClassrooms.map((classroom: any) => (
+                      <option key={classroom.id} value={classroom.id}>
+                        {classroom.name}
+                      </option>
+                    ))}
                   </select>
-                  {!formData.sessionId && (
-                    <p className="text-xs text-gray-500 mt-1">Please select a session first</p>
-                  )}
                 </div>
               </div>
             </div>

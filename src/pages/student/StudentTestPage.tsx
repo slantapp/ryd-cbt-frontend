@@ -10,13 +10,22 @@ interface InstitutionData {
     name: string;
     uniqueSlug: string;
   };
-  classes: Array<{
+  classes?: Array<{
     id: string;
     name: string;
     description?: string;
     academicSession?: string;
   }>;
-  sessions: any[];
+  publishedTests?: Array<{
+    id: string;
+    title: string;
+    description?: string | null;
+    duration?: number | null;
+    isTimed?: boolean;
+    classrooms: Array<{
+      classroom: { id: string; name: string };
+    }>;
+  }>;
   theme?: ThemeConfig;
 }
 
@@ -129,18 +138,13 @@ export default function StudentTestPage() {
     text: data.theme?.textColor || '#0f172a',
   };
 
-  // Filter tests by selected class
+  const schoolClasses = data.classes ?? [];
+
   const getTestsForClass = (classId: string | null) => {
-    if (!classId) return [];
-    
-    return data.sessions.flatMap((session) => {
-      return session.tests
-        ?.filter((st: any) => {
-          // Check if test is assigned to the selected class
-          return st.test.classrooms?.some((tc: any) => tc.classroom.id === classId);
-        })
-        .map((st: any) => ({ ...st.test, sessionName: session.name, sessionId: session.id })) || [];
-    });
+    if (!classId || !data.publishedTests?.length) return [];
+    return data.publishedTests.filter((t) =>
+      t.classrooms?.some((tc) => tc.classroom?.id === classId)
+    );
   };
 
   const availableTests = selectedClassId ? getTestsForClass(selectedClassId) : [];
@@ -172,7 +176,7 @@ export default function StudentTestPage() {
               <span className="mr-3">🎓</span>
               Select Your Class
             </h2>
-            {data.classes.length === 0 ? (
+            {schoolClasses.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-6xl mb-4">📚</div>
                 <p className="text-gray-500 text-lg">No classes available at this time.</p>
@@ -180,7 +184,7 @@ export default function StudentTestPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {data.classes.map((classItem) => (
+                {schoolClasses.map((classItem) => (
                   <button
                     key={classItem.id}
                     onClick={() => setSelectedClassId(classItem.id)}
@@ -231,75 +235,42 @@ export default function StudentTestPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {data.sessions
-                  .filter((session) => {
-                    return session.tests?.some((st: any) => {
-                      return st.test.classrooms?.some((tc: any) => tc.classroom.id === selectedClassId);
-                    });
-                  })
-                  .map((session) => {
-                    const sessionTests = session.tests?.filter((st: any) => {
-                      return st.test.classrooms?.some((tc: any) => tc.classroom.id === selectedClassId);
-                    }) || [];
-
-                    if (sessionTests.length === 0) return null;
-
-                    return (
-                      <div
-                        key={session.id}
-                        className="border-2 rounded-xl p-6 transition-all bg-gray-50 hover:bg-white"
-                        style={{ borderColor: brand.primary }}
-                      >
-                        <h3 className="font-bold text-xl text-gray-900 mb-2 flex items-center">
-                          <span className="mr-2">📅</span>
-                          {session.name}
-                        </h3>
-                        {session.description && (
-                          <p className="text-gray-600 text-sm mb-4 ml-7">{session.description}</p>
+                {availableTests.map((test) => (
+                  <Link
+                    key={test.id}
+                    to={`/${slug}/test/${test.id}`}
+                    className="block p-5 rounded-xl transition-all border-2 hover:shadow-lg transform hover:-translate-y-1"
+                    style={{
+                      background: `linear-gradient(135deg, ${brand.primary}15, ${brand.secondary}20)`,
+                      borderColor: brand.primary,
+                    }}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-lg text-gray-900 mb-1">{test.title}</h4>
+                        {test.description && (
+                          <p className="text-sm text-gray-600 mb-2">{test.description}</p>
                         )}
-                        <div className="space-y-3 ml-7">
-                          {sessionTests.map((st: any) => (
-                            <Link
-                              key={st.id}
-                              to={`/${slug}/test/${st.test.id}`}
-                              className="block p-5 rounded-xl transition-all border-2 hover:shadow-lg transform hover:-translate-y-1"
-                              style={{
-                                background: `linear-gradient(135deg, ${brand.primary}15, ${brand.secondary}20)`,
-                                borderColor: brand.primary,
-                              }}
-                            >
-                              <div className="flex justify-between items-center">
-                                <div className="flex-1">
-                                  <h4 className="font-semibold text-lg text-gray-900 mb-1">
-                                    {st.test.title}
-                                  </h4>
-                                  {st.test.description && (
-                                    <p className="text-sm text-gray-600 mb-2">
-                                      {st.test.description}
-                                    </p>
-                                  )}
-                                  <div className="flex items-center space-x-4 text-sm text-gray-500">
-                                    <span className="flex items-center">
-                                      <span className="mr-1">⏱️</span>
-                                      {st.test.duration} minutes
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="ml-4">
-                                  <span
-                                    className="inline-flex items-center justify-center w-12 h-12 rounded-full font-bold text-lg shadow-md"
-                                    style={{ backgroundColor: brand.primary, color: brand.background }}
-                                  >
-                                    →
-                                  </span>
-                                </div>
-                              </div>
-                            </Link>
-                          ))}
-                        </div>
+                        {test.isTimed && test.duration != null && (
+                          <div className="flex items-center space-x-4 text-sm text-gray-500">
+                            <span className="flex items-center">
+                              <span className="mr-1">⏱️</span>
+                              {test.duration} minutes
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    );
-                  })}
+                      <div className="ml-4">
+                        <span
+                          className="inline-flex items-center justify-center w-12 h-12 rounded-full font-bold text-lg shadow-md"
+                          style={{ backgroundColor: brand.primary, color: brand.background }}
+                        >
+                          →
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
               </div>
             )}
           </div>

@@ -9,7 +9,7 @@ import { format } from 'date-fns';
 export default function StudentDashboard() {
   const { account } = useAuthStore();
   const [tests, setTests] = useState<any[]>([]);
-  const [studentClass, setStudentClass] = useState<{ id: string; name: string; sessionId?: string; sessionName?: string } | null>(null);
+  const [studentClass, setStudentClass] = useState<{ id: string; name: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'available' | 'completed' | 'missed'>('available');
   const [filterSubjectId, setFilterSubjectId] = useState<string>('');
@@ -159,7 +159,7 @@ export default function StudentDashboard() {
     }
     
     // Can retake if test allows retrial and hasn't exceeded max attempts
-    if (test.allowRetrial && studentTest.attemptNumber < (test.maxAttempts || 1)) {
+    if ((test.maxAttempts || 1) > 1 && studentTest.attemptNumber < (test.maxAttempts || 1)) {
       return true;
     }
     
@@ -248,21 +248,6 @@ export default function StudentDashboard() {
     );
   }
 
-  // Extract unique sessions and classrooms from tests
-  const sessionsMap = new Map<string, any>();
-  tests.forEach(t => {
-    (t.sessions || []).forEach((ts: any) => {
-      if (ts.session?.id && !sessionsMap.has(ts.session.id)) {
-        sessionsMap.set(ts.session.id, ts.session);
-      }
-    });
-  });
-  const sessions = Array.from(sessionsMap.values());
-  
-  // Find active session
-  const activeSession = sessions.find((s: any) => s.isActive === true);
-  const activeSessionId = activeSession?.id;
-
   const classroomsMap = new Map<string, any>();
   tests.forEach(t => {
     (t.classrooms || []).forEach((tc: any) => {
@@ -275,13 +260,6 @@ export default function StudentDashboard() {
 
   // Filter tests based on active tab
   let filteredTests = Array.isArray(tests) ? tests.filter(t => t) : [];
-  
-  // ALWAYS filter to active session first
-  if (activeSessionId) {
-    filteredTests = filteredTests.filter(t => 
-      t.sessions?.some((ts: any) => ts.session?.id === activeSessionId)
-    );
-  }
   
   if (activeTab === 'available') {
     filteredTests = filteredTests.filter(t => canTakeTest(t));
@@ -297,10 +275,6 @@ export default function StudentDashboard() {
   // Get subjects and test groups from completed/missed tests only (for filter dropdowns)
   const completedAndMissedTests = Array.isArray(tests) ? tests.filter(t => {
     if (!t) return false;
-    // Filter to active session
-    if (activeSessionId && !t.sessions?.some((ts: any) => ts.session?.id === activeSessionId)) {
-      return false;
-    }
     const status = getTestStatus(t);
     return status.status === 'completed' || isMissedTest(t);
   }) : [];
@@ -354,23 +328,10 @@ export default function StudentDashboard() {
     });
   }
 
-  // Calculate counts - filter to active session first
+  // Calculate counts
   let availableTests = Array.isArray(tests) ? tests.filter(t => t) : [];
   let completedTests = Array.isArray(tests) ? tests.filter(t => t) : [];
   let missedTests = Array.isArray(tests) ? tests.filter(t => t) : [];
-  
-  // Filter to active session
-  if (activeSessionId) {
-    availableTests = availableTests.filter(t => 
-      t.sessions?.some((ts: any) => ts.session?.id === activeSessionId)
-    );
-    completedTests = completedTests.filter(t => 
-      t.sessions?.some((ts: any) => ts.session?.id === activeSessionId)
-    );
-    missedTests = missedTests.filter(t => 
-      t.sessions?.some((ts: any) => ts.session?.id === activeSessionId)
-    );
-  }
   
   // Apply tab-specific filters
   availableTests = availableTests.filter(t => canTakeTest(t));
@@ -402,9 +363,6 @@ export default function StudentDashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
               <span className="font-semibold">Class: {studentClass.name}</span>
-              {studentClass.sessionName && (
-                <span className="text-white/80">• {studentClass.sessionName}</span>
-              )}
             </div>
           )}
         </div>
@@ -736,7 +694,7 @@ export default function StudentDashboard() {
           <p className="text-gray-500">
             {(activeTab === 'completed' || activeTab === 'missed') && (filterSubjectId || filterTestGroupId)
               ? 'Try adjusting your filters to see more tests.'
-              : `No ${activeTab === 'available' ? 'available' : activeTab === 'completed' ? 'completed' : 'missed'} tests in the current active session.`}
+              : `No ${activeTab === 'available' ? 'available' : activeTab === 'completed' ? 'completed' : 'missed'} tests found.`}
           </p>
           {(activeTab === 'completed' || activeTab === 'missed') && (filterSubjectId || filterTestGroupId) && (
             <button

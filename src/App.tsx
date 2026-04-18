@@ -8,8 +8,6 @@ import Register from './pages/institution/Register';
 import Dashboard from './pages/institution/Dashboard';
 import Tests from './pages/institution/Tests';
 import TestDetail from './pages/institution/TestDetail';
-import Sessions from './pages/institution/Sessions';
-import SessionDetail from './pages/institution/SessionDetail';
 import StudentScores from './pages/institution/StudentScores';
 import Profile from './pages/institution/Profile';
 import AdminMinistries from './pages/institution/AdminMinistries';
@@ -331,26 +329,6 @@ function App() {
               <PrivateRoute>
                 <InstitutionLayout>
                   <GradeStudentTest />
-                </InstitutionLayout>
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/sessions"
-            element={
-              <PrivateRoute>
-                <InstitutionLayout>
-                  <Sessions />
-                </InstitutionLayout>
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/sessions/:id"
-            element={
-              <PrivateRoute>
-                <InstitutionLayout>
-                  <SessionDetail />
                 </InstitutionLayout>
               </PrivateRoute>
             }

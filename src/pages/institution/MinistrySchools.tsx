@@ -151,10 +151,9 @@ export default function MinistrySchools() {
                       {school.metrics ? (
                         <div className="flex flex-col gap-1">
                           <span className="text-xs">Teachers: {school.metrics.teachers}</span>
-                          <span className="text-xs">Sessions: {school.metrics.sessions}</span>
+                          <span className="text-xs">Classes: {school.metrics.classes}</span>
                           <span className="text-xs">Tests: {school.metrics.tests}</span>
                           <span className="text-xs">Students: {school.metrics.students}</span>
-                          <span className="text-xs">Classes: {school.metrics.classes}</span>
                         </div>
                       ) : (
                         <span className="text-gray-400">-</span>

@@ -3,13 +3,12 @@ import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import {
   testAPI,
-  sessionAPI,
   adminAPI,
   ministryAPI,
   teacherAPI,
   themeAPI,
 } from '../../services/api';
-import { Test, Session, Classroom, TeacherAssignment } from '../../types';
+import { Test, Classroom, TeacherAssignment } from '../../types';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
@@ -21,7 +20,6 @@ const copyToClipboard = (text: string) => {
 export default function Dashboard() {
   const { account } = useAuthStore();
   const [tests, setTests] = useState<Test[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
   const [adminStats, setAdminStats] = useState<any>(null);
   const [ministryStats, setMinistryStats] = useState<any>(null);
   const [teacherStats, setTeacherStats] = useState<{
@@ -99,20 +97,13 @@ export default function Dashboard() {
         }
       } else {
         // For SCHOOL and SCHOOL_ADMIN roles
-        const [testsRes, sessionsRes] = await Promise.all([
-          testAPI.getAll(),
-          sessionAPI.getAll(),
-        ]);
+        const testsRes = await testAPI.getAll();
         const testsData = Array.isArray(testsRes.data) ? testsRes.data : [];
-        const sessionsData = Array.isArray(sessionsRes.data) ? sessionsRes.data : [];
         console.log('Dashboard data loaded:', {
           testsCount: testsData.length,
-          sessionsCount: sessionsData.length,
           tests: testsData,
-          sessions: sessionsData,
         });
         setTests(testsData);
-        setSessions(sessionsData);
       }
     } catch (error: any) {
       console.error('Dashboard load error:', error);
@@ -136,9 +127,8 @@ export default function Dashboard() {
           stats: { classCount: 0, testCount: 0 },
         });
       } else if (account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN') {
-        // Ensure tests and sessions are arrays even on error
+        // Ensure tests are arrays even on error
         setTests([]);
-        setSessions([]);
       }
     } finally {
       setLoading(false);
@@ -157,131 +147,18 @@ export default function Dashboard() {
     );
   }
 
-  // Helper function to parse dates consistently (matches Sessions.tsx logic)
-  const parseDate = (dateStr: string | Date) => {
-    if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      const [year, month, day] = dateStr.split('-').map(Number);
-      return new Date(Date.UTC(year, month - 1, day));
-    }
-    return new Date(dateStr);
-  };
-
-  // Get active session (matches Sessions.tsx logic for determining active sessions)
-  // A session is "active" if it's isActive=true, not archived, and current date is between start and end
-  const activeSession = sessions.find(s => {
-    // Skip if not active or explicitly archived
-    if (!s.isActive || s.isArchived === true) {
-      return false;
-    }
-    
-    const startDate = parseDate(s.startDate);
-    const endDate = parseDate(s.endDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
-    
-    // Session is active if current date is between start and end (inclusive)
-    // This matches Sessions.tsx logic: session.isActive && start <= today && end >= today
-    const isCurrentlyActive = start <= today && end >= today;
-    
-    // Debug logging for sessions that should be checked
-    console.log('Checking session for active status:', {
-      sessionName: s.name,
-      sessionId: s.id,
-      isActive: s.isActive,
-      isArchived: s.isArchived,
-      startDate: s.startDate,
-      endDate: s.endDate,
-      parsedStart: start.toISOString(),
-      parsedEnd: end.toISOString(),
-      today: today.toISOString(),
-      startCompare: `${start.toISOString()} <= ${today.toISOString()} = ${start <= today}`,
-      endCompare: `${end.toISOString()} >= ${today.toISOString()} = ${end >= today}`,
-      result: isCurrentlyActive,
-    });
-    
-    return isCurrentlyActive;
-  });
-  
-  console.log('Dashboard active session result:', activeSession ? {
-    id: activeSession.id,
-    name: activeSession.name,
-    startDate: activeSession.startDate,
-    endDate: activeSession.endDate,
-    isActive: activeSession.isActive,
-    isArchived: activeSession.isArchived,
-  } : 'No active session found', {
-    totalSessions: sessions.length,
-    activeSessions: sessions.filter(s => s.isActive).length,
-  });
-
-  // Calculate metrics - use active session if available, otherwise use all data
-  let totalTests = 0;
-  let totalClasses = 0;
-  let totalStudents = 0;
-
-  console.log('Calculating metrics:', {
-    hasActiveSession: !!activeSession,
-    testsCount: Array.isArray(tests) ? tests.length : 0,
-    sessionsCount: Array.isArray(sessions) ? sessions.length : 0,
-    activeSession,
-  });
-
-  if (activeSession) {
-    // Get tests assigned to the active session
-    // Session.tests is an array of SessionTest objects with testId or test.id
-    const activeSessionTestIds = new Set<string>();
-    if (activeSession.tests && Array.isArray(activeSession.tests)) {
-      activeSession.tests.forEach((st: any) => {
-        if (st.testId) {
-          activeSessionTestIds.add(st.testId);
-        } else if (st.test?.id) {
-          activeSessionTestIds.add(st.test.id);
-        } else if (st.testId) {
-          activeSessionTestIds.add(st.testId);
-        }
+  const totalTests = Array.isArray(tests) ? tests.length : 0;
+  const allClassIds = new Set<string>();
+  tests.forEach((test: any) => {
+    if (Array.isArray(test.classrooms)) {
+      test.classrooms.forEach((tc: any) => {
+        const classId = tc.classroom?.id || tc.classroomId;
+        if (classId) allClassIds.add(classId);
       });
     }
-    
-    const activeSessionTests = tests.filter(t => activeSessionTestIds.has(t.id));
-    
-    totalTests = activeSessionTests.length;
-    
-    // Get classes assigned to the active session
-    if (activeSession.classAssignments && Array.isArray(activeSession.classAssignments)) {
-      totalClasses = activeSession.classAssignments.length;
-    }
-    
-    // Count students in active session classes (if we have student data)
-    // For now, we'll leave this as 0 or calculate from student assignments if available
-  } else {
-    // Fallback: show all tests and classes if no active session
-    totalTests = Array.isArray(tests) ? tests.length : 0;
-    
-    // Count unique classes from all sessions
-    const allClassIds = new Set<string>();
-    sessions.forEach((session: any) => {
-      if (session.classAssignments && Array.isArray(session.classAssignments)) {
-        session.classAssignments.forEach((ca: any) => {
-          if (ca.classroomId) {
-            allClassIds.add(ca.classroomId);
-          } else if (ca.classroom?.id) {
-            allClassIds.add(ca.classroom.id);
-          }
-        });
-      }
-    });
-    totalClasses = allClassIds.size;
-    
-    // Total students - would need to be fetched from API or calculated from student data
-    // For now, leave as 0 or fetch separately if needed
-  }
-
-  console.log('Final metrics:', { totalTests, totalClasses, totalStudents });
+  });
+  const totalClasses = allClassIds.size;
+  const totalStudents = 0;
 
   const renderSchoolDashboard = () => (
     <>
@@ -372,103 +249,6 @@ export default function Dashboard() {
           <div className="text-sm text-gray-600">Total Students</div>
         </div>
       </div>
-
-      {/* Active Session */}
-      {(() => {
-
-        if (!activeSession) {
-          return (
-            <div className="card border-2 border-dashed border-gray-300">
-              <div className="text-center py-8">
-                <div className="flex justify-center mb-3">
-                  <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-        </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Active Session</h3>
-                <p className="text-gray-500 text-sm">There is currently no active session running.</p>
-      </div>
-            </div>
-          );
-        }
-
-        return (
-          <div 
-            className="card border-2"
-            style={{
-              background: `linear-gradient(to bottom right, ${theme?.primaryColor || '#A8518A'}10, white)`,
-              borderColor: `${theme?.primaryColor || '#A8518A'}40`
-            }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <div 
-                  className="w-12 h-12 rounded-lg flex items-center justify-center"
-                  style={{
-                    backgroundColor: `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}20`
-                  }}
-                >
-                  <svg 
-                    className="w-6 h-6" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24"
-                    style={{ color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8' }}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-        </div>
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">Active Session</h2>
-                  <p className="text-sm text-gray-600">Current ongoing session</p>
-          </div>
-              </div>
-              <span 
-                className="px-3 py-1 text-xs font-semibold rounded-full"
-                style={{
-                  backgroundColor: `${theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'}20`,
-                  color: theme?.secondaryColor || theme?.primaryColor || '#1d4ed8'
-                }}
-              >
-                Active Now
-                        </span>
-                    </div>
-            <div className="space-y-3">
-              <div>
-                <h3 className="font-semibold text-gray-900 text-lg mb-1">{activeSession.name}</h3>
-                {activeSession.description && (
-                  <p className="text-sm text-gray-600">{activeSession.description}</p>
-                      )}
-                    </div>
-              <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-200">
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Start Date</p>
-                  <p className="text-sm font-medium text-gray-900">
-                    {format(new Date(activeSession.startDate), 'MMM dd, yyyy')}
-                  </p>
-                  </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">End Date</p>
-                  <p className="text-sm font-medium text-gray-900">
-                    {format(new Date(activeSession.endDate), 'MMM dd, yyyy')}
-                  </p>
-                </div>
-              </div>
-              <div className="pt-3 border-t border-gray-200">
-            <Link
-                  to={`/sessions/${activeSession.id}`}
-                  className="inline-flex items-center text-primary hover:text-primary-600 font-medium text-sm"
-                >
-                  View Session Details
-                  <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-            </Link>
-                      </div>
-      </div>
-          </div>
-        );
-      })()}
 
       {/* Quick Actions */}
       {(account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN') && (
@@ -639,17 +419,6 @@ export default function Dashboard() {
         gradient: 'from-green-500 to-green-600',
       },
       {
-        label: 'Sessions',
-        value: totals.sessionCount ?? 0,
-        subLabel: `${totals.activeSessionCount ?? 0} active`,
-        icon: (
-          <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-        ),
-        gradient: 'from-purple-500 to-purple-600',
-      },
-      {
         label: 'Tests',
         value: totals.testCount ?? 0,
         subLabel: `${totals.activeTestCount ?? 0} active`,
@@ -731,9 +500,6 @@ export default function Dashboard() {
                       Classes
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Sessions
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Tests
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -767,16 +533,6 @@ export default function Dashboard() {
                       </td>
                       <td className="px-4 py-4 text-center text-gray-900 font-medium">
                         {school.classCount ?? 0}
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <div className="flex flex-col items-center">
-                          <span className="text-gray-900 font-medium">{school.sessionCount ?? 0}</span>
-                          {school.activeSessionCount !== undefined && (
-                            <span className="text-xs text-green-600">
-                              {school.activeSessionCount} active
-                            </span>
-                          )}
-                        </div>
                       </td>
                       <td className="px-4 py-4 text-center">
                         <div className="flex flex-col items-center">
@@ -1164,20 +920,6 @@ export default function Dashboard() {
               <div>
                 <p className="font-semibold text-gray-900">Create Test</p>
                 <p className="text-sm text-gray-500">Create a new test for your classes</p>
-              </div>
-            </Link>
-            <Link
-              to="/sessions"
-              className="p-4 border rounded-lg hover:border-primary hover:shadow-md transition-all flex items-center space-x-3"
-            >
-              <div className="p-2 bg-green-100 rounded-lg">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900">View Sessions</p>
-                <p className="text-sm text-gray-500">Manage your test sessions</p>
               </div>
             </Link>
           </div>

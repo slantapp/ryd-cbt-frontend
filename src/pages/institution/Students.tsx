@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { studentAPI, sessionAPI, classroomAPI, institutionAPI, themeAPI } from '../../services/api';
+import { studentAPI, classroomAPI, institutionAPI, themeAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -15,14 +15,12 @@ export default function Students() {
   });
   const navigate = useNavigate();
   const [students, setStudents] = useState<any[]>([]);
-  const [sessions, setSessions] = useState<any[]>([]);
   const [classrooms, setClassrooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [bulkUploadClassroomId, setBulkUploadClassroomId] = useState<string>('');
-  const [bulkUploadSessionId, setBulkUploadSessionId] = useState<string>('');
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [showPromoteDialog, setShowPromoteDialog] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -48,11 +46,9 @@ export default function Students() {
     dateOfBirth: '',
     password: '',
     classroomId: '',
-    sessionId: '',
   });
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [filters, setFilters] = useState({
-    sessionId: '',
     classroomId: '',
     isAssigned: '',
     search: '',
@@ -60,12 +56,10 @@ export default function Students() {
   const [assignForm, setAssignForm] = useState({
     studentId: '',
     classroomId: '',
-    sessionId: '',
   });
   const [promoteForm, setPromoteForm] = useState({
     studentIds: [] as string[],
     targetClassroomId: '',
-    targetSessionId: '',
   });
   const [schoolInfo, setSchoolInfo] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'unassigned'>('all');
@@ -103,16 +97,13 @@ export default function Students() {
     if (isSchool || isTeacher || isSuperAdmin) {
       loadStudents();
       if (isSchool) {
-      loadSessions();
       loadClassrooms();
       loadSchoolInfo();
       } else if (isTeacher) {
-        // Teachers can filter by sessions and classes they're assigned to
-        loadSessions();
+        // Teachers can filter by classes they're assigned to
         loadClassrooms();
       } else if (isSuperAdmin) {
-        // Super admins can view all sessions and classrooms for filtering
-        loadSessions();
+        // Super admins can view all classrooms for filtering
         loadClassrooms();
       }
     }
@@ -122,7 +113,6 @@ export default function Students() {
     try {
       setLoading(true);
       const params: any = {};
-      if (filters.sessionId) params.sessionId = filters.sessionId;
       if (filters.classroomId) params.classroomId = filters.classroomId;
       // If on unassigned tab, always filter to unassigned
       if (activeTab === 'unassigned') {
@@ -149,15 +139,6 @@ export default function Students() {
       toast.error(error?.response?.data?.error || 'Failed to load students');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadSessions = async () => {
-    try {
-      const { data } = await sessionAPI.getAll();
-      setSessions(data);
-    } catch (error: any) {
-      console.error('Failed to load sessions');
     }
   };
 
@@ -222,14 +203,8 @@ export default function Students() {
       if (createFormData.dateOfBirth) submitData.dateOfBirth = createFormData.dateOfBirth;
       if (createFormData.password) submitData.password = createFormData.password;
       if (createFormData.classroomId) submitData.classroomId = createFormData.classroomId;
-      if (createFormData.sessionId) submitData.sessionId = createFormData.sessionId;
       
       // Validate that if one is selected, both must be selected
-      if ((createFormData.classroomId && !createFormData.sessionId) || (!createFormData.classroomId && createFormData.sessionId)) {
-        toast.error('Please select both class and session, or leave both empty');
-        return;
-      }
-
       await studentAPI.create(submitData);
       toast.success('Student created successfully');
       setShowCreateForm(false);
@@ -242,7 +217,6 @@ export default function Students() {
         dateOfBirth: '',
         password: '',
         classroomId: '',
-        sessionId: '',
       });
       loadStudents();
     } catch (error: any) {
@@ -255,17 +229,10 @@ export default function Students() {
     if (!file) return;
 
     // Validate that if one is selected, both must be selected
-    if ((bulkUploadClassroomId && !bulkUploadSessionId) || (!bulkUploadClassroomId && bulkUploadSessionId)) {
-      toast.error('Please select both class and session, or leave both empty to upload without assignment');
-      e.target.value = '';
-      return;
-    }
-
     setUploading(true);
     try {
       const response = await studentAPI.bulkUpload(file, {
         classroomId: bulkUploadClassroomId || undefined,
-        sessionId: bulkUploadSessionId || undefined,
       });
       toast.success(
         `Upload completed: ${response.data.successful} successful, ${response.data.failed} failed${bulkUploadClassroomId ? ' and assigned to class' : ''}`
@@ -288,7 +255,6 @@ export default function Students() {
       loadStudents();
       setShowBulkUpload(false);
       setBulkUploadClassroomId('');
-      setBulkUploadSessionId('');
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to upload students');
     } finally {
@@ -323,19 +289,17 @@ export default function Students() {
     const studentIdsToAssign = selectedStudents.length > 0 ? selectedStudents : 
                                 (assignForm.studentId ? [assignForm.studentId] : []);
     
-    if (studentIdsToAssign.length === 0 || !assignForm.classroomId || !assignForm.sessionId) {
-      toast.error('Please select student(s), class, and session');
+    if (studentIdsToAssign.length === 0 || !assignForm.classroomId) {
+      toast.error('Please select student(s) and class');
       return;
     }
 
     // For bulk assignment, show confirmation
     if (studentIdsToAssign.length > 1) {
       const selectedClass = classrooms.find((c) => c.id === assignForm.classroomId);
-      const selectedSession = sessions.find((s) => s.id === assignForm.sessionId);
       const confirmMessage = `Assign ${studentIdsToAssign.length} students to:\n` +
-        `Class: ${selectedClass?.name || 'Unknown'}\n` +
-        `Session: ${selectedSession?.name || 'Unknown'}\n\n` +
-        `This will assign all selected students to the same class and session. Continue?`;
+        `Class: ${selectedClass?.name || 'Unknown'}\n\n` +
+        `Continue?`;
 
       if (!window.confirm(confirmMessage)) {
         return;
@@ -355,7 +319,6 @@ export default function Students() {
           await studentAPI.assignToClass({
             studentId,
             classroomId: assignForm.classroomId,
-            sessionId: assignForm.sessionId,
           });
           successCount++;
         } catch (error: any) {
@@ -381,7 +344,7 @@ export default function Students() {
       }
 
       setShowAssignDialog(false);
-      setAssignForm({ studentId: '', classroomId: '', sessionId: '' });
+      setAssignForm({ studentId: '', classroomId: '' });
       setSelectedStudents([]);
       loadStudents();
     } catch (error: any) {
@@ -401,11 +364,8 @@ export default function Students() {
     }
 
     const currentClass = classrooms.find((c) => c.id === currentAssignment.classroomId);
-    const currentSession = sessions.find((s) => s.id === currentAssignment.sessionId);
-
     const confirmMessage = `Are you sure you want to unassign this student from:\n` +
-      `Class: ${currentClass?.name || 'Unknown'}\n` +
-      `Session: ${currentSession?.name || 'Unknown'}\n\n` +
+      `Class: ${currentClass?.name || 'Unknown'}\n\n` +
       `They will be moved to the unassigned pool.`;
 
     if (!window.confirm(confirmMessage)) {
@@ -470,8 +430,8 @@ export default function Students() {
   };
 
   const handlePromoteStudents = async () => {
-    if (promoteForm.studentIds.length === 0 || !promoteForm.targetClassroomId || !promoteForm.targetSessionId) {
-      toast.error('Please select students, target class, and session');
+    if (promoteForm.studentIds.length === 0 || !promoteForm.targetClassroomId) {
+      toast.error('Please select students and target class');
       return;
     }
 
@@ -500,7 +460,7 @@ export default function Students() {
       }
       
       setShowPromoteDialog(false);
-      setPromoteForm({ studentIds: [], targetClassroomId: '', targetSessionId: '' });
+      setPromoteForm({ studentIds: [], targetClassroomId: '' });
       setSelectedStudents([]);
       loadStudents();
     } catch (error: any) {
@@ -688,10 +648,10 @@ export default function Students() {
                   onClick={() => {
                     // If students are selected, use them for bulk assignment
                     if (selectedStudents.length > 0) {
-                      setAssignForm({ studentId: '', classroomId: '', sessionId: '' });
+                      setAssignForm({ studentId: '', classroomId: '' });
                     } else {
                       // No students selected, allow single selection
-                      setAssignForm({ studentId: '', classroomId: '', sessionId: '' });
+                      setAssignForm({ studentId: '', classroomId: '' });
                     }
                     setShowAssignDialog(true);
                   }}
@@ -728,32 +688,8 @@ export default function Students() {
           >
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Bulk Upload Students</h3>
             
-            {/* Class and Session Selection (Optional) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Assign to Session (Optional)
-                </label>
-                <select
-                  className="input-field w-full"
-                  value={bulkUploadSessionId}
-                  onChange={(e) => {
-                    setBulkUploadSessionId(e.target.value);
-                    // Clear classroom selection if session changes
-                    if (!e.target.value) {
-                      setBulkUploadClassroomId('');
-                    }
-                  }}
-                  disabled={uploading}
-                >
-                  <option value="">Select session (optional)</option>
-                  {sessions.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {/* Optional default class for bulk upload */}
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Assign to Class (Optional)
@@ -762,12 +698,10 @@ export default function Students() {
                   className="input-field w-full"
                   value={bulkUploadClassroomId}
                   onChange={(e) => setBulkUploadClassroomId(e.target.value)}
-                  disabled={uploading || !bulkUploadSessionId}
+                  disabled={uploading}
                 >
-                  <option value="">
-                    {!bulkUploadSessionId ? 'Select session first' : 'Select class (optional)'}
-                  </option>
-                  {bulkUploadSessionId && classrooms.map((c) => (
+                  <option value="">Select class (optional)</option>
+                  {classrooms.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
                     </option>
@@ -776,7 +710,7 @@ export default function Students() {
               </div>
             </div>
 
-            {bulkUploadClassroomId && bulkUploadSessionId && (
+            {bulkUploadClassroomId && (
               <div 
                 className="mb-4 p-3 border rounded-lg"
                 style={{
@@ -790,8 +724,6 @@ export default function Students() {
                 >
                   ✅ Students will be automatically assigned to: <strong>
                     {classrooms.find((c) => c.id === bulkUploadClassroomId)?.name}
-                  </strong> in session <strong>
-                    {sessions.find((s) => s.id === bulkUploadSessionId)?.name}
                   </strong>
                 </p>
               </div>
@@ -810,8 +742,8 @@ export default function Students() {
               </label>
               <span className="text-sm text-gray-600">
                 Upload an Excel file with student data. Download the template for the correct format.
-                {bulkUploadClassroomId && bulkUploadSessionId && ' Students will be assigned to the selected class.'}
-                {' '}You can also specify "Class Name" and "Session Name" columns in the Excel file to assign students individually.
+                {bulkUploadClassroomId && ' Students will be assigned to the selected class.'}
+                {' '}You can also specify "Class Name" in the Excel file to assign students individually.
               </span>
             </div>
           </div>
@@ -819,7 +751,7 @@ export default function Students() {
 
         {/* Filters */}
         <div className="mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
           <input
             type="text"
             placeholder="🔍 Search students..."
@@ -827,18 +759,6 @@ export default function Students() {
             value={filters.search}
             onChange={(e) => setFilters({ ...filters, search: e.target.value })}
           />
-          <select
-            className="input-field"
-            value={filters.sessionId}
-            onChange={(e) => setFilters({ ...filters, sessionId: e.target.value })}
-          >
-            <option value="">All Sessions</option>
-            {sessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
           <select
             className="input-field"
             value={filters.classroomId}
@@ -863,10 +783,10 @@ export default function Students() {
           </select>
             )}
           </div>
-          {(filters.search || filters.sessionId || filters.classroomId || (activeTab !== 'unassigned' && filters.isAssigned)) && (
+          {(filters.search || filters.classroomId || (activeTab !== 'unassigned' && filters.isAssigned)) && (
             <button
               onClick={() => {
-                const newFilters = { sessionId: '', classroomId: '', search: '', isAssigned: activeTab === 'unassigned' ? 'false' : '' };
+                const newFilters = { classroomId: '', search: '', isAssigned: activeTab === 'unassigned' ? 'false' : '' };
                 setFilters(newFilters);
               }}
               className="text-sm text-primary hover:text-primary-600 font-medium flex items-center space-x-1"
@@ -973,7 +893,8 @@ export default function Students() {
                             }}
                           >
                             {student.classAssignments[0].classroom?.name}
-                            {student.classAssignments[0].session?.name && ` (${student.classAssignments[0].session.name})`}
+                            {student.classAssignments[0].classroom?.academicSession &&
+                              ` (${student.classAssignments[0].classroom.academicSession})`}
                           </span>
                         </div>
                       ) : (
@@ -1035,7 +956,6 @@ export default function Students() {
                             setAssignForm({
                               studentId: student.id,
                               classroomId: student.classAssignments?.[0]?.classroomId || '',
-                              sessionId: student.classAssignments?.[0]?.sessionId || '',
                             });
                             setShowAssignDialog(true);
                           }}
@@ -1100,11 +1020,9 @@ export default function Students() {
         const selectedStudent = students.find((s) => s.id === assignForm.studentId);
         const currentAssignment = selectedStudent?.classAssignments?.[0];
         const currentClass = currentAssignment ? classrooms.find((c) => c.id === currentAssignment.classroomId) : null;
-        const currentSession = currentAssignment ? sessions.find((s) => s.id === currentAssignment.sessionId) : null;
         const isReassigning = currentAssignment && 
-          assignForm.classroomId && assignForm.sessionId &&
-          (currentAssignment.classroomId !== assignForm.classroomId || 
-           currentAssignment.sessionId !== assignForm.sessionId);
+          assignForm.classroomId &&
+          currentAssignment.classroomId !== assignForm.classroomId;
 
         return (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -1180,8 +1098,10 @@ export default function Students() {
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-yellow-800 mb-1">Current Assignment:</p>
                       <p className="text-sm text-yellow-700">
-                        <strong>Class:</strong> {currentClass?.name || 'Unknown'} | 
-                        <strong> Session:</strong> {currentSession?.name || 'Unknown'}
+                        <strong>Class:</strong> {currentClass?.name || 'Unknown'}
+                        {currentClass?.academicSession && (
+                          <span className="text-yellow-700"> ({currentClass.academicSession})</span>
+                        )}
                       </p>
                     </div>
                     <button
@@ -1189,7 +1109,7 @@ export default function Students() {
                         if (window.confirm('Are you sure you want to remove this student from the current class?')) {
                           await handleUnassignStudent(assignForm.studentId);
                           setShowAssignDialog(false);
-                          setAssignForm({ studentId: '', classroomId: '', sessionId: '' });
+                          setAssignForm({ studentId: '', classroomId: '' });
                         }
                       }}
                       className="ml-2 px-3 py-1 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-lg transition-colors"
@@ -1213,7 +1133,7 @@ export default function Students() {
                   style={{ color: theme?.primaryColor || '#A8518A' }}
                 >
                   <strong>Note:</strong> {isBulkAssignment 
-                    ? `All ${selectedStudents.length} selected students will be assigned to the same class and session. A student can only belong to one class at a time.`
+                    ? `All ${selectedStudents.length} selected students will be assigned to the same class. A student can only belong to one class at a time.`
                     : 'A student can only belong to one class at a time. ' + 
                       (currentAssignment ? 'Reassigning will automatically unassign from the current class.' : 'Assigning to a new class will automatically unassign from any previous class.')
                   }
@@ -1236,7 +1156,6 @@ export default function Students() {
                         setAssignForm({
                           studentId,
                           classroomId: student?.classAssignments?.[0]?.classroomId || '',
-                          sessionId: student?.classAssignments?.[0]?.sessionId || '',
                         });
                       }}
                     >
@@ -1249,21 +1168,6 @@ export default function Students() {
                     </select>
                   </div>
                 )}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Session</label>
-                  <select
-                    className="input-field"
-                    value={assignForm.sessionId}
-                    onChange={(e) => setAssignForm({ ...assignForm, sessionId: e.target.value })}
-                  >
-                    <option value="">Choose a session...</option>
-                    {sessions.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Class</label>
                   <select
@@ -1293,7 +1197,7 @@ export default function Students() {
               <div className="p-6 pt-4 border-t border-gray-200 flex space-x-2 bg-white rounded-b-xl">
                 <button 
                   onClick={handleAssignStudent} 
-                  disabled={assigning || (!isBulkAssignment && !assignForm.studentId) || !assignForm.classroomId || !assignForm.sessionId}
+                  disabled={assigning || (!isBulkAssignment && !assignForm.studentId) || !assignForm.classroomId}
                   className="btn-primary flex-1"
                 >
                   {assigning 
@@ -1306,7 +1210,7 @@ export default function Students() {
                 <button
                   onClick={() => {
                     setShowAssignDialog(false);
-                    setAssignForm({ studentId: '', classroomId: '', sessionId: '' });
+                    setAssignForm({ studentId: '', classroomId: '' });
                   }}
                   className="btn-secondary flex-1"
                   disabled={assigning}
@@ -1329,24 +1233,10 @@ export default function Students() {
                 Promoting {promoteForm.studentIds.length} student(s) to the next class
               </p>
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Target Session
-                  </label>
-                  <select
-                    className="input-field"
-                    value={promoteForm.targetSessionId}
-                    onChange={(e) =>
-                      setPromoteForm({ ...promoteForm, targetSessionId: e.target.value })
-                    }
-                  >
-                    <option value="">Choose a session...</option>
-                    {sessions.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <p className="text-sm text-gray-700">
+                    Current class assignments are archived when the student is promoted into the target class.
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -1376,7 +1266,7 @@ export default function Students() {
               <button
                 onClick={() => {
                   setShowPromoteDialog(false);
-                  setPromoteForm({ studentIds: [], targetClassroomId: '', targetSessionId: '' });
+                  setPromoteForm({ studentIds: [], targetClassroomId: '' });
                 }}
                 className="btn-secondary flex-1"
               >
@@ -1513,49 +1403,20 @@ export default function Students() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Assign to Session (optional)
-                  </label>
-                  <select
-                    className="input-field w-full"
-                    value={createFormData.sessionId}
-                    onChange={(e) => {
-                      setCreateFormData({ ...createFormData, sessionId: e.target.value });
-                      // Clear classroom selection if session changes
-                      if (!e.target.value) {
-                        setCreateFormData((prev) => ({ ...prev, classroomId: '' }));
-                      }
-                    }}
-                  >
-                    <option value="">Select session (optional)</option>
-                    {sessions.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Assign to Class (optional)
                   </label>
                   <select
                     className="input-field w-full"
                     value={createFormData.classroomId}
                     onChange={(e) => setCreateFormData({ ...createFormData, classroomId: e.target.value })}
-                    disabled={!createFormData.sessionId}
                   >
                     <option value="">Select class (optional)</option>
-                    {createFormData.sessionId && sessions
-                      .find((s) => s.id === createFormData.sessionId)
-                      ?.classAssignments?.map((ca: any) => (
-                        <option key={ca.classroom.id} value={ca.classroom.id}>
-                          {ca.classroom.name}
-                        </option>
-                      ))}
+                    {classrooms.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
                   </select>
-                  {!createFormData.sessionId && (
-                    <p className="text-xs text-gray-500 mt-1">Please select a session first</p>
-                  )}
                 </div>
               </div>
               <div className="flex space-x-2 mt-6 pt-4 border-t border-gray-200">
@@ -1578,7 +1439,6 @@ export default function Students() {
                       dateOfBirth: '',
                       password: '',
                       classroomId: '',
-                      sessionId: '',
                     });
                   }}
                   className="btn-secondary flex-1"
@@ -1782,19 +1642,9 @@ export default function Students() {
                             <span className="font-medium">Classroom ID:</span> {error.record.classroomId || '(empty)'}
                           </div>
                         )}
-                        {error.record.sessionId !== undefined && (
-                          <div>
-                            <span className="font-medium">Session ID:</span> {error.record.sessionId || '(empty)'}
-                          </div>
-                        )}
                         {error.record.className !== undefined && (
                           <div>
                             <span className="font-medium">Class Name:</span> {error.record.className || '(empty)'}
-                          </div>
-                        )}
-                        {error.record.sessionName !== undefined && (
-                          <div>
-                            <span className="font-medium">Session Name:</span> {error.record.sessionName || '(empty)'}
                           </div>
                         )}
                       </div>

@@ -457,7 +457,12 @@ export default function QuestionBank() {
       await loadQuestions();
       e.target.value = ''; // Reset file input
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to upload questions to bank');
+      const data = error?.response?.data;
+      let msg = data?.error || 'Failed to upload questions to bank';
+      if (Array.isArray(data?.details) && data.details.length > 0) {
+        msg = `${msg}: ${data.details.slice(0, 5).join(' ')}`;
+      }
+      toast.error(msg);
       e.target.value = ''; // Reset file input
     } finally {
       setBulkUploading(false);
@@ -467,20 +472,35 @@ export default function QuestionBank() {
   const handleDownloadBankTemplate = async () => {
     try {
       const response = await questionAPI.downloadBankTemplate();
-      // Create blob from response
+      const contentType = String(response.headers['content-type'] || '');
+      if (contentType.includes('application/json')) {
+        const text = await (response.data as Blob).text();
+        try {
+          const j = JSON.parse(text) as { error?: string };
+          toast.error(j.error || 'Template download failed');
+        } catch {
+          toast.error('Template download failed');
+        }
+        return;
+      }
+      if (import.meta.env.DEV) {
+        const cfg = response.config;
+        console.info('[question bank template] request:', cfg.baseURL, cfg.url, cfg.params);
+      }
       const blob = new Blob([response.data], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'question-bank-bulk-template.xlsx';
+      link.download = 'Question-Bank-Template.xlsx';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      toast.success('Template downloaded successfully');
+      toast.success(
+        'Template downloaded — Questions sheet has Question Type dropdown; include Grade on each row. See Instructions.',
+      );
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to download template');
     }
@@ -1215,8 +1235,17 @@ export default function QuestionBank() {
             <div className="p-6">
               <h3 className="text-xl font-semibold mb-4">Bulk Upload Questions to Bank</h3>
               <p className="text-gray-600 mb-4 text-sm">
-                Select the subject, then upload an Excel (.xlsx, .xls) or CSV file. Each row must include: questionText, questionType, optionA, optionB, optionC, optionD, correctAnswer, points, and grade. For multiple_select, use comma-separated answers in correctAnswer (for example: A,B).
+                Columns: Question Text, Question Type, Option A–D, Correct Answer, Points, Grade. The template includes a Question Type dropdown (Short Answer, Multiple Choice, Multiple Select, True/False). Correct Answer accepts letters, option text, or comma-separated answers for Multiple Select (spaces OK).
               </p>
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={() => void handleDownloadBankTemplate()}
+                  className="btn-secondary text-sm w-full sm:w-auto"
+                >
+                  Download Question-Bank-Template.xlsx
+                </button>
+              </div>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

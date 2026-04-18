@@ -1,18 +1,14 @@
 import { useEffect, useState } from 'react';
-import { gradingSchemeAPI, subjectAPI, testGroupAPI, sessionAPI, teacherAPI, classroomAPI } from '../../services/api';
+import { gradingSchemeAPI, subjectAPI, testGroupAPI, teacherAPI, classroomAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 
 interface GradingScheme {
   id: string;
   subjectId: string;
-  sessionClassId: string;
+  classroomId: string;
   subject?: { id: string; name: string };
-  sessionClass?: {
-    id: string;
-    session?: { id: string; name: string };
-    classroom?: { id: string; name: string };
-  };
+  classroom?: { id: string; name: string; academicSession?: string | null };
   weights?: Array<{
     id: string;
     testGroupId: string;
@@ -23,35 +19,23 @@ interface GradingScheme {
   updatedAt: string;
 }
 
-interface SessionClass {
-  id: string;
-  sessionId: string;
-  classroomId: string;
-  session: { id: string; name: string };
-  classroom: { id: string; name: string };
-}
-
 export default function GradingSchemes() {
   const { account } = useAuthStore();
   const [gradingSchemes, setGradingSchemes] = useState<GradingScheme[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [testGroups, setTestGroups] = useState<any[]>([]);
   const [classrooms, setClassrooms] = useState<any[]>([]);
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [sessionClasses, setSessionClasses] = useState<SessionClass[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     subjectId: '',
     classroomId: '',
-    sessionId: '',
     weights: [] as Array<{ testGroupId: string; weight: number }>,
   });
   const [bulkFormData, setBulkFormData] = useState({
     subjectIds: [] as string[],
     classroomIds: [] as string[],
-    sessionIds: [] as string[],
     weights: [] as Array<{ testGroupId: string; weight: number }>,
   });
   const [isBulkMode, setIsBulkMode] = useState(false);
@@ -112,8 +96,6 @@ export default function GradingSchemes() {
         loadSubjects(),
         loadTestGroups(),
         loadClassrooms(),
-        loadSessions(),
-        loadSessionClasses(), // Keep for display purposes
       ]);
     } catch (error: any) {
       toast.error('Failed to load data');
@@ -169,102 +151,6 @@ export default function GradingSchemes() {
     } catch (error: any) {
       console.error('Failed to load classrooms:', error);
       toast.error('Failed to load classrooms');
-    }
-  };
-
-  const loadSessions = async () => {
-    try {
-      if (account?.role === 'TEACHER') {
-        // For teachers, get their sessions from dashboard
-        const teacherResponse = await teacherAPI.dashboard();
-        const teacherData = teacherResponse.data;
-        if (teacherData?.sessions && Array.isArray(teacherData.sessions)) {
-          // Filter to active or scheduled sessions only
-          const now = new Date();
-          const activeSessions = teacherData.sessions.filter((s: any) => {
-            const startDate = new Date(s.startDate);
-            const endDate = new Date(s.endDate);
-            const isActive = startDate <= now && endDate >= now;
-            const isScheduled = startDate > now;
-            return (isActive || isScheduled) && s.isActive && !s.isArchived;
-          });
-          setSessions(activeSessions);
-        }
-      } else {
-        // For non-teachers, load all active/scheduled sessions
-        const response = await sessionAPI.getAll();
-        const allSessions = response.data || [];
-        const now = new Date();
-        const activeSessions = allSessions.filter((s: any) => {
-          const startDate = new Date(s.startDate);
-          const endDate = new Date(s.endDate);
-          const isActive = startDate <= now && endDate >= now;
-          const isScheduled = startDate > now;
-          return (isActive || isScheduled) && s.isActive && !s.isArchived;
-        });
-        setSessions(activeSessions);
-      }
-    } catch (error: any) {
-      console.error('Failed to load sessions:', error);
-      toast.error('Failed to load sessions');
-    }
-  };
-
-  const loadSessionClasses = async () => {
-    try {
-      // Keep this for displaying existing grading schemes that reference sessionClasses
-      // This is only used for display, not for creating new ones
-      let sessionsList: any[] = [];
-      let assignedClassroomIds: string[] = [];
-
-      if (account?.role === 'TEACHER') {
-        const teacherResponse = await teacherAPI.dashboard();
-        const teacherData = teacherResponse.data;
-        
-        if (teacherData?.assignments && Array.isArray(teacherData.assignments)) {
-          assignedClassroomIds = teacherData.assignments
-            .map((a: any) => a.classroom?.id || a.classroomId)
-            .filter((id: string) => id);
-        }
-        
-        if (teacherData?.sessions && Array.isArray(teacherData.sessions)) {
-          sessionsList = teacherData.sessions;
-        }
-      } else {
-        const sessionsResponse = await sessionAPI.getAll();
-        sessionsList = sessionsResponse.data || [];
-      }
-      
-      const sessionClassList: SessionClass[] = [];
-      sessionsList.forEach((session: any) => {
-        if (session.classAssignments && Array.isArray(session.classAssignments)) {
-          session.classAssignments.forEach((ca: any) => {
-            const classroomId = ca.classroomId || ca.classroom?.id;
-            
-            if (!classroomId) {
-              return;
-            }
-            
-            if (account?.role === 'TEACHER') {
-              if (!assignedClassroomIds.includes(classroomId)) {
-                return;
-              }
-            }
-            
-            sessionClassList.push({
-              id: ca.id,
-              sessionId: session.id,
-              classroomId: classroomId,
-              session: { id: session.id, name: session.name },
-              classroom: ca.classroom || { id: classroomId, name: ca.classroom?.name || 'Unknown' },
-            });
-          });
-        }
-      });
-      
-      setSessionClasses(sessionClassList);
-    } catch (error: any) {
-      console.error('Failed to load session classes:', error);
     }
   };
 
@@ -329,8 +215,8 @@ export default function GradingSchemes() {
         return;
       }
 
-      if (bulkFormData.classroomIds.length === 0 || bulkFormData.sessionIds.length === 0) {
-        toast.error('Please select at least one class and one session');
+      if (bulkFormData.classroomIds.length === 0) {
+        toast.error('Please select at least one class');
         return;
       }
 
@@ -353,7 +239,6 @@ export default function GradingSchemes() {
         const response = await gradingSchemeAPI.bulkCreate({
           subjectIds: bulkFormData.subjectIds,
           classroomIds: bulkFormData.classroomIds,
-          sessionIds: bulkFormData.sessionIds,
           weights: nonZeroWeights,
         });
         
@@ -363,7 +248,7 @@ export default function GradingSchemes() {
         );
         
         setShowForm(false);
-        setBulkFormData({ subjectIds: [], classroomIds: [], sessionIds: [], weights: [] });
+        setBulkFormData({ subjectIds: [], classroomIds: [], weights: [] });
         loadGradingSchemes();
       } catch (error: any) {
         toast.error(error?.response?.data?.error || 'Failed to create grading schemes');
@@ -377,11 +262,6 @@ export default function GradingSchemes() {
 
       if (!formData.classroomId) {
         toast.error('Please select a class');
-        return;
-      }
-
-      if (!formData.sessionId) {
-        toast.error('Please select a session');
         return;
       }
 
@@ -410,7 +290,6 @@ export default function GradingSchemes() {
           await gradingSchemeAPI.create({
             subjectId: formData.subjectId,
             classroomId: formData.classroomId,
-            sessionId: formData.sessionId,
             weights: nonZeroWeights,
           });
           toast.success('Grading scheme created successfully');
@@ -418,7 +297,7 @@ export default function GradingSchemes() {
         
         setShowForm(false);
         setEditingId(null);
-        setFormData({ subjectId: '', classroomId: '', sessionId: '', weights: [] });
+        setFormData({ subjectId: '', classroomId: '', weights: [] });
         loadGradingSchemes();
       } catch (error: any) {
         toast.error(error?.response?.data?.error || 'Failed to save grading scheme');
@@ -440,14 +319,11 @@ export default function GradingSchemes() {
       return existing || { testGroupId: tg.id, weight: 0 };
     });
     
-    // For editing, we need to extract classroomId and sessionId from the sessionClass
-    const classroomId = scheme.sessionClass?.classroom?.id || '';
-    const sessionId = scheme.sessionClass?.session?.id || '';
+    const classroomId = scheme.classroomId || scheme.classroom?.id || '';
     
     setFormData({
       subjectId: scheme.subjectId,
       classroomId: classroomId,
-      sessionId: sessionId,
       weights: allWeights,
     });
     setShowForm(true);
@@ -471,8 +347,8 @@ export default function GradingSchemes() {
     setShowForm(false);
     setEditingId(null);
     setIsBulkMode(false);
-    setFormData({ subjectId: '', classroomId: '', sessionId: '', weights: [] });
-    setBulkFormData({ subjectIds: [], classroomIds: [], sessionIds: [], weights: [] });
+    setFormData({ subjectId: '', classroomId: '', weights: [] });
+    setBulkFormData({ subjectIds: [], classroomIds: [], weights: [] });
   };
 
   const handleBulkWeightChange = (testGroupId: string, value: string) => {
@@ -505,12 +381,6 @@ export default function GradingSchemes() {
         weights: [...bulkFormData.weights, { testGroupId, weight: clampedValue }],
       });
     }
-  };
-
-  const getSessionClassName = (sessionClassId: string) => {
-    const sc = sessionClasses.find(s => s.id === sessionClassId);
-    if (!sc) return 'Unknown';
-    return `${sc.classroom.name} - ${sc.session.name}`;
   };
 
   if (loading) {
@@ -553,8 +423,8 @@ export default function GradingSchemes() {
                   type="button"
                   onClick={() => {
                     setIsBulkMode(false);
-                    setFormData({ subjectId: '', classroomId: '', sessionId: '', weights: [] });
-                    setBulkFormData({ subjectIds: [], classroomIds: [], sessionIds: [], weights: [] });
+                    setFormData({ subjectId: '', classroomId: '', weights: [] });
+                    setBulkFormData({ subjectIds: [], classroomIds: [], weights: [] });
                   }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     !isBulkMode
@@ -568,8 +438,8 @@ export default function GradingSchemes() {
                   type="button"
                   onClick={() => {
                     setIsBulkMode(true);
-                    setFormData({ subjectId: '', classroomId: '', sessionId: '', weights: [] });
-                    setBulkFormData({ subjectIds: [], classroomIds: [], sessionIds: [], weights: [] });
+                    setFormData({ subjectId: '', classroomId: '', weights: [] });
+                    setBulkFormData({ subjectIds: [], classroomIds: [], weights: [] });
                   }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     isBulkMode
@@ -706,65 +576,6 @@ export default function GradingSchemes() {
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Sessions <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    className="input-field"
-                    value=""
-                    onChange={(e) => {
-                      const selectedId = e.target.value;
-                      if (selectedId && !bulkFormData.sessionIds.includes(selectedId)) {
-                        setBulkFormData({ 
-                          ...bulkFormData, 
-                          sessionIds: [...bulkFormData.sessionIds, selectedId] 
-                        });
-                        e.target.value = ''; // Reset dropdown
-                      }
-                    }}
-                  >
-                    <option value="">Select a session to add...</option>
-                    {sessions.filter(s => !bulkFormData.sessionIds.includes(s.id)).map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                  
-                  {/* Selected Sessions Display */}
-                  {bulkFormData.sessionIds.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      <p className="text-xs text-gray-600 font-medium">Selected Sessions:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {bulkFormData.sessionIds.map((sessionId: string) => {
-                          const s = sessions.find(se => se.id === sessionId);
-                          if (!s) return null;
-                          return (
-                            <span
-                              key={sessionId}
-                              className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
-                            >
-                              {s.name}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setBulkFormData({
-                                    ...bulkFormData,
-                                    sessionIds: bulkFormData.sessionIds.filter((id: string) => id !== sessionId)
-                                  });
-                                }}
-                                className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-blue-200 focus:outline-none"
-                              >
-                                ×
-                              </button>
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
               </div>
             ) : (
               // Single Mode Form
@@ -781,7 +592,6 @@ export default function GradingSchemes() {
                         ...formData, 
                         subjectId: e.target.value, 
                         classroomId: '', 
-                        sessionId: '', 
                         weights: [] 
                       });
                     }}
@@ -817,29 +627,10 @@ export default function GradingSchemes() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Session <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    className="input-field"
-                    value={formData.sessionId}
-                    onChange={(e) => setFormData({ ...formData, sessionId: e.target.value })}
-                    required
-                    disabled={!!editingId}
-                  >
-                    <option value="">Select Session</option>
-                    {sessions.map((session) => (
-                      <option key={session.id} value={session.id}>
-                        {session.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
               </div>
             )}
 
-            {((!isBulkMode && formData.subjectId) || (isBulkMode && (bulkFormData.subjectIds.length > 0 || (bulkFormData.classroomIds.length > 0 && bulkFormData.sessionIds.length > 0)))) && (
+            {((!isBulkMode && formData.subjectId) || (isBulkMode && (bulkFormData.subjectIds.length > 0 || bulkFormData.classroomIds.length > 0))) && (
               <div className="border-t border-gray-200 pt-6">
                 <div className="flex justify-between items-center mb-4">
                   <label className="block text-sm font-medium text-gray-700">
@@ -913,10 +704,10 @@ export default function GradingSchemes() {
                     Total weight must equal 100%. Current: {totalWeight.toFixed(2)}%
                   </p>
                 )}
-                {isBulkMode && bulkFormData.subjectIds.length > 0 && bulkFormData.classroomIds.length > 0 && bulkFormData.sessionIds.length > 0 && (
+                {isBulkMode && bulkFormData.subjectIds.length > 0 && bulkFormData.classroomIds.length > 0 && (
                   <p className="mt-3 text-sm text-blue-600">
-                    This will create {bulkFormData.subjectIds.length * bulkFormData.classroomIds.length * bulkFormData.sessionIds.length} grading scheme(s) 
-                    for all combinations of selected subjects, classes, and sessions.
+                    This will create {bulkFormData.subjectIds.length * bulkFormData.classroomIds.length} grading scheme(s) 
+                    for all combinations of selected subjects and classes.
                   </p>
                 )}
               </div>
@@ -952,7 +743,7 @@ export default function GradingSchemes() {
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Subject</th>
-                    <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden md:table-cell">Class-Session</th>
+                    <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden md:table-cell">Class</th>
                     <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Test Groups & Weights</th>
                     <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden sm:table-cell">Total</th>
                     <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Actions</th>
@@ -967,7 +758,10 @@ export default function GradingSchemes() {
                         {scheme.subject?.name || 'Unknown'}
                       </td>
                       <td className="px-2 sm:px-4 md:px-6 py-3 text-xs sm:text-sm text-gray-700 hidden md:table-cell">
-                        {scheme.sessionClass?.classroom?.name || 'Unknown'} - {scheme.sessionClass?.session?.name || 'Unknown'}
+                        {scheme.classroom?.name || 'Unknown'}
+                        {scheme.classroom?.academicSession
+                          ? ` (${scheme.classroom.academicSession})`
+                          : ''}
                       </td>
                       <td className="px-2 sm:px-4 md:px-6 py-3 text-xs sm:text-sm text-gray-700">
                         <div className="space-y-1">

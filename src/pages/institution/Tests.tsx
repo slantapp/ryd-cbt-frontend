@@ -1,15 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { testAPI, sessionAPI, classroomAPI, teacherAPI, customFieldAPI, testGroupAPI, subjectAPI, themeAPI } from '../../services/api';
-import { Test, Session, Classroom, Institution, TestCustomField } from '../../types';
+import { testAPI, classroomAPI, teacherAPI, customFieldAPI, testGroupAPI, subjectAPI, themeAPI } from '../../services/api';
+import { Test, Classroom, Institution, TestCustomField } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
+
+function resolveTestMaxAttempts(field: string): { maxAttempts: number; allowRetrial: boolean } {
+  const t = (field || '').trim();
+  if (t === '') return { maxAttempts: 1, allowRetrial: false };
+  const n = parseInt(t, 10);
+  const maxAttempts = Number.isFinite(n) && n >= 1 ? n : 1;
+  return { maxAttempts, allowRetrial: maxAttempts > 1 };
+}
 
 export default function Tests() {
   const { account } = useAuthStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tests, setTests] = useState<Test[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [teachers, setTeachers] = useState<Institution[]>([]);
   const [teacherData, setTeacherData] = useState<any>(null);
@@ -31,6 +38,7 @@ export default function Tests() {
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [tempDueDate, setTempDueDate] = useState('');
+  const [showMoreTestOptions, setShowMoreTestOptions] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -40,10 +48,8 @@ export default function Tests() {
     duration: '',
     dueDate: '',
     passingScore: '',
-    maxAttempts: '1',
-    allowRetrial: false,
+    maxAttempts: '',
     scoreVisibility: false,
-    sessionId: '',
     classroomIds: [] as string[],
     teacherId: '',
   });
@@ -84,7 +90,6 @@ export default function Tests() {
     if (account && account.role === 'TEACHER') {
       loadTeacherData();
     } else {
-    loadSessions();
       if (account && (account.role === 'SCHOOL' || account.role === 'TEACHER' || isSuperAdmin)) {
         loadClassrooms();
       }
@@ -123,25 +128,6 @@ export default function Tests() {
       
       setTeacherData(response.data);
       
-      // Set sessions
-      if (response.data.sessions && Array.isArray(response.data.sessions) && response.data.sessions.length > 0) {
-        const loadedSessions = response.data.sessions;
-        setSessions(loadedSessions);
-        
-        // Set default session: active first, then next scheduled
-        const activeSession = getActiveSession(loadedSessions);
-        const nextScheduled = getNextScheduledSession(loadedSessions);
-        const defaultSession = activeSession || nextScheduled;
-        
-        if (defaultSession) {
-          setFormData(prev => ({
-            ...prev,
-            sessionId: defaultSession.id,
-            classroomIds: [], // Don't auto-select classes
-          }));
-        }
-      }
-      
       // Set classrooms from assignments
       if (response.data.assignments && Array.isArray(response.data.assignments) && response.data.assignments.length > 0) {
         const classrooms = response.data.assignments
@@ -159,7 +145,6 @@ export default function Tests() {
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to load teacher assignments';
       toast.error(errorMessage);
       // Set empty arrays to prevent UI crashes
-      setSessions([]);
       setClassrooms([]);
       setTeacherData(null);
     }
@@ -176,105 +161,6 @@ export default function Tests() {
     }
   };
 
-  // Helper function to check if a session is currently active
-  const isActiveSession = (session: Session): boolean => {
-    if (!session.isActive || session.isArchived) return false;
-    
-    const parseDate = (dateStr: string | Date) => {
-      if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-        const [year, month, day] = dateStr.split('-').map(Number);
-        return new Date(Date.UTC(year, month - 1, day));
-      }
-      return new Date(dateStr);
-    };
-    
-    const startDate = parseDate(session.startDate);
-    const endDate = parseDate(session.endDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
-    
-    return start <= today && end >= today;
-  };
-
-  // Helper function to check if a session is scheduled (future)
-  const isScheduledSession = (session: Session): boolean => {
-    if (!session.isActive || session.isArchived) return false;
-    
-    const parseDate = (dateStr: string | Date) => {
-      if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-        const [year, month, day] = dateStr.split('-').map(Number);
-        return new Date(Date.UTC(year, month - 1, day));
-      }
-      return new Date(dateStr);
-    };
-    
-    const startDate = parseDate(session.startDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
-    
-    return start > today;
-  };
-
-  // Get active session from sessions array
-  const getActiveSession = (sessionsList: Session[]): Session | null => {
-    return sessionsList.find(s => isActiveSession(s)) || null;
-  };
-
-  // Get next scheduled session (earliest startDate)
-  const getNextScheduledSession = (sessionsList: Session[]): Session | null => {
-    const scheduled = sessionsList.filter(s => isScheduledSession(s));
-    if (scheduled.length === 0) return null;
-    
-    // Sort by startDate and return the earliest
-    return scheduled.sort((a, b) => {
-      const parseDate = (dateStr: string | Date) => {
-        if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-          const [year, month, day] = dateStr.split('-').map(Number);
-          return new Date(Date.UTC(year, month - 1, day));
-        }
-        return new Date(dateStr);
-      };
-      return parseDate(a.startDate).getTime() - parseDate(b.startDate).getTime();
-    })[0];
-  };
-
-  // Get filtered sessions (only active or scheduled)
-  const getAvailableSessions = (): Session[] => {
-    return sessions.filter(s => isActiveSession(s) || isScheduledSession(s));
-  };
-
-  const loadSessions = async () => {
-    try {
-      const response = await sessionAPI.getAll();
-      const loadedSessions = response.data;
-      setSessions(loadedSessions);
-      
-      // Set default session: active first, then next scheduled
-      if (loadedSessions && loadedSessions.length > 0) {
-        const activeSession = getActiveSession(loadedSessions);
-        const nextScheduled = getNextScheduledSession(loadedSessions);
-        const defaultSession = activeSession || nextScheduled;
-        
-        if (defaultSession && !formData.sessionId) {
-          setFormData(prev => ({
-            ...prev,
-            sessionId: defaultSession.id,
-            classroomIds: [], // Don't auto-select classes
-          }));
-        }
-      }
-    } catch (error: any) {
-      console.error('Failed to load sessions');
-    }
-  };
 
   const loadCustomFields = async () => {
     try {
@@ -303,34 +189,8 @@ export default function Tests() {
     }
   };
 
-  // Get available classrooms for a specific session (used when changing sessions)
-  const getAvailableClassroomsForSession = (sessionId: string) => {
-    if (!sessionId) return [];
-    
-    const selectedSession = sessions.find(s => s.id === sessionId);
-    
-    // For teachers, only show classrooms they're assigned to that are in the selected session
-    if (account && account.role === 'TEACHER') {
-      if (selectedSession?.classAssignments && selectedSession.classAssignments.length > 0) {
-        const sessionClassroomIds = selectedSession.classAssignments.map((ca: any) => ca.classroomId);
-        // Filter to only show classrooms the teacher is assigned to
-        return classrooms.filter(c => sessionClassroomIds.includes(c.id));
-      }
-      return [];
-    }
-    
-    // For schools, show all classrooms for the selected session
-    if (selectedSession?.classAssignments && selectedSession.classAssignments.length > 0) {
-      const sessionClassroomIds = selectedSession.classAssignments.map((ca: any) => ca.classroomId);
-      return classrooms.filter(c => sessionClassroomIds.includes(c.id));
-    }
-
-    return classrooms;
-  };
-
-  // Get available classrooms based on selected session and user role
   const getAvailableClassrooms = () => {
-    return getAvailableClassroomsForSession(formData.sessionId);
+    return classrooms;
   };
 
   const formatDueDate = (dateString: string): string => {
@@ -346,11 +206,6 @@ export default function Tests() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.sessionId) {
-      toast.error('Please select a session');
-      return;
-    }
-
     if (!formData.classroomIds || formData.classroomIds.length === 0) {
       toast.error('Please select at least one classroom');
       return;
@@ -371,7 +226,12 @@ export default function Tests() {
     }
 
     try {
-      const response = await testAPI.create(formData);
+      const { maxAttempts: resolvedAttempts, allowRetrial } = resolveTestMaxAttempts(formData.maxAttempts);
+      const response = await testAPI.create({
+        ...formData,
+        maxAttempts: resolvedAttempts,
+        allowRetrial,
+      });
       const testId = response.data.test.id;
 
       // Save custom field values if any
@@ -399,13 +259,12 @@ export default function Tests() {
         duration: '',
         dueDate: '',
         passingScore: '',
-        maxAttempts: '1',
-        allowRetrial: false,
+        maxAttempts: '',
         scoreVisibility: false,
-        sessionId: '',
         classroomIds: [],
         teacherId: '',
       });
+      setShowMoreTestOptions(false);
       setCustomFieldValues({});
       navigate(`/tests/${testId}`);
     } catch (error: any) {
@@ -463,11 +322,6 @@ export default function Tests() {
               <p className="text-white/80 text-lg">Manage and create your assessment tests</p>
             </div>
             <div className="flex space-x-3">
-              {account && account.role === 'SCHOOL' && (
-              <Link to="/sessions" className="bg-white/20 hover:bg-white/30 text-white font-medium py-2.5 px-6 rounded-lg transition-all backdrop-blur-sm">
-                Manage Sessions
-              </Link>
-              )}
               <button 
                 onClick={() => setShowForm(!showForm)} 
                 className="bg-white font-semibold py-2.5 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl"
@@ -545,76 +399,23 @@ export default function Tests() {
           </div>
           <form onSubmit={handleCreate} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Session <span className="text-red-500">*</span>
-                  {account && account.role === 'TEACHER' && sessions.length > 1 && (
-                    <span className="text-xs text-gray-500 ml-2">(Your assigned sessions)</span>
-                  )}
-              </label>
-              <select
-                className="input-field"
-                value={formData.sessionId}
-                onChange={(e) => {
-                  const sessionId = e.target.value;
-                  // Don't auto-select classes - let teacher choose manually
-                  setFormData({ 
-                    ...formData, 
-                    sessionId: sessionId,
-                    classroomIds: [] // Clear classes when session changes
-                  });
-                }}
-                required
-              >
-                <option value="">Select a session</option>
-                {getAvailableSessions().map((session) => {
-                  const status = isActiveSession(session) ? 'Active' : 'Scheduled';
-                  return (
-                    <option key={session.id} value={session.id}>
-                      {session.name} ({status})
-                    </option>
-                  );
-                })}
-              </select>
-                {getAvailableSessions().length === 0 && account && account.role !== 'TEACHER' && (
-                <p className="text-sm text-red-600 mt-2 flex items-center">
-                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  No active or scheduled sessions. Please{' '}
-                  <Link to="/sessions" className="text-primary underline font-medium ml-1">
-                    create a session
-                  </Link>{' '}
-                  first.
-                </p>
-              )}
-                {account && account.role === 'TEACHER' && getAvailableSessions().length === 0 && (
-                  <p className="text-sm text-amber-600 mt-2">
-                    No active or scheduled sessions available for your assigned classes. Please contact your school administrator.
-                  </p>
-                )}
-              </div>
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Classes <span className="text-red-500">*</span>
                   {account && account.role === 'TEACHER' && (
                     <span className="text-xs text-gray-500 ml-2">(Your assigned classes)</span>
                   )}
                 </label>
-                {!formData.sessionId ? (
-                  <div className="input-field bg-gray-50 cursor-not-allowed">
-                    Select a session first
-                  </div>
-                ) : getAvailableClassrooms().length === 0 ? (
+                {getAvailableClassrooms().length === 0 ? (
                   <div>
                     <div className="input-field bg-gray-50 cursor-not-allowed">
                       {(account && account.role === 'TEACHER')
-                        ? 'No assigned classes available for this session'
+                        ? 'No assigned classes available'
                         : 'No classes available'}
                     </div>
                     <p className="text-sm text-amber-600 mt-2">
                       {(account && account.role === 'TEACHER')
-                        ? 'You are not assigned to any classes for this session. Please contact your school administrator.'
+                        ? 'You are not assigned to any classes. Please contact your school administrator.'
                         : 'No classes available. Please create classes first.'}
                     </p>
                   </div>
@@ -660,40 +461,14 @@ export default function Tests() {
                 )}
               </div>
             </div>
-            {account?.role === 'SCHOOL' && (
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Assign to Teacher (Optional)
-                </label>
-                <select
-                  className="input-field"
-                  value={formData.teacherId}
-                  onChange={(e) => setFormData({ ...formData, teacherId: e.target.value })}
-                >
-                  <option value="">No specific teacher (School-owned test)</option>
-                  {teachers
-                    .filter((teacher) => {
-                      // For now show all teachers - can be enhanced later to filter by selected classrooms
-                      return true;
-                    })
-                    .map((teacher) => (
-                      <option key={teacher.id} value={teacher.id}>
-                        {teacher.name} ({teacher.email})
-                      </option>
-                    ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Select a teacher to assign this test to. The teacher must be assigned to the selected classes.
-                </p>
-              </div>
-            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Test Title <span className="text-red-500">*</span>
                 </label>
                 <input
-                  className="input-field"
+                  className="input-field w-full"
                   placeholder="Enter test title"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -702,27 +477,10 @@ export default function Tests() {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Test Group
-                </label>
-                <select
-                  className="input-field"
-                  value={formData.testGroupId}
-                  onChange={(e) => setFormData({ ...formData, testGroupId: e.target.value })}
-                >
-                  <option value="">Select Test Group (optional)</option>
-                  {testGroups.filter(tg => tg.isActive).map((tg) => (
-                    <option key={tg.id} value={tg.id}>
-                      {tg.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Subject
                 </label>
                 <select
-                  className="input-field"
+                  className="input-field w-full"
                   value={formData.subjectId}
                   onChange={(e) => setFormData({ ...formData, subjectId: e.target.value })}
                 >
@@ -735,19 +493,8 @@ export default function Tests() {
                 </select>
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Description
-              </label>
-              <textarea
-                className="input-field"
-                placeholder="Test description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={3}
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               <div>
                 <label className="flex items-center cursor-pointer group mb-4">
                   <input
@@ -765,7 +512,7 @@ export default function Tests() {
                     </label>
                     <input
                       type="number"
-                      className="input-field"
+                      className="input-field w-full"
                       placeholder="e.g., 60"
                       value={formData.duration}
                       onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
@@ -782,80 +529,24 @@ export default function Tests() {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Due Date (optional)
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    className="input-field flex-1"
-                    placeholder="Click to select date and time (optional)"
-                    value={formatDueDate(formData.dueDate)}
-                    readOnly
-                    onClick={() => {
-                      setTempDueDate(formData.dueDate || '');
-                      setShowDatePicker(true);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTempDueDate(formData.dueDate || '');
-                      setShowDatePicker(true);
-                    }}
-                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-600 transition-colors"
-                  >
-                    📅
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Optional: Set a deadline for when students should complete this test
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Passing Score (%)
                 </label>
                 <input
                   type="number"
                   step="0.1"
-                  className="input-field"
+                  className="input-field w-full"
                   placeholder="e.g., 70"
                   value={formData.passingScore}
                   onChange={(e) => setFormData({ ...formData, passingScore: e.target.value })}
                 />
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Max Attempts <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  className="input-field"
-                  placeholder="e.g., 1"
-                  value={formData.maxAttempts}
-                  onChange={(e) => setFormData({ ...formData, maxAttempts: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="flex items-end">
-                <label className="flex items-center cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={formData.allowRetrial}
-                    onChange={(e) => setFormData({ ...formData, allowRetrial: e.target.checked })}
-                    className="mr-3 w-5 h-5 text-primary focus:ring-primary rounded"
-                  />
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Allow Retrial</span>
-                </label>
-              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+              <div className="md:col-span-2">
                 <label className="text-sm font-medium text-gray-700 block mb-2">Score Visibility</label>
                 <span className="text-xs text-gray-500 block mb-2">Control when students can see their scores</span>
-                <div className="flex space-x-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, scoreVisibility: true })}
@@ -882,6 +573,123 @@ export default function Tests() {
               </div>
             </div>
 
+            <div className="border-t border-gray-200 pt-6 space-y-4">
+              <button
+                type="button"
+                onClick={() => setShowMoreTestOptions((v) => !v)}
+                className="text-sm font-medium text-primary hover:text-primary-700 underline-offset-2 hover:underline"
+              >
+                {showMoreTestOptions ? 'Hide optional details' : 'Show more (teacher, group, description, due date, max attempts)'}
+              </button>
+
+              {showMoreTestOptions && (
+                <div className="space-y-6 rounded-lg border border-dashed border-gray-300 bg-gray-50/50 p-4 sm:p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                    {account?.role === 'SCHOOL' && (
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Assign to Teacher (Optional)
+                        </label>
+                        <select
+                          className="input-field w-full"
+                          value={formData.teacherId}
+                          onChange={(e) => setFormData({ ...formData, teacherId: e.target.value })}
+                        >
+                          <option value="">No specific teacher (School-owned test)</option>
+                          {teachers.map((teacher) => (
+                            <option key={teacher.id} value={teacher.id}>
+                              {teacher.name} ({teacher.email})
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          The teacher must be assigned to the selected classes.
+                        </p>
+                      </div>
+                    )}
+                    <div className={account?.role === 'SCHOOL' ? '' : 'md:col-span-2'}>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Test Group
+                      </label>
+                      <select
+                        className="input-field w-full"
+                        value={formData.testGroupId}
+                        onChange={(e) => setFormData({ ...formData, testGroupId: e.target.value })}
+                      >
+                        <option value="">Select Test Group (optional)</option>
+                        {testGroups.filter(tg => tg.isActive).map((tg) => (
+                          <option key={tg.id} value={tg.id}>
+                            {tg.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Description
+                    </label>
+                    <textarea
+                      className="input-field w-full"
+                      placeholder="Test description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      rows={3}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Due Date (optional)
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          className="input-field flex-1 min-w-0"
+                          placeholder="Click to select date and time (optional)"
+                          value={formatDueDate(formData.dueDate)}
+                          readOnly
+                          onClick={() => {
+                            setTempDueDate(formData.dueDate || '');
+                            setShowDatePicker(true);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTempDueDate(formData.dueDate || '');
+                            setShowDatePicker(true);
+                          }}
+                          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-600 transition-colors shrink-0"
+                        >
+                          📅
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Optional deadline for completing this test
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Max attempts (optional)
+                      </label>
+                      <input
+                        type="number"
+                        className="input-field w-full"
+                        placeholder="Leave blank for 1 — use 2+ to allow retakes"
+                        value={formData.maxAttempts}
+                        onChange={(e) => setFormData({ ...formData, maxAttempts: e.target.value })}
+                        min="1"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        More than one attempt allows retakes up to this limit.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Test Summary Section */}
             <div className="border-t border-gray-200 pt-6 mt-6">
               <div className="flex items-center justify-between mb-4">
@@ -897,14 +705,6 @@ export default function Tests() {
                   <div>
                     <span className="text-xs font-semibold text-gray-500 uppercase">Description</span>
                     <p className="text-sm text-gray-900 mt-1">{formData.description || <span className="text-gray-400 italic">No description</span>}</p>
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-gray-500 uppercase">Session</span>
-                    <p className="text-sm text-gray-900 mt-1">
-                      {formData.sessionId 
-                        ? sessions.find(s => s.id === formData.sessionId)?.name || 'Selected'
-                        : <span className="text-red-500 italic">Required</span>}
-                    </p>
                   </div>
                   <div>
                     <span className="text-xs font-semibold text-gray-500 uppercase">Classes</span>
@@ -978,15 +778,10 @@ export default function Tests() {
                   </div>
                   <div>
                     <span className="text-xs font-semibold text-gray-500 uppercase">Max Attempts</span>
-                    <p className="text-sm text-gray-900 mt-1">{formData.maxAttempts || '1'}</p>
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-gray-500 uppercase">Allow Retrial</span>
                     <p className="text-sm text-gray-900 mt-1">
-                      {formData.allowRetrial ? (
-                        <span className="text-green-600 font-medium">✓ Yes</span>
-                      ) : (
-                        <span className="text-gray-400">✗ No</span>
+                      {resolveTestMaxAttempts(formData.maxAttempts).maxAttempts}
+                      {resolveTestMaxAttempts(formData.maxAttempts).maxAttempts > 1 && (
+                        <span className="text-gray-500 text-xs ml-1">(retakes allowed)</span>
                       )}
                     </p>
                   </div>
@@ -1025,7 +820,7 @@ export default function Tests() {
               <button
                 type="submit"
                 className="btn-primary"
-                disabled={!formData.sessionId}
+                disabled={false}
               >
                 Create Test
               </button>
@@ -1188,13 +983,13 @@ export default function Tests() {
                   </div>
                 )}
               </div>
-              {test.allowRetrial && (
+              {(test.maxAttempts || 1) > 1 && (
                 <div className="mt-3 pt-3 border-t border-gray-100">
                   <span className="inline-flex items-center text-xs font-medium text-primary bg-primary-50 px-2.5 py-1 rounded-full">
                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    Retrial Allowed
+                    Multiple attempts ({test.maxAttempts})
                   </span>
                 </div>
               )}

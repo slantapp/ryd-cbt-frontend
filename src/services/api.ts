@@ -169,18 +169,8 @@ export const parentAPI = {
   linkStudent: (data: { studentId: string }) => api.post('/parent/link-student', data),
   getLinkedStudents: () => api.get('/parent/students'),
   getStudentScores: (studentId: string) => api.get(`/parent/students/${studentId}/scores`),
-  getStudentReportCard: (studentId: string, sessionId?: string) => api.get(`/parent/students/${studentId}/report-card`, { params: sessionId ? { sessionId } : {} }),
-};
-
-// Session Archive
-export const sessionArchiveAPI = {
-  archive: (sessionId: string, data: { archiveClassAssignments: boolean; archiveTeacherAssignments: boolean }) => api.post(`/sessions/${sessionId}/archive`, data),
-  unarchive: (sessionId: string) => api.post(`/sessions/${sessionId}/unarchive`),
-  getArchived: () => api.get('/sessions/archived'),
-  getArchivedAssignments: (sessionId: string) => api.get(`/sessions/${sessionId}/archived-assignments`),
-  getHistoricalClasses: (sessionId: string) => api.get(`/sessions/${sessionId}/historical-classes`),
-  addClasses: (id: string, classroomIds: string[]) => api.post(`/sessions/${id}/classes`, { classroomIds }),
-  removeClasses: (id: string, classroomIds: string[]) => api.delete(`/sessions/${id}/classes`, { data: { classroomIds } }),
+  getStudentReportCard: (studentId: string, classroomId?: string) =>
+    api.get(`/parent/students/${studentId}/report-card`, { params: classroomId ? { classroomId } : {} }),
 };
 
 // Audit Logs
@@ -238,30 +228,19 @@ export const questionAPI = {
   addFromBankToTest: (data: { testId: string; questionIds: string[] }) => api.post('/questions/bank/add-to-test', data),
 };
 
-// Sessions
-export const sessionAPI = {
-  create: (data: any) => api.post('/sessions', data),
-  getAll: () => api.get('/sessions'),
-  getOne: (id: string) => api.get(`/sessions/${id}`),
-  update: (id: string, data: any) => api.put(`/sessions/${id}`, data),
-  delete: (id: string) => api.delete(`/sessions/${id}`),
-  addClasses: (id: string, classroomIds: string[]) => api.post(`/sessions/${id}/classes`, { classroomIds }),
-  removeClasses: (id: string, classroomIds: string[]) => api.delete(`/sessions/${id}/classes`, { data: { classroomIds } }),
-};
-
 // Students
 export const studentAPI = {
-  create: (data: { firstName: string; lastName: string; username: string; email?: string; phone?: string; dateOfBirth?: string; password?: string; classroomId?: string; sessionId?: string }) =>
+  create: (data: { firstName: string; lastName: string; username: string; email?: string; phone?: string; dateOfBirth?: string; password?: string; classroomId?: string }) =>
     api.post('/students', data),
-  getScores: (params?: { testId?: string; sessionId?: string; classroomId?: string }) =>
+  getScores: (params?: { testId?: string; classroomId?: string }) =>
     api.get('/students/scores', { params }),
-  getOverallScores: (params?: { sessionId?: string; subjectId?: string }) =>
+  getOverallScores: (params?: { classroomId?: string; subjectId?: string }) =>
     api.get('/students/overall-scores', { params }),
   grantRetrial: (studentTestId: string) =>
     api.post('/students/grant-retrial', { studentTestId }),
-  getAll: (params?: { sessionId?: string; classroomId?: string; isAssigned?: boolean }) =>
+  getAll: (params?: { classroomId?: string; isAssigned?: boolean }) =>
     api.get('/students/all', { params }),
-  getUnassigned: (params?: { sessionId?: string }) =>
+  getUnassigned: (params?: Record<string, never>) =>
     api.get('/students/unassigned', { params }),
   getById: (id: string) => api.get(`/students/${id}`),
   checkUsernameAvailability: (username: string, excludeStudentId?: string) =>
@@ -271,26 +250,23 @@ export const studentAPI = {
   getMyTests: () => api.get('/students/my-tests'),
   getTest: (testId: string) => api.get(`/students/test/${testId}`),
   getTestReview: (testId: string) => api.get(`/students/test/${testId}/review`),
-  bulkUpload: (file: File, options?: { classroomId?: string; sessionId?: string }) => {
+  bulkUpload: (file: File, options?: { classroomId?: string }) => {
     const formData = new FormData();
     formData.append('file', file);
     if (options?.classroomId) {
       formData.append('classroomId', options.classroomId);
     }
-    if (options?.sessionId) {
-      formData.append('sessionId', options.sessionId);
-    }
     return api.post('/students/bulk-upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
-  assignToClass: (data: { studentId: string; classroomId: string; sessionId: string }) =>
+  assignToClass: (data: { studentId: string; classroomId: string }) =>
     api.post('/students/assign', data),
   unassignFromClass: (data: { studentId: string }) =>
     api.post('/students/unassign', data),
   markForPromotion: (data: { studentId: string; markForPromotion: boolean }) =>
     api.post('/students/mark-promotion', data),
-  promote: (data: { studentIds: string[]; targetClassroomId: string; targetSessionId: string }) =>
+  promote: (data: { studentIds: string[]; targetClassroomId: string }) =>
     api.post('/students/promote', data),
   downloadTemplate: () => api.get('/students/template', { responseType: 'blob' }),
   resetPassword: (data: { studentId: string; newPassword: string; forceReset?: boolean }) =>
@@ -331,7 +307,6 @@ export const publicAPI = {
     phone?: string;
     dateOfBirth?: string;
     classroomId?: string;
-    sessionId?: string;
   }) => api.post('/public/register-student', data),
 };
 
@@ -372,7 +347,7 @@ export const ministryAPI = {
 };
 
 export const classroomAPI = {
-  create: (data: { name: string; description?: string; academicSession?: string; sessionId?: string }) =>
+  create: (data: { name: string; description?: string; academicSession?: string }) =>
     api.post('/classrooms', data),
   list: () => api.get('/classrooms'),
   update: (id: string, data: { name: string; description?: string; academicSession?: string }) =>
@@ -432,9 +407,9 @@ export const subjectAPI = {
 export const gradingSchemeAPI = {
   getAll: () => api.get('/grading-schemes'),
   getOne: (id: string) => api.get(`/grading-schemes/${id}`),
-  create: (data: { subjectId: string; classroomId: string; sessionId: string; weights: Array<{ testGroupId: string; weight: number }> }) =>
+  create: (data: { subjectId: string; classroomId: string; weights: Array<{ testGroupId: string; weight: number }> }) =>
     api.post('/grading-schemes', data),
-  bulkCreate: (data: { subjectIds: string[]; classroomIds: string[]; sessionIds: string[]; weights: Array<{ testGroupId: string; weight: number }> }) =>
+  bulkCreate: (data: { subjectIds: string[]; classroomIds: string[]; weights: Array<{ testGroupId: string; weight: number }> }) =>
     api.post('/grading-schemes/bulk', data),
   update: (id: string, data: { weights: Array<{ testGroupId: string; weight: number }> }) =>
     api.put(`/grading-schemes/${id}`, data),

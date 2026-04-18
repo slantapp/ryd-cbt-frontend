@@ -57,9 +57,6 @@ export interface Test {
   createdAt: string;
   updatedAt: string;
   questions?: Question[];
-  sessions?: Array<{
-    session: Session;
-  }>;
   classrooms?: Array<{
     classroom: Classroom;
   }>;
@@ -127,29 +124,6 @@ export interface PracticeAttemptAnswer {
   question?: Question;
 }
 
-export interface Session {
-  id: string;
-  institutionId: string;
-  name: string;
-  description?: string;
-  startDate: string;
-  endDate: string;
-  isActive: boolean;
-  isArchived: boolean;
-  archivedAt?: string | null;
-  archivedById?: string | null;
-  createdById?: string | null;
-  tests?: SessionTest[];
-  classAssignments?: SessionClass[];
-}
-
-export interface SessionTest {
-  id: string;
-  sessionId: string;
-  testId: string;
-  test: Test;
-}
-
 export interface Student {
   id: string;
   institutionId: string;
@@ -172,7 +146,6 @@ export interface StudentTest {
   id: string;
   studentId: string;
   testId: string;
-  sessionId?: string;
   score?: number;
   percentage?: number;
   isPassed?: boolean;
@@ -224,22 +197,10 @@ export interface ThemeConfig {
   bannerUrl?: string;
 }
 
-// New models
-export interface SessionClass {
-  id: string;
-  sessionId: string;
-  classroomId: string;
-  assignedAt: string;
-  assignedById: string;
-  session?: Session;
-  classroom?: Classroom;
-}
-
 export interface StudentClassAssignment {
   id: string;
   studentId: string;
   classroomId: string;
-  sessionId: string;
   assignedAt: string;
   assignedById?: string | null;
   isArchived: boolean;
@@ -247,7 +208,6 @@ export interface StudentClassAssignment {
   archivedById?: string | null;
   student?: Student;
   classroom?: Classroom;
-  session?: Session;
 }
 
 export interface TestCustomField {

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { classroomAPI, teacherAPI, sessionAPI, themeAPI } from '../../services/api';
+import { classroomAPI, teacherAPI, themeAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
-import { Session } from '../../types';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
@@ -9,7 +8,6 @@ export default function Classes() {
   const { account } = useAuthStore();
   const [classes, setClasses] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
   const [theme, setTheme] = useState<any>({
     primaryColor: '#A8518A',
     secondaryColor: '#1d4ed8',
@@ -31,7 +29,6 @@ export default function Classes() {
     name: '',
     academicSession: '',
     description: '',
-    sessionId: '',
   });
   const [assignment, setAssignment] = useState({
     classroomId: '',
@@ -66,12 +63,8 @@ export default function Classes() {
   useEffect(() => {
     loadClasses();
     if (isSchool || isSuperAdmin) {
-      if (isSuperAdmin) {
-        // Super admin can view sessions for filtering
-        loadSessions();
-      } else {
+      if (!isSuperAdmin) {
         loadTeachers();
-        loadSessions();
       }
     }
   }, [account?.role, isSuperAdmin]);
@@ -97,38 +90,13 @@ export default function Classes() {
     }
   };
 
-  const loadSessions = async () => {
-    try {
-      const { data } = await sessionAPI.getAll();
-      setSessions(data);
-    } catch (error: any) {
-      console.error('Failed to load sessions:', error);
-      // Don't show error toast - sessions are optional for class creation
-    }
-  };
-
-  // Get active or scheduled sessions for dropdown
-  const getAvailableSessions = () => {
-    const now = new Date();
-    return sessions.filter((session) => {
-      if (!session.isActive || session.isArchived) return false;
-      const startDate = new Date(session.startDate);
-      const endDate = new Date(session.endDate);
-      // Active: current date is between start and end
-      const isActive = startDate <= now && endDate >= now;
-      // Scheduled: start date is in the future
-      const isScheduled = startDate > now;
-      return isActive || isScheduled;
-    });
-  };
-
   const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreating(true);
     try {
       await classroomAPI.create(classForm);
-      toast.success(classForm.sessionId ? 'Class created and assigned to session' : 'Class created');
-      setClassForm({ name: '', academicSession: '', description: '', sessionId: '' });
+      toast.success('Class created');
+      setClassForm({ name: '', academicSession: '', description: '' });
       setShowCreateModal(false);
       loadClasses();
     } catch (error: any) {
@@ -184,7 +152,6 @@ export default function Classes() {
       name: cls.name || '',
       academicSession: cls.academicSession || '',
       description: cls.description || '',
-      sessionId: '', // Don't pre-fill sessionId for edit
     });
     setShowEditModal(true);
   };
@@ -203,7 +170,7 @@ export default function Classes() {
       toast.success('Class updated successfully');
       setShowEditModal(false);
       setEditingClass(null);
-      setClassForm({ name: '', academicSession: '', description: '', sessionId: '' });
+      setClassForm({ name: '', academicSession: '', description: '' });
       loadClasses();
     } catch (error: any) {
       console.error('Update class error:', error);
@@ -360,7 +327,7 @@ export default function Classes() {
               <button
                 onClick={() => {
                   setShowCreateModal(false);
-                  setClassForm({ name: '', academicSession: '', description: '', sessionId: '' });
+                  setClassForm({ name: '', academicSession: '', description: '' });
                 }}
                 className="text-gray-400 hover:text-gray-600"
               >
@@ -378,43 +345,6 @@ export default function Classes() {
                 value={classForm.name}
                 onChange={(e) => setClassForm({ ...classForm, name: e.target.value })}
               />
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Assign to Session (Optional)
-                </label>
-                <select
-                  name="sessionId"
-                  className="input-field"
-                  value={classForm.sessionId}
-                  onChange={(e) => {
-                    const selectedSession = getAvailableSessions().find(s => s.id === e.target.value);
-                    setClassForm({ 
-                      ...classForm, 
-                      sessionId: e.target.value,
-                      academicSession: selectedSession ? selectedSession.name : '',
-                    });
-                  }}
-                >
-                  <option value="">Select a session (optional)</option>
-                  {getAvailableSessions().map((session) => {
-                    const startDate = new Date(session.startDate);
-                    const endDate = new Date(session.endDate);
-                    const now = new Date();
-                    const isActive = startDate <= now && endDate >= now;
-                    const isScheduled = startDate > now;
-                    const status = isActive ? 'Active' : isScheduled ? 'Scheduled' : '';
-                    const dateRange = `${format(startDate, 'MMM dd, yyyy')} - ${format(endDate, 'MMM dd, yyyy')}`;
-                    return (
-                      <option key={session.id} value={session.id}>
-                        {session.name} - {dateRange} {status ? `(${status})` : ''}
-                      </option>
-                    );
-                  })}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Select an active or scheduled session to assign this class to
-                </p>
-              </div>
               <textarea
                 name="description"
                 placeholder="Description"
@@ -427,7 +357,7 @@ export default function Classes() {
                   type="button"
                   onClick={() => {
                     setShowCreateModal(false);
-                    setClassForm({ name: '', academicSession: '', description: '', sessionId: '' });
+                    setClassForm({ name: '', academicSession: '', description: '' });
                   }}
                   className="btn-secondary flex-1"
                 >
@@ -639,7 +569,7 @@ export default function Classes() {
                 onClick={() => {
                   setShowEditModal(false);
                   setEditingClass(null);
-                  setClassForm({ name: '', academicSession: '', description: '', sessionId: '' });
+                  setClassForm({ name: '', academicSession: '', description: '' });
                 }}
                 className="text-gray-400 hover:text-gray-600"
               >
@@ -677,7 +607,7 @@ export default function Classes() {
                   onClick={() => {
                     setShowEditModal(false);
                     setEditingClass(null);
-                    setClassForm({ name: '', academicSession: '', description: '', sessionId: '' });
+                    setClassForm({ name: '', academicSession: '', description: '' });
                   }}
                   className="btn-secondary flex-1"
                 >

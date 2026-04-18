@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { studentAPI, sessionAPI, classroomAPI } from '../../services/api';
+import { studentAPI, classroomAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -13,7 +13,6 @@ export default function StudentProfile() {
   const [student, setStudent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [sessions, setSessions] = useState<any[]>([]);
   const [classrooms, setClassrooms] = useState<any[]>([]);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -37,7 +36,6 @@ export default function StudentProfile() {
   const [assignForm, setAssignForm] = useState({
     studentId: '',
     classroomId: '',
-    sessionId: '',
   });
 
   const isTeacher = account?.role === 'TEACHER';
@@ -47,7 +45,6 @@ export default function StudentProfile() {
     if (id) {
       loadStudent();
       if (isSchool) {
-        loadSessions();
         loadClassrooms();
       }
     }
@@ -167,15 +164,6 @@ export default function StudentProfile() {
     }
   };
 
-  const loadSessions = async () => {
-    try {
-      const { data } = await sessionAPI.getAll();
-      setSessions(data);
-    } catch (error: any) {
-      console.error('Failed to load sessions:', error);
-    }
-  };
-
   const loadClassrooms = async () => {
     try {
       const { data } = await classroomAPI.list();
@@ -186,28 +174,23 @@ export default function StudentProfile() {
   };
 
   const handleAssignStudent = async () => {
-    if (!assignForm.studentId || !assignForm.classroomId || !assignForm.sessionId) {
-      toast.error('Please select class and session');
+    if (!assignForm.studentId || !assignForm.classroomId) {
+      toast.error('Please select class');
       return;
     }
 
     const currentAssignment = student?.classAssignments?.[0];
     const isReassigning = currentAssignment && 
-      (currentAssignment.classroomId !== assignForm.classroomId || 
-       currentAssignment.sessionId !== assignForm.sessionId);
+      currentAssignment.classroomId !== assignForm.classroomId;
 
     if (isReassigning) {
       const currentClass = classrooms.find((c) => c.id === currentAssignment.classroomId);
-      const currentSession = sessions.find((s) => s.id === currentAssignment.sessionId);
       const newClass = classrooms.find((c) => c.id === assignForm.classroomId);
-      const newSession = sessions.find((s) => s.id === assignForm.sessionId);
 
       const confirmMessage = `This student is currently assigned to:\n` +
-        `Class: ${currentClass?.name || 'Unknown'}\n` +
-        `Session: ${currentSession?.name || 'Unknown'}\n\n` +
+        `Class: ${currentClass?.name || 'Unknown'}\n\n` +
         `You are about to reassign them to:\n` +
-        `Class: ${newClass?.name || 'Unknown'}\n` +
-        `Session: ${newSession?.name || 'Unknown'}\n\n` +
+        `Class: ${newClass?.name || 'Unknown'}\n\n` +
         `This will automatically unassign them from their current class. Continue?`;
 
       if (!window.confirm(confirmMessage)) {
@@ -220,7 +203,7 @@ export default function StudentProfile() {
       await studentAPI.assignToClass(assignForm);
       toast.success(isReassigning ? 'Student reassigned successfully' : 'Student assigned to class successfully');
       setShowAssignDialog(false);
-      setAssignForm({ studentId: '', classroomId: '', sessionId: '' });
+      setAssignForm({ studentId: '', classroomId: '' });
       loadStudent();
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to assign student');
@@ -583,7 +566,6 @@ export default function StudentProfile() {
                       setAssignForm({
                         studentId: student.id,
                         classroomId: currentAssignment?.classroomId || '',
-                        sessionId: currentAssignment?.sessionId || '',
                       });
                       setShowAssignDialog(true);
                     }}
@@ -604,8 +586,7 @@ export default function StudentProfile() {
                         }
 
                         const confirmMessage = `Are you sure you want to unassign this student from:\n` +
-                          `Class: ${currentAssignment.classroom?.name || 'Unknown'}\n` +
-                          `Session: ${currentAssignment.session?.name || 'Unknown'}\n\n` +
+                          `Class: ${currentAssignment.classroom?.name || 'Unknown'}\n\n` +
                           `They will be moved to the unassigned pool.`;
 
                         if (!window.confirm(confirmMessage)) {
@@ -647,7 +628,9 @@ export default function StudentProfile() {
                         <h3 className="font-semibold text-gray-900">
                           {assignment.classroom?.name}
                         </h3>
-                        <p className="text-sm text-gray-600">{assignment.session?.name}</p>
+                        {assignment.classroom?.academicSession && (
+                          <p className="text-sm text-gray-600">{assignment.classroom.academicSession}</p>
+                        )}
                         <p className="text-xs text-gray-500 mt-1">
                           Assigned: {format(new Date(assignment.assignedAt), 'MMM dd, yyyy')}
                         </p>
@@ -887,11 +870,9 @@ export default function StudentProfile() {
       {showAssignDialog && student && (() => {
         const currentAssignment = student.classAssignments?.[0];
         const currentClass = currentAssignment ? classrooms.find((c) => c.id === currentAssignment.classroomId) : null;
-        const currentSession = currentAssignment ? sessions.find((s) => s.id === currentAssignment.sessionId) : null;
         const isReassigning = currentAssignment && 
-          assignForm.classroomId && assignForm.sessionId &&
-          (currentAssignment.classroomId !== assignForm.classroomId || 
-           currentAssignment.sessionId !== assignForm.sessionId);
+          assignForm.classroomId &&
+          currentAssignment.classroomId !== assignForm.classroomId;
 
         return (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -904,8 +885,10 @@ export default function StudentProfile() {
                 <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-sm font-semibold text-yellow-800 mb-1">Current Assignment:</p>
                   <p className="text-sm text-yellow-700">
-                    <strong>Class:</strong> {currentClass?.name || 'Unknown'} | 
-                    <strong> Session:</strong> {currentSession?.name || 'Unknown'}
+                    <strong>Class:</strong> {currentClass?.name || 'Unknown'}
+                    {currentClass?.academicSession && (
+                      <span> ({currentClass.academicSession})</span>
+                    )}
                   </p>
                 </div>
               )}
@@ -918,21 +901,6 @@ export default function StudentProfile() {
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Session</label>
-                  <select
-                    className="input-field"
-                    value={assignForm.sessionId}
-                    onChange={(e) => setAssignForm({ ...assignForm, sessionId: e.target.value })}
-                  >
-                    <option value="">Choose a session...</option>
-                    {sessions.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Class</label>
                   <select
@@ -970,7 +938,7 @@ export default function StudentProfile() {
                 <button
                   onClick={() => {
                     setShowAssignDialog(false);
-                    setAssignForm({ studentId: '', classroomId: '', sessionId: '' });
+                    setAssignForm({ studentId: '', classroomId: '' });
                   }}
                   className="btn-secondary flex-1"
                 >

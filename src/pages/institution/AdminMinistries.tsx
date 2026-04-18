@@ -170,7 +170,7 @@ export default function AdminMinistries() {
                         <div className="flex flex-col gap-1">
                           <span className="text-xs">Schools: {ministry.metrics.schools}</span>
                           <span className="text-xs">Teachers: {ministry.metrics.teachers}</span>
-                          <span className="text-xs">Sessions: {ministry.metrics.sessions}</span>
+                          <span className="text-xs">Classes: {ministry.metrics.classes}</span>
                           <span className="text-xs">Tests: {ministry.metrics.tests}</span>
                         </div>
                       ) : (

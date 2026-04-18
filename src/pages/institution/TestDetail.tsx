@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { testAPI, questionAPI, sessionAPI, classroomAPI, teacherAPI, customFieldAPI, gradingAPI, studentAPI, subjectAPI, testGroupAPI } from '../../services/api';
-import { Test, Question, Session, Classroom, Institution, TestCustomField, StudentTest } from '../../types';
+import { testAPI, questionAPI, classroomAPI, teacherAPI, customFieldAPI, gradingAPI, studentAPI, subjectAPI, testGroupAPI } from '../../services/api';
+import { Test, Question, Classroom, Institution, TestCustomField, StudentTest } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+
+function resolveTestMaxAttempts(field: string): { maxAttempts: number; allowRetrial: boolean } {
+  const t = (field || '').trim();
+  if (t === '') return { maxAttempts: 1, allowRetrial: false };
+  const n = parseInt(t, 10);
+  const maxAttempts = Number.isFinite(n) && n >= 1 ? n : 1;
+  return { maxAttempts, allowRetrial: maxAttempts > 1 };
+}
 
 export default function TestDetail() {
   const { id } = useParams();
@@ -12,7 +20,6 @@ export default function TestDetail() {
   const { account } = useAuthStore();
   const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [teachers, setTeachers] = useState<Institution[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
@@ -47,6 +54,7 @@ export default function TestDetail() {
     E: '',
   });
   const [useVisualBuilder, setUseVisualBuilder] = useState(true);
+  const [showMoreTestOptions, setShowMoreTestOptions] = useState(false);
   const [testForm, setTestForm] = useState({
     title: '',
     description: '',
@@ -58,11 +66,9 @@ export default function TestDetail() {
     dueDate: '',
     passingScore: '',
     maxAttempts: '1',
-    allowRetrial: false,
     scoreVisibility: false,
     requiresManualGrading: false,
     isActive: true,
-    sessionId: '',
     classroomId: '',
     classroomIds: [] as string[],
     teacherId: '',
@@ -94,7 +100,6 @@ export default function TestDetail() {
           await Promise.all([
             loadTest(),
             loadQuestions(),
-            loadSessions(),
             loadCustomFields(),
             loadSubjects(),
             loadTestGroups(),
@@ -129,7 +134,6 @@ export default function TestDetail() {
     try {
       const response = await testAPI.getOne(id!);
       setTest(response.data);
-      const currentSession = response.data.sessions?.[0]?.session;
       const currentClassroom = response.data.classrooms?.[0]?.classroom;
       const currentTeacher = (response.data as any).teacher;
       
@@ -145,12 +149,10 @@ export default function TestDetail() {
         duration: response.data.duration?.toString() || '',
         dueDate: dueDate,
         passingScore: response.data.passingScore?.toString() || '',
-        maxAttempts: response.data.maxAttempts.toString(),
-        allowRetrial: response.data.allowRetrial,
+        maxAttempts: String(response.data.maxAttempts ?? 1),
         scoreVisibility: response.data.scoreVisibility || false,
         requiresManualGrading: response.data.requiresManualGrading || false,
         isActive: response.data.isActive,
-        sessionId: currentSession?.id || '',
         classroomId: currentClassroom?.id || '',
         classroomIds: allClassroomIds,
         teacherId: currentTeacher?.id || '',
@@ -186,15 +188,6 @@ export default function TestDetail() {
       setTeachers(response.data);
     } catch (error: any) {
       console.error('Failed to load teachers');
-    }
-  };
-
-  const loadSessions = async () => {
-    try {
-      const response = await sessionAPI.getAll();
-      setSessions(response.data);
-    } catch (error: any) {
-      console.error('Failed to load sessions');
     }
   };
 
@@ -321,8 +314,11 @@ export default function TestDetail() {
     }
     
     try {
+      const { maxAttempts: resolvedAttempts, allowRetrial } = resolveTestMaxAttempts(testForm.maxAttempts);
       const updateData: any = {
         ...testForm,
+        maxAttempts: resolvedAttempts,
+        allowRetrial,
         subjectId: testForm.subjectId || undefined,
         testGroupId: testForm.testGroupId || undefined,
       };
@@ -673,12 +669,12 @@ export default function TestDetail() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'question-bulk-template.xlsx';
+      link.download = 'Question-Template.xlsx';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      toast.success('Template downloaded — open the Instructions sheet to confirm v2 (optionA–D).');
+      toast.success('Template downloaded — Instructions sheet describes v3 headers and the Question Type dropdown.');
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to download template');
     }
@@ -799,42 +795,6 @@ export default function TestDetail() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Session <span className="text-red-500">*</span>
-                  {account && account.role === 'TEACHER' && test?.teacherId !== account.id && <span className="text-xs text-gray-500 ml-2">(Locked)</span>}
-                </label>
-                {account && account.role === 'TEACHER' && test?.teacherId !== account.id ? (
-                  <div className="input-field bg-gray-50 cursor-not-allowed">
-                    {test?.sessions?.[0]?.session?.name || 'No session assigned'}
-                    {test?.sessions?.[0]?.session?.classAssignments?.[0]?.classroom?.name && ` (${test.sessions[0].session.classAssignments[0].classroom.name})`}
-                  </div>
-                ) : (
-                  <select
-                    className="input-field"
-                    value={testForm.sessionId}
-                    onChange={(e) => {
-                      const selectedSession = sessions.find(s => s.id === e.target.value);
-                      setTestForm({ 
-                        ...testForm, 
-                        sessionId: e.target.value,
-                        classroomId: selectedSession?.classAssignments?.[0]?.classroomId || testForm.classroomId
-                      });
-                    }}
-                    required
-                  >
-                    <option value="">Select a session</option>
-                    {sessions
-                      .filter((s) => s.isActive)
-                      .map((session) => (
-                        <option key={session.id} value={session.id}>
-                          {session.name}
-                          {session.classAssignments?.[0]?.classroom?.name && ` (${session.classAssignments[0].classroom.name})`}
-                        </option>
-                      ))}
-                  </select>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Classes <span className="text-red-500">*</span>
                   {account && account.role === 'TEACHER' && test?.teacherId !== account.id && <span className="text-xs text-gray-500 ml-2">(Locked)</span>}
                 </label>
@@ -890,7 +850,17 @@ export default function TestDetail() {
                 )}
               </div>
             </div>
-            {account && account.role === 'SCHOOL' && (
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowMoreTestOptions((v) => !v)}
+                className="text-sm font-medium text-primary hover:text-primary-700 underline-offset-2 hover:underline"
+              >
+                {showMoreTestOptions ? 'Hide optional details' : 'Show more (teacher, group, description, due date, max attempts)'}
+              </button>
+            </div>
+
+            {showMoreTestOptions && account && account.role === 'SCHOOL' && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Assign to Teacher (Optional)
@@ -909,35 +879,19 @@ export default function TestDetail() {
                 </select>
               </div>
             )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Test Title <span className="text-red-500">*</span>
                 </label>
-            <input
-              className="input-field"
-              placeholder="Test Title"
-              value={testForm.title}
-              onChange={(e) => setTestForm({ ...testForm, title: e.target.value })}
-              required
-            />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Test Group
-                </label>
-                <select
+                <input
                   className="input-field"
-                  value={testForm.testGroupId}
-                  onChange={(e) => setTestForm({ ...testForm, testGroupId: e.target.value, testGroup: testGroups.find(tg => tg.id === e.target.value)?.name || '' })}
-                >
-                  <option value="">Select Test Group (optional)</option>
-                  {testGroups.filter(tg => tg.isActive).map((tg) => (
-                    <option key={tg.id} value={tg.id}>
-                      {tg.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Test Title"
+                  value={testForm.title}
+                  onChange={(e) => setTestForm({ ...testForm, title: e.target.value })}
+                  required
+                />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -957,18 +911,41 @@ export default function TestDetail() {
                 </select>
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Description
-              </label>
-            <textarea
-              className="input-field"
-              placeholder="Description"
-              value={testForm.description}
-              onChange={(e) => setTestForm({ ...testForm, description: e.target.value })}
-              rows={3}
-            />
-            </div>
+
+            {showMoreTestOptions && (
+              <>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Test Group
+                  </label>
+                  <select
+                    className="input-field"
+                    value={testForm.testGroupId}
+                    onChange={(e) => setTestForm({ ...testForm, testGroupId: e.target.value, testGroup: testGroups.find(tg => tg.id === e.target.value)?.name || '' })}
+                  >
+                    <option value="">Select Test Group (optional)</option>
+                    {testGroups.filter(tg => tg.isActive).map((tg) => (
+                      <option key={tg.id} value={tg.id}>
+                        {tg.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    className="input-field"
+                    placeholder="Description"
+                    value={testForm.description}
+                    onChange={(e) => setTestForm({ ...testForm, description: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+              </>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="flex items-center cursor-pointer group mb-2">
@@ -981,12 +958,12 @@ export default function TestDetail() {
                   <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Is this test timed?</span>
                 </label>
                 {testForm.isTimed && (
-              <input
-                type="number"
-                className="input-field"
-                placeholder="Duration (minutes)"
-                value={testForm.duration}
-                onChange={(e) => setTestForm({ ...testForm, duration: e.target.value })}
+                  <input
+                    type="number"
+                    className="input-field"
+                    placeholder="Duration (minutes)"
+                    value={testForm.duration}
+                    onChange={(e) => setTestForm({ ...testForm, duration: e.target.value })}
                     required={testForm.isTimed}
                     min="1"
                   />
@@ -997,73 +974,69 @@ export default function TestDetail() {
                   </p>
                 )}
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Due Date (optional)
-                </label>
-                <input
-                  type="datetime-local"
-                  className="input-field"
-                  value={testForm.dueDate}
-                  onChange={(e) => setTestForm({ ...testForm, dueDate: e.target.value })}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Optional: Set a deadline for when students should complete this test
-                </p>
-              </div>
+              {showMoreTestOptions && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Due Date (optional)
+                  </label>
+                  <input
+                    type="datetime-local"
+                    className="input-field"
+                    value={testForm.dueDate}
+                    onChange={(e) => setTestForm({ ...testForm, dueDate: e.target.value })}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Optional: Set a deadline for when students should complete this test
+                  </p>
+                </div>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Passing Score (%)
                 </label>
-              <input
-                type="number"
-                step="0.1"
-                className="input-field"
-                placeholder="Passing Score (%)"
-                value={testForm.passingScore}
-                onChange={(e) => setTestForm({ ...testForm, passingScore: e.target.value })}
-              />
+                <input
+                  type="number"
+                  step="0.1"
+                  className="input-field"
+                  placeholder="Passing Score (%)"
+                  value={testForm.passingScore}
+                  onChange={(e) => setTestForm({ ...testForm, passingScore: e.target.value })}
+                />
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Max Attempts <span className="text-red-500">*</span>
-                </label>
-              <input
-                type="number"
-                className="input-field"
-                placeholder="Max Attempts"
-                value={testForm.maxAttempts}
-                onChange={(e) => setTestForm({ ...testForm, maxAttempts: e.target.value })}
-                required
-              />
-              </div>
+              {showMoreTestOptions && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Max attempts (optional)
+                  </label>
+                  <input
+                    type="number"
+                    className="input-field"
+                    placeholder="Leave blank for 1 — use 2+ to allow retakes"
+                    value={testForm.maxAttempts}
+                    onChange={(e) => setTestForm({ ...testForm, maxAttempts: e.target.value })}
+                    min="1"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    More than one attempt lets students retake until they reach this limit.
+                  </p>
+                </div>
+              )}
             </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <label className="flex items-center cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={testForm.allowRetrial}
-                    onChange={(e) =>
-                      setTestForm({ ...testForm, allowRetrial: e.target.checked })
-                    }
-                  className="mr-3 w-5 h-5 text-primary focus:ring-primary rounded"
-                  />
-                <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Allow Retrial</span>
-                </label>
-              <label className="flex items-center cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={testForm.isActive}
-                    onChange={(e) =>
-                      setTestForm({ ...testForm, isActive: e.target.checked })
-                    }
-                    className="mr-2"
-                  />
-                  <span className="text-sm">Active</span>
-                </label>
-              </div>
+                <input
+                  type="checkbox"
+                  checked={testForm.isActive}
+                  onChange={(e) => setTestForm({ ...testForm, isActive: e.target.checked })}
+                  className="mr-2"
+                />
+                <span className="text-sm">Active</span>
+              </label>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                   <div>
                 <label className="text-sm font-medium text-gray-700 block mb-2">Score Visibility</label>
@@ -1271,18 +1244,10 @@ export default function TestDetail() {
             </div>
           </div>
 
-          {/* Session & Classes */}
+          {/* Classes */}
           <div className="mb-6 pb-6 border-b border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase mb-4">Session & Classes</h3>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase mb-4">Classes</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {test.sessions && test.sessions.length > 0 && (
-                <div>
-                  <label className="text-xs font-semibold text-gray-500 uppercase">Session</label>
-                  <p className="font-medium text-gray-900 mt-1">
-                    {test.sessions[0]?.session?.name || 'N/A'}
-                  </p>
-                </div>
-              )}
               {test.classrooms && test.classrooms.length > 0 && (
                 <div>
                   <label className="text-xs font-semibold text-gray-500 uppercase">Assigned Classes</label>
@@ -1336,19 +1301,10 @@ export default function TestDetail() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase">Max Attempts</label>
-                <p className="font-medium text-gray-900 mt-1">{test.maxAttempts || '1'}</p>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-gray-500 uppercase">Allow Retrial</label>
                 <p className="font-medium text-gray-900 mt-1">
-                  {test.allowRetrial ? (
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      ✓ Yes
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                      ✗ No
-                    </span>
+                  {test.maxAttempts || 1}
+                  {(test.maxAttempts || 1) > 1 && (
+                    <span className="text-gray-500 text-xs ml-1">(retakes allowed)</span>
                   )}
                 </p>
               </div>
@@ -1681,7 +1637,7 @@ export default function TestDetail() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
-                              {score.test?.allowRetrial &&
+                              {(score.test?.maxAttempts || 1) > 1 &&
                                 (score.status === 'graded' || score.status === 'submitted') &&
                                 score.attemptNumber < (score.test?.maxAttempts || 1) && (
                                   <button
@@ -1814,7 +1770,7 @@ export default function TestDetail() {
               </button>
             </div>
             <p className="text-xs text-gray-500 max-w-md sm:text-right">
-              Template columns: questionText, questionType, optionA, optionB, optionC, optionD, correctAnswer, points. Multiple select: use A,B in correctAnswer.
+              Use the downloaded template: Question Text, Question Type, Option A–D, Correct Answer, Points. Multiple select: comma-separated letters or option text (e.g. A, C). Older spreadsheets with different headers can still be uploaded.
             </p>
           </div>
         </div>
