@@ -14,8 +14,11 @@ export default function StudentPracticeTake() {
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [flagged, setFlagged] = useState<Record<string, boolean>>({});
   const [shownAnswer, setShownAnswer] = useState<Record<string, boolean>>({});
-  const [answerResult, setAnswerResult] = useState<Record<string, { isCorrect: boolean; correctAnswer: string }>>({});
+  const [answerResult, setAnswerResult] = useState<
+    Record<string, { isCorrect: boolean; correctAnswer: string; answerRationale?: string | null; topicTag?: string | null }>
+  >({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,6 +38,23 @@ export default function StudentPracticeTake() {
         setQuestions(Array.isArray(qList) ? qList : []);
         const attempt = await practiceAPI.studentStartAttempt(practiceId);
         setAttemptId(attempt?.id ?? null);
+        if (attempt?.id) {
+          try {
+            const attemptDetails = await practiceAPI.studentGetAttempt(attempt.id);
+            const nextAnswers: Record<string, string> = {};
+            const nextFlags: Record<string, boolean> = {};
+            (attemptDetails?.answers || []).forEach((a: any) => {
+              if (typeof a?.questionId === 'string') {
+                nextAnswers[a.questionId] = a.selectedAnswer ?? '';
+                if (a.isFlagged) nextFlags[a.questionId] = true;
+              }
+            });
+            setAnswers(nextAnswers);
+            setFlagged(nextFlags);
+          } catch {
+            // Non-blocking: practice can continue even if previous state fetch fails.
+          }
+        }
       } catch (error: any) {
         toast.error(error.response?.data?.error || 'Failed to start practice');
         navigate('/student/practice');
@@ -49,6 +69,7 @@ export default function StudentPracticeTake() {
   const selected = qId ? answers[qId] : '';
   const shown = qId ? shownAnswer[qId] : false;
   const result = qId ? answerResult[qId] : null;
+  const isFlagged = qId ? !!flagged[qId] : false;
   const options = currentQuestion?.options && typeof currentQuestion.options === 'object'
     ? Object.entries(currentQuestion.options as Record<string, string>)
     : [];
@@ -57,6 +78,22 @@ export default function StudentPracticeTake() {
   const handleSelect = (value: string) => {
     if (!qId || shown) return;
     setAnswers((prev) => ({ ...prev, [qId]: value }));
+  };
+
+  const handleToggleFlag = async () => {
+    if (!attemptId || !qId) return;
+    const nextFlag = !isFlagged;
+    setFlagged((prev) => ({ ...prev, [qId]: nextFlag }));
+    try {
+      await practiceAPI.studentSubmitAnswer(attemptId, {
+        questionId: qId,
+        selectedAnswer: answers[qId] ?? '',
+        isFlagged: nextFlag,
+      });
+    } catch {
+      setFlagged((prev) => ({ ...prev, [qId]: !nextFlag }));
+      toast.error('Failed to update flag');
+    }
   };
 
   const saveAnswer = async (questionId: string, value: string, showAnswerFlag = false) => {
@@ -68,7 +105,15 @@ export default function StudentPracticeTake() {
         showAnswer: showAnswerFlag,
       });
       if (showAnswerFlag && res?.isCorrect !== undefined && res?.correctAnswer !== undefined) {
-        setAnswerResult((prev) => ({ ...prev, [questionId]: { isCorrect: res.isCorrect, correctAnswer: res.correctAnswer } }));
+        setAnswerResult((prev) => ({
+          ...prev,
+          [questionId]: {
+            isCorrect: res.isCorrect,
+            correctAnswer: res.correctAnswer,
+            answerRationale: res?.answerRationale ?? null,
+            topicTag: res?.topicTag ?? null,
+          },
+        }));
         setShownAnswer((prev) => ({ ...prev, [questionId]: true }));
       }
     } catch (e) {
@@ -87,7 +132,15 @@ export default function StudentPracticeTake() {
       });
       setShownAnswer((prev) => ({ ...prev, [qId]: true }));
       if (res?.isCorrect !== undefined && res?.correctAnswer !== undefined) {
-        setAnswerResult((prev) => ({ ...prev, [qId]: { isCorrect: res.isCorrect, correctAnswer: res.correctAnswer } }));
+        setAnswerResult((prev) => ({
+          ...prev,
+          [qId]: {
+            isCorrect: res.isCorrect,
+            correctAnswer: res.correctAnswer,
+            answerRationale: res?.answerRationale ?? null,
+            topicTag: res?.topicTag ?? null,
+          },
+        }));
       }
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to save answer');
@@ -172,6 +225,20 @@ export default function StudentPracticeTake() {
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden mb-6">
         <div className="p-6 sm:p-8">
           <p className="text-gray-900 font-medium text-lg leading-relaxed">{currentQuestion?.questionText}</p>
+          <div className="mt-4 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={handleToggleFlag}
+              className={`rounded-xl border px-3 py-1.5 text-xs font-medium ${
+                isFlagged
+                  ? 'border-amber-300 bg-amber-50 text-amber-800'
+                  : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {isFlagged ? 'Flagged' : 'Flag question'}
+            </button>
+            {isFlagged && <span className="text-xs text-amber-700">This question is flagged for review</span>}
+          </div>
           {(currentQuestion?.questionType === 'multiple_choice' || currentQuestion?.questionType === 'true_false') && (
             <div className="mt-6 space-y-3">
               {options.map(([key, label]) => (
@@ -206,6 +273,18 @@ export default function StudentPracticeTake() {
             <div className={`mt-6 p-4 rounded-xl ${result.isCorrect ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>
               <p className="font-medium">{result.isCorrect ? 'Correct!' : 'Correct answer:'}</p>
               {!result.isCorrect && <p className="mt-1">{result.correctAnswer}</p>}
+              {result.answerRationale && (
+                <p className="mt-2 text-sm leading-relaxed">
+                  <span className="font-medium">Answer rationale: </span>
+                  {result.answerRationale}
+                </p>
+              )}
+              {result.topicTag && (
+                <p className="mt-2 text-xs opacity-85">
+                  <span className="font-medium">Topic: </span>
+                  {result.topicTag}
+                </p>
+              )}
             </div>
           )}
           {!shown && (
@@ -276,8 +355,10 @@ export default function StudentPracticeTake() {
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
             style={i === currentIndex ? { backgroundColor: 'var(--theme-primary)' } : {}}
+            title={flagged[q.id] ? 'Flagged question' : undefined}
           >
             {i + 1}
+            {flagged[q.id] ? ' *' : ''}
           </button>
         ))}
       </div>

@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { authAPI } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -13,8 +13,16 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const passwordInputRef = useRef<HTMLInputElement>(null);
+  const autoRydRef = useRef(false);
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isAutoLogin = searchParams.get('auto') === '1';
+
+  useEffect(() => {
+    if (!isAutoLogin) return;
+    navigate(`/sso/redirect?${searchParams.toString()}`, { replace: true });
+  }, [isAutoLogin, navigate, searchParams]);
 
   // Check for auto-filled password
   useEffect(() => {
@@ -43,104 +51,149 @@ export default function Login() {
     setError(null);
   };
 
+  const loginWithRole = useCallback(
+    async (
+      emailIn: string,
+      passwordIn: string,
+      roleIn: 'SUPER_ADMIN' | 'MINISTRY' | 'SCHOOL' | 'SCHOOL_ADMIN' | 'TEACHER',
+    ) => {
+      setLoading(true);
+      setError(null);
+      try {
+        let response;
+        if (roleIn === 'SCHOOL_ADMIN') {
+          try {
+            response = await authAPI.login({ email: emailIn, password: passwordIn, role: 'SCHOOL_ADMIN' });
+          } catch (error: any) {
+            if (error.response?.status === 401 || error.response?.status === 404) {
+              try {
+                response = await authAPI.login({ email: emailIn, password: passwordIn, role: 'SCHOOL' });
+              } catch (schoolError: any) {
+                throw schoolError;
+              }
+            } else {
+              throw error;
+            }
+          }
+        } else {
+          response = await authAPI.login({ email: emailIn, password: passwordIn, role: roleIn });
+        }
+
+        const token = response.data?.token;
+        const institution = response.data?.institution;
+        const requiresPasswordReset = response.data?.requiresPasswordReset === true;
+
+        if (!token) {
+          setError('Login failed: No authentication token received');
+          toast.error('Login failed: No authentication token received');
+          return;
+        }
+
+        if (!institution) {
+          setError('Login failed: No account data received');
+          toast.error('Login failed: No account data received');
+          return;
+        }
+
+        const institutionWithResetFlag = {
+          ...institution,
+          mustResetPassword: requiresPasswordReset || institution.mustResetPassword || false,
+        };
+
+        setAuth(token, institutionWithResetFlag);
+        toast.success(
+          requiresPasswordReset ? 'Login successful! Please reset your password.' : 'Login successful!',
+        );
+        navigate('/dashboard');
+      } catch (error: any) {
+        let errorMessage = 'Invalid email or password. Please try again.';
+
+        if (error.response?.status === 429) {
+          errorMessage =
+            error.response?.data?.message ||
+            error.response?.data?.error ||
+            'Too many login attempts. Please wait 15 minutes or restart the backend server to reset the limit.';
+          setError(errorMessage);
+          toast.error(errorMessage, { duration: 6000 });
+          return;
+        }
+
+        if (error.response?.data?.error) {
+          errorMessage = error.response.data.error;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
+        setError(errorMessage);
+        toast.error(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [navigate, setAuth],
+  );
+
+  // RYD Partner deep-link: /login?email=...&password=...&auto=1&role=SCHOOL
+  useEffect(() => {
+    if (autoRydRef.current) return;
+    if (searchParams.get('auto') !== '1') return;
+    const e = searchParams.get('email')?.trim();
+    const p = searchParams.get('password') ?? '';
+    if (!e || !p) return;
+    const r = (searchParams.get('role') || 'SCHOOL').toUpperCase();
+    const mapRole = (): 'SUPER_ADMIN' | 'MINISTRY' | 'SCHOOL' | 'SCHOOL_ADMIN' | 'TEACHER' | null => {
+      if (r === 'SCHOOL' || r === 'SCHOOL_ADMIN' || r === 'MINISTRY' || r === 'TEACHER' || r === 'SUPER_ADMIN') {
+        return r as 'SCHOOL' | 'SCHOOL_ADMIN' | 'MINISTRY' | 'TEACHER' | 'SUPER_ADMIN';
+      }
+      return 'SCHOOL';
+    };
+    const roleIn = mapRole();
+    autoRydRef.current = true;
+    setEmail(e);
+    setPassword(p);
+    if (roleIn === 'SCHOOL' || roleIn === 'SCHOOL_ADMIN') {
+      setRole(roleIn === 'SCHOOL' ? 'SCHOOL' : 'SCHOOL_ADMIN');
+    } else {
+      setRole(roleIn);
+    }
+    if (roleIn === 'SCHOOL' || roleIn === 'SCHOOL_ADMIN') {
+      void loginWithRole(
+        e,
+        p,
+        roleIn === 'SCHOOL' ? 'SCHOOL' : 'SCHOOL_ADMIN',
+      );
+    } else if (roleIn) {
+      void loginWithRole(e, p, roleIn);
+    }
+  }, [searchParams, loginWithRole]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!role) {
       setError('Please select your role');
       toast.error('Please select your role');
       return;
     }
-    
-    setLoading(true);
-    setError(null);
 
-    try {
-      // If "I am a School Administrator" is selected, try both SCHOOL and SCHOOL_ADMIN roles
-      let response;
-      
-      if (role === 'SCHOOL_ADMIN') {
-        // Try SCHOOL_ADMIN first, then SCHOOL if it fails with 401/404 (authentication errors)
-        try {
-          response = await authAPI.login({ email, password, role: 'SCHOOL_ADMIN' });
-        } catch (error: any) {
-          // If SCHOOL_ADMIN fails with authentication error, try SCHOOL role
-          if (error.response?.status === 401 || error.response?.status === 404) {
-            try {
-              response = await authAPI.login({ email, password, role: 'SCHOOL' });
-            } catch (schoolError: any) {
-              // Both failed, throw the school error (it will be handled below)
-              throw schoolError;
-            }
-          } else {
-            // Other errors (403, 500, etc.) should be thrown immediately
-            throw error;
-          }
-        }
-      } else {
-        response = await authAPI.login({ email, password, role });
-      }
-      
-      // Extract token and institution from response
-      const token = response.data?.token;
-      const institution = response.data?.institution;
-      const requiresPasswordReset = response.data?.requiresPasswordReset === true;
-      
-      if (!token) {
-        console.error('Login failed: No token in response', response.data);
-        setError('Login failed: No authentication token received');
-        toast.error('Login failed: No authentication token received');
-        return;
-      }
-      
-      if (!institution) {
-        console.error('Login failed: No institution in response', response.data);
-        setError('Login failed: No account data received');
-        toast.error('Login failed: No account data received');
-        return;
-      }
-      
-      // Set mustResetPassword flag in institution object
-      const institutionWithResetFlag = {
-        ...institution,
-        mustResetPassword: requiresPasswordReset || institution.mustResetPassword || false,
-      };
-      
-      setAuth(token, institutionWithResetFlag);
-      toast.success(requiresPasswordReset ? 'Login successful! Please reset your password.' : 'Login successful!');
-      navigate('/dashboard');
-    } catch (error: any) {
-      console.error('Login error:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      
-      // Extract error message from response
-      let errorMessage = 'Invalid email or password. Please try again.';
-      
-      // Handle rate limiting (429)
-      if (error.response?.status === 429) {
-        errorMessage = error.response?.data?.message || 
-                      error.response?.data?.error || 
-                      'Too many login attempts. Please wait 15 minutes or restart the backend server to reset the limit.';
-        setError(errorMessage);
-        toast.error(errorMessage, { duration: 6000 });
-        return;
-      }
-      
-      if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      setError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
+    await loginWithRole(email, password, role);
   };
 
   const primaryColor = '#a8518a'; // Primary color
+
+  if (isAutoLogin) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow p-8 text-center">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-purple-100 mb-4">
+            <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-[#88167a]" />
+          </div>
+          <h1 className="text-lg font-semibold text-gray-900">Redirecting...</h1>
+          <p className="text-sm text-gray-600 mt-2">Signing you in securely. Please wait.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex overflow-hidden bg-gray-50">
@@ -412,24 +465,6 @@ export default function Login() {
             </div>
           )}
         </form>
-        
-          {/* Super Admin Login Link - Footer */}
-          <div className="mt-6 pt-6 border-t border-gray-200 text-center">
-            <button
-              type="button"
-              onClick={() => handleRoleSelect('SUPER_ADMIN')}
-              className="text-sm text-gray-500 transition-colors hover:underline"
-              style={{ '--hover-color': primaryColor } as React.CSSProperties}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = primaryColor;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = '#6b7280';
-              }}
-            >
-              Super Admin Login
-            </button>
-          </div>
         </div>
       </div>
     </div>

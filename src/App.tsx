@@ -57,6 +57,7 @@ import StudentPractice from './pages/student/StudentPractice';
 import StudentPracticeTake from './pages/student/StudentPracticeTake';
 import StudentPracticeResult from './pages/student/StudentPracticeResult';
 import SchoolLogin from './pages/student/SchoolLogin';
+import SsoRedirect from './pages/shared/SsoRedirect';
 
 // Parent pages
 import ParentLogin from './pages/parent/ParentLogin';
@@ -93,6 +94,7 @@ function App() {
         <Routes>
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
+          <Route path="/sso/redirect" element={<SsoRedirect />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />

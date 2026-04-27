@@ -81,6 +81,8 @@ export interface Question {
   questionType: 'multiple_choice' | 'multiple_select' | 'true_false' | 'short_answer';
   options?: Record<string, string>;
   correctAnswer?: string | null;
+  answerRationale?: string | null;
+  topicTag?: string | null;
   points: number;
   order: number;
   requiresManualGrading: boolean;
@@ -120,6 +122,7 @@ export interface PracticeAttemptAnswer {
   questionId: string;
   selectedAnswer: string;
   isCorrect: boolean | null;
+  isFlagged?: boolean;
   shownAnswerAt?: string | null;
   question?: Question;
 }

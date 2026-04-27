@@ -507,7 +507,10 @@ export const practiceAPI = {
   studentGetQuestions: (id: string) => api.get(`/practices/student/${id}/questions`).then((r) => r.data),
   studentStartAttempt: (practiceId: string) =>
     api.post(`/practices/student/${practiceId}/attempts`).then((r) => r.data),
-  studentSubmitAnswer: (attemptId: string, data: { questionId: string; selectedAnswer: string; showAnswer?: boolean }) =>
+  studentSubmitAnswer: (
+    attemptId: string,
+    data: { questionId: string; selectedAnswer?: string; showAnswer?: boolean; isFlagged?: boolean },
+  ) =>
     api.put(`/practices/student/attempts/${attemptId}/answer`, data).then((r) => r.data),
   studentSubmitAttempt: (attemptId: string) =>
     api.post(`/practices/student/attempts/${attemptId}/submit`).then((r) => r.data),

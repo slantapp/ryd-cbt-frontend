@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { authAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
@@ -26,6 +26,62 @@ export default function StudentLogin() {
   const confirmPasswordInputRef = useRef<HTMLInputElement>(null);
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isAutoLogin = searchParams.get('auto') === '1';
+  const autoLoginStarted = useRef(false);
+
+  useEffect(() => {
+    if (!isAutoLogin) return;
+    navigate(`/sso/redirect?${searchParams.toString()}`, { replace: true });
+  }, [isAutoLogin, navigate, searchParams]);
+
+  // Partner / deep-link: ?username=...&password=...&auto=1
+  useEffect(() => {
+    if (autoLoginStarted.current) return;
+    if (searchParams.get('auto') !== '1') return;
+    const u = searchParams.get('username')?.trim();
+    const p = searchParams.get('password') ?? '';
+    if (!u || !p) return;
+    autoLoginStarted.current = true;
+    setFormData({ username: u, password: p });
+
+    (async () => {
+      setLoading(true);
+      try {
+        const response = await authAPI.studentLogin({ username: u, password: p });
+        if (response.data.requiresPasswordReset) {
+          setRequiresPasswordReset(true);
+          setResetData(response.data.student);
+          return;
+        }
+        if (!response.data.token || !response.data.student) {
+          toast.error('Login failed');
+          return;
+        }
+        const studentAccount = {
+          id: response.data.student.id,
+          name: `${response.data.student.firstName} ${response.data.student.lastName}`,
+          email: response.data.student.email || response.data.student.username,
+          role: 'STUDENT' as const,
+          username: response.data.student.username,
+          firstName: response.data.student.firstName,
+          lastName: response.data.student.lastName,
+          institutionId: response.data.student.institutionId,
+          institution: response.data.student.institution,
+          createdAt: new Date().toISOString(),
+          status: 'ACTIVE' as const,
+        };
+        setAuth(response.data.token, studentAccount as any);
+        toast.success('Login successful!');
+        navigate('/student/dashboard');
+      } catch (error: any) {
+        toast.error(error?.response?.data?.error || 'Login failed');
+        autoLoginStarted.current = false;
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [searchParams, setAuth, navigate]);
 
   // Check for auto-filled password
   useEffect(() => {
@@ -165,6 +221,20 @@ export default function StudentLogin() {
   };
 
   const themeColor = '#a8518a'; // Primary color
+
+  if (isAutoLogin) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow p-8 text-center">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-purple-100 mb-4">
+            <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-[#88167a]" />
+          </div>
+          <h1 className="text-lg font-semibold text-gray-900">Redirecting...</h1>
+          <p className="text-sm text-gray-600 mt-2">Signing you in securely. Please wait.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-gray-50">
