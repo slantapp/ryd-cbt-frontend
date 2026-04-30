@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import {
   testAPI,
+  studentAPI,
   adminAPI,
   ministryAPI,
   teacherAPI,
@@ -20,6 +21,7 @@ const copyToClipboard = (text: string) => {
 export default function Dashboard() {
   const { account } = useAuthStore();
   const [tests, setTests] = useState<Test[]>([]);
+  const [studentCount, setStudentCount] = useState(0);
   const [adminStats, setAdminStats] = useState<any>(null);
   const [ministryStats, setMinistryStats] = useState<any>(null);
   const [teacherStats, setTeacherStats] = useState<{
@@ -97,13 +99,19 @@ export default function Dashboard() {
         }
       } else {
         // For SCHOOL and SCHOOL_ADMIN roles
-        const testsRes = await testAPI.getAll();
+        const [testsRes, studentsRes] = await Promise.all([
+          testAPI.getAll(),
+          studentAPI.getAll(),
+        ]);
         const testsData = Array.isArray(testsRes.data) ? testsRes.data : [];
+        const studentsData = Array.isArray(studentsRes.data) ? studentsRes.data : [];
         console.log('Dashboard data loaded:', {
           testsCount: testsData.length,
           tests: testsData,
+          studentsCount: studentsData.length,
         });
         setTests(testsData);
+        setStudentCount(studentsData.length);
       }
     } catch (error: any) {
       console.error('Dashboard load error:', error);
@@ -129,6 +137,7 @@ export default function Dashboard() {
       } else if (account?.role === 'SCHOOL' || account?.role === 'SCHOOL_ADMIN') {
         // Ensure tests are arrays even on error
         setTests([]);
+        setStudentCount(0);
       }
     } finally {
       setLoading(false);
@@ -158,7 +167,7 @@ export default function Dashboard() {
     }
   });
   const totalClasses = allClassIds.size;
-  const totalStudents = 0;
+  const totalStudents = studentCount;
 
   const renderSchoolDashboard = () => (
     <>
