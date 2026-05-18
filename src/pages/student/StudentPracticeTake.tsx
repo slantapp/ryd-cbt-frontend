@@ -5,6 +5,55 @@ import { Question } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 
+function entriesFromQuestionOptions(options: unknown): [string, string][] {
+  if (options == null || options === '') return [];
+  if (typeof options === 'string') {
+    try {
+      const parsed = JSON.parse(options) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return Object.entries(parsed as Record<string, string>);
+      }
+    } catch {
+      return [];
+    }
+  }
+  if (typeof options === 'object' && !Array.isArray(options)) {
+    return Object.entries(options as Record<string, string>);
+  }
+  return [];
+}
+
+function splitAnswerTokens(s: string | undefined | null): string[] {
+  if (s == null || s === '') return [];
+  return String(s).split(',').map((t) => t.trim()).filter(Boolean);
+}
+
+/** e.g. "C" + { C: "4" } → "C (4)"; "A,C" → "A (2), C (4)" */
+function formatLetterAnswerForDisplay(
+  answer: string | undefined | null,
+  options: Record<string, string>,
+): string {
+  const tokens = splitAnswerTokens(answer);
+  if (!tokens.length) return answer?.trim() || '—';
+  return tokens
+    .map((key) => {
+      const label = options[key];
+      return label ? `${key} (${label})` : key;
+    })
+    .join(', ');
+}
+
+/** DB / upload may use snake_case or human labels. */
+function normalizeQuestionType(type: string | undefined | null): Question['questionType'] | null {
+  if (!type) return null;
+  const raw = String(type).trim().toLowerCase().replace(/\s+/g, '_').replace(/\//g, '_');
+  if (raw === 'multiple_choice' || raw === 'mcq') return 'multiple_choice';
+  if (raw === 'multiple_select' || raw === 'msq') return 'multiple_select';
+  if (raw === 'true_false' || raw === 'tf') return 'true_false';
+  if (raw === 'short_answer' || raw === 'sa') return 'short_answer';
+  return null;
+}
+
 export default function StudentPracticeTake() {
   const { id: practiceId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -65,19 +114,28 @@ export default function StudentPracticeTake() {
   }, [practiceId, account?.role, navigate]);
 
   const currentQuestion = questions[currentIndex];
+  const questionType = normalizeQuestionType(currentQuestion?.questionType);
   const qId = currentQuestion?.id;
-  const selected = qId ? answers[qId] : '';
+  const selected = qId ? String(answers[qId] ?? '') : '';
   const shown = qId ? shownAnswer[qId] : false;
   const result = qId ? answerResult[qId] : null;
   const isFlagged = qId ? !!flagged[qId] : false;
-  const options = currentQuestion?.options && typeof currentQuestion.options === 'object'
-    ? Object.entries(currentQuestion.options as Record<string, string>)
-    : [];
+  const choiceOptionEntries =
+    currentQuestion && (questionType === 'multiple_choice' || questionType === 'multiple_select')
+      ? entriesFromQuestionOptions(currentQuestion.options)
+      : [];
   const progress = questions.length > 0 ? ((currentIndex + 1) / questions.length) * 100 : 0;
 
   const handleSelect = (value: string) => {
     if (!qId || shown) return;
     setAnswers((prev) => ({ ...prev, [qId]: value }));
+  };
+
+  const handleToggleMultiSelect = (letter: string) => {
+    if (!qId || shown) return;
+    const cur = splitAnswerTokens(answers[qId] ?? '');
+    const next = cur.includes(letter) ? cur.filter((x) => x !== letter) : [...cur, letter];
+    setAnswers((prev) => ({ ...prev, [qId]: next.join(',') }));
   };
 
   const handleToggleFlag = async () => {
@@ -161,7 +219,7 @@ export default function StudentPracticeTake() {
     }
   };
 
-  const getOptionClasses = (key: string) => {
+  const getMcOptionClasses = (key: string) => {
     const base = 'flex items-center gap-3 p-4 rounded-xl border-2 transition-all ';
     if (!shown || !result) {
       const selectedClass = selected === key ? 'border-[var(--theme-primary)] bg-[var(--theme-primary-50,#fdf2f8)]' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50';
@@ -172,6 +230,38 @@ export default function StudentPracticeTake() {
     const isCorrectKey = key === correctKey;
     if (isCorrectKey) return base + 'border-emerald-500 bg-emerald-50 cursor-default';
     if (isSelected && !result.isCorrect) return base + 'border-red-400 bg-red-50 cursor-default';
+    return base + 'border-gray-100 bg-gray-50/50 cursor-default opacity-80';
+  };
+
+  const getTfOptionClasses = (option: string) => {
+    const base = 'flex items-center gap-3 p-4 rounded-xl border-2 transition-all ';
+    if (!shown || !result) {
+      const selectedClass = selected === option ? 'border-[var(--theme-primary)] bg-[var(--theme-primary-50,#fdf2f8)]' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50';
+      return base + selectedClass + (shown ? ' cursor-default' : ' cursor-pointer');
+    }
+    const correctKey = (result.correctAnswer || '').trim().toLowerCase();
+    const isSelected = selected === option;
+    const isCorrectKey = option === correctKey;
+    if (isCorrectKey) return base + 'border-emerald-500 bg-emerald-50 cursor-default';
+    if (isSelected && !result.isCorrect) return base + 'border-red-400 bg-red-50 cursor-default';
+    return base + 'border-gray-100 bg-gray-50/50 cursor-default opacity-80';
+  };
+
+  const getMultiSelectRowClasses = (key: string) => {
+    const base = 'flex items-center gap-3 p-4 rounded-xl border-2 transition-all ';
+    const selectedKeys = splitAnswerTokens(selected);
+    const isChosen = selectedKeys.includes(key);
+    if (!shown || !result) {
+      const selectedClass = isChosen
+        ? 'border-[var(--theme-primary)] bg-[var(--theme-primary-50,#fdf2f8)]'
+        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50';
+      return base + selectedClass + (shown ? ' cursor-default' : ' cursor-pointer');
+    }
+    const correctKeys = splitAnswerTokens(result.correctAnswer || '');
+    const inCorrect = correctKeys.includes(key);
+    const wronglySelected = isChosen && !inCorrect;
+    if (inCorrect) return base + 'border-emerald-500 bg-emerald-50 cursor-default';
+    if (wronglySelected) return base + 'border-red-400 bg-red-50 cursor-default';
     return base + 'border-gray-100 bg-gray-50/50 cursor-default opacity-80';
   };
 
@@ -239,10 +329,10 @@ export default function StudentPracticeTake() {
             </button>
             {isFlagged && <span className="text-xs text-amber-700">This question is flagged for review</span>}
           </div>
-          {(currentQuestion?.questionType === 'multiple_choice' || currentQuestion?.questionType === 'true_false') && (
+          {questionType === 'multiple_choice' && choiceOptionEntries.length > 0 && (
             <div className="mt-6 space-y-3">
-              {options.map(([key, label]) => (
-                <label key={key} className={getOptionClasses(key)}>
+              {choiceOptionEntries.map(([key, label]) => (
+                <label key={key} className={getMcOptionClasses(key)}>
                   <input
                     type="radio"
                     name={`q-${qId}`}
@@ -257,7 +347,55 @@ export default function StudentPracticeTake() {
               ))}
             </div>
           )}
-          {currentQuestion?.questionType === 'short_answer' && (
+          {questionType === 'multiple_select' && choiceOptionEntries.length === 0 && (
+            <p className="mt-6 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              This question has no answer options. Contact your instructor or skip and continue.
+            </p>
+          )}
+          {questionType === 'multiple_select' && choiceOptionEntries.length > 0 && (
+            <div className="mt-6 space-y-3">
+              <p className="text-sm text-gray-600 mb-1">
+                Select one or more correct options. You get credit if every option you choose is correct.
+              </p>
+              {choiceOptionEntries.map(([key, label]) => {
+                const checked = splitAnswerTokens(selected).includes(key);
+                return (
+                  <label key={key} className={getMultiSelectRowClasses(key)}>
+                    <input
+                      type="checkbox"
+                      name={`q-${qId}-${key}`}
+                      value={key}
+                      checked={checked}
+                      onChange={() => handleToggleMultiSelect(key)}
+                      disabled={shown}
+                      className="w-5 h-5 rounded border-2 border-gray-300 text-[var(--theme-primary)] focus:ring-[var(--theme-primary)]"
+                    />
+                    <span className="font-medium text-gray-700">{key}.</span>
+                    <span className="text-gray-900">{label || key}</span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          {questionType === 'true_false' && (
+            <div className="mt-6 space-y-3">
+              {['true', 'false'].map((option) => (
+                <label key={option} className={getTfOptionClasses(option)}>
+                  <input
+                    type="radio"
+                    name={`q-${qId}`}
+                    value={option}
+                    checked={selected === option}
+                    onChange={() => handleSelect(option)}
+                    disabled={shown}
+                    className="w-5 h-5 rounded-full border-2 border-gray-300 text-[var(--theme-primary)] focus:ring-[var(--theme-primary)]"
+                  />
+                  <span className="capitalize text-gray-900 font-medium">{option}</span>
+                </label>
+              ))}
+            </div>
+          )}
+          {questionType === 'short_answer' && (
             <div className="mt-6">
               <input
                 type="text"
@@ -272,7 +410,16 @@ export default function StudentPracticeTake() {
           {shown && result && (
             <div className={`mt-6 p-4 rounded-xl ${result.isCorrect ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>
               <p className="font-medium">{result.isCorrect ? 'Correct!' : 'Correct answer:'}</p>
-              {!result.isCorrect && <p className="mt-1">{result.correctAnswer}</p>}
+              {!result.isCorrect && (
+                <p className="mt-1">
+                  {questionType === 'multiple_select' && currentQuestion?.options
+                    ? formatLetterAnswerForDisplay(
+                        result.correctAnswer,
+                        currentQuestion.options as Record<string, string>,
+                      )
+                    : result.correctAnswer}
+                </p>
+              )}
               {result.answerRationale && (
                 <p className="mt-2 text-sm leading-relaxed">
                   <span className="font-medium">Answer rationale: </span>

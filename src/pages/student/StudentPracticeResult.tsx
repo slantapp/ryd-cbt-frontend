@@ -5,6 +5,25 @@ import { PracticeAttempt } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 
+function splitAnswerTokens(s: string | undefined | null): string[] {
+  if (s == null || s === '') return [];
+  return String(s).split(',').map((t) => t.trim()).filter(Boolean);
+}
+
+function formatLetterAnswerForDisplay(
+  answer: string | undefined | null,
+  options: Record<string, string>,
+): string {
+  const tokens = splitAnswerTokens(answer);
+  if (!tokens.length) return answer?.trim() || '—';
+  return tokens
+    .map((key) => {
+      const label = options[key];
+      return label ? `${key} (${label})` : key;
+    })
+    .join(', ');
+}
+
 export default function StudentPracticeResult() {
   const { attemptId } = useParams<{ attemptId: string }>();
   const navigate = useNavigate();
@@ -42,15 +61,17 @@ export default function StudentPracticeResult() {
       `Score: ${summary?.score ?? 0}%`,
       `Correct: ${summary?.correct ?? 0}`,
       `Wrong: ${summary?.wrong ?? 0}`,
-      `Total: ${summary?.total ?? 0}`,
+      `Total questions: ${summary?.total ?? 0}`,
+      `Answered in review: ${(attempt.answers || []).length}`,
       '',
       '--- QUESTIONS & ANSWERS ---',
     ];
     (attempt.answers || []).forEach((a, i) => {
       const q = (a as any).question;
+      const unanswered = !String(a.selectedAnswer ?? '').trim();
       lines.push('');
       lines.push(`${i + 1}. ${q?.questionText ?? ''}`);
-      lines.push(`   Your answer: ${a.selectedAnswer}`);
+      lines.push(`   Your answer: ${unanswered ? 'Not answered' : a.selectedAnswer}`);
       lines.push(`   Correct: ${a.isCorrect ? 'Yes' : 'No'}`);
       if (q?.correctAnswer) lines.push(`   Correct answer: ${q.correctAnswer}`);
     });
@@ -97,7 +118,7 @@ export default function StudentPracticeResult() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-2">
         <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 text-center shadow-sm">
           <p className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--theme-primary)' }}>{summary.score}%</p>
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Score</p>
@@ -114,7 +135,10 @@ export default function StudentPracticeResult() {
           <p className="text-2xl sm:text-3xl font-bold text-gray-800">{summary.total}</p>
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Total</p>
         </div>
-      </div>
+        </div>
+        <p className="text-xs text-gray-500 mb-6">
+          Score uses every question in this practice. Questions you did not submit an answer for count as incorrect.
+        </p>
 
       <div className="flex justify-end mb-4">
         <button
@@ -136,22 +160,57 @@ export default function StudentPracticeResult() {
             {answers.map((a: any, i: number) => {
               const q = a.question;
               const options = q?.options && typeof q.options === 'object' ? q.options : {};
+              const unanswered = !String(a.selectedAnswer ?? '').trim();
+              const isMultiSelect = q?.questionType === 'multiple_select';
+              const yourLabel = unanswered
+                ? 'Not answered'
+                : isMultiSelect
+                  ? formatLetterAnswerForDisplay(a.selectedAnswer, options)
+                  : String(a.selectedAnswer);
               return (
                 <li key={a.id} className="p-4 rounded-xl border border-gray-100 bg-gray-50/30">
                   <p className="font-medium text-gray-900 mb-2">{i + 1}. {q?.questionText}</p>
+                  {q?.topicTag && (
+                    <p className="text-xs text-gray-500 mb-2">Topic: {q.topicTag}</p>
+                  )}
                   <p className="text-sm text-gray-600">
-                    Your answer: <span className={a.isCorrect ? 'text-emerald-600 font-medium' : 'text-red-600 font-medium'}>{a.selectedAnswer}</span>
-                    {options[a.selectedAnswer] && ` (${options[a.selectedAnswer]})`}
+                    Your answer:{' '}
+                    <span
+                      className={
+                        unanswered
+                          ? 'text-gray-600 font-medium'
+                          : a.isCorrect
+                            ? 'text-emerald-600 font-medium'
+                            : 'text-red-600 font-medium'
+                      }
+                    >
+                      {yourLabel}
+                    </span>
+                    {!unanswered &&
+                      !isMultiSelect &&
+                      options[a.selectedAnswer] &&
+                      ` (${options[a.selectedAnswer]})`}
                   </p>
                   {!a.isCorrect && q?.correctAnswer && (
                     <p className="text-sm text-emerald-600 mt-1">
-                      Correct answer: {q.correctAnswer}
-                      {options[q.correctAnswer] && ` (${options[q.correctAnswer]})`}
+                      Correct answer:{' '}
+                      {isMultiSelect
+                        ? formatLetterAnswerForDisplay(q.correctAnswer, options)
+                        : q.correctAnswer}
+                      {!isMultiSelect &&
+                        options[q.correctAnswer] &&
+                        ` (${options[q.correctAnswer]})`}
                     </p>
                   )}
-                  <span className={`inline-block mt-2 text-xs font-medium px-2 py-0.5 rounded-full ${a.isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                    {a.isCorrect ? 'Correct' : 'Incorrect'}
-                  </span>
+                  {unanswered ? (
+                    <span className="inline-block mt-2 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
+                      Not answered
+                    </span>
+                  ) : (
+                    <span className={`inline-block mt-2 text-xs font-medium px-2 py-0.5 rounded-full ${a.isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                      {a.isCorrect ? 'Correct' : 'Incorrect'}
+                    </span>
+                  )}
                 </li>
               );
             })}

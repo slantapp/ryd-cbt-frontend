@@ -494,14 +494,14 @@ export const practiceAPI = {
     formData.append('file', file);
     return api.post(`/practices/${practiceId}/questions/bulk-upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    }).then((r) => r.data);
   },
   removeQuestion: (practiceId: string, questionId: string) =>
     api.delete(`/practices/${practiceId}/questions/${questionId}`),
   downloadTemplate: () =>
     api.get('/practices/template', { responseType: 'blob', params: { t: Date.now() } }),
   // Student
-  studentList: (params?: { class?: string; subject?: string }) =>
+  studentList: (params?: { class?: string; subject?: string; tag?: string }) =>
     api.get('/practices/student', { params }).then((r) => r.data),
   studentGet: (id: string) => api.get(`/practices/student/${id}`).then((r) => r.data),
   studentGetQuestions: (id: string) => api.get(`/practices/student/${id}/questions`).then((r) => r.data),

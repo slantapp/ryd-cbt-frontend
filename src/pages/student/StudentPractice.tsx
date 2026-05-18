@@ -15,10 +15,11 @@ interface PracticeItem {
 interface AttemptItem {
   id: string;
   practiceId: string;
-  practice: { id: string; name: string; subjectName: string; classLabel: string };
+  practice: { id: string; name: string; subjectName: string; classLabel: string; _count?: { questions: number } };
   startedAt: string;
   submittedAt: string | null;
   totalQuestions: number;
+  answeredCount?: number;
   score: number | null;
 }
 
@@ -30,6 +31,7 @@ export default function StudentPractice() {
   const [loading, setLoading] = useState(true);
   const [filterClass, setFilterClass] = useState('');
   const [filterSubject, setFilterSubject] = useState('');
+  const [tagSearch, setTagSearch] = useState('');
 
   useEffect(() => {
     if (account?.role !== 'STUDENT') {
@@ -57,7 +59,7 @@ export default function StudentPractice() {
 
   useEffect(() => {
     if (account?.role === 'STUDENT') load();
-  }, [filterClass, filterSubject]);
+  }, [filterClass, filterSubject, tagSearch]);
 
   const uniqueClasses = Array.from(new Set(practices.map((p) => p.classLabel).filter(Boolean))).sort();
   const uniqueSubjects = Array.from(new Set(practices.map((p) => p.subjectName).filter(Boolean))).sort();
@@ -106,6 +108,19 @@ export default function StudentPractice() {
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
+                <div className="flex flex-1 min-w-[200px] max-w-md items-center gap-2">
+                  <label htmlFor="practice-tag-search" className="sr-only">
+                    Topic tag
+                  </label>
+                  <input
+                    id="practice-tag-search"
+                    type="search"
+                    placeholder="Topic tag (e.g. Algebra)"
+                    value={tagSearch}
+                    onChange={(e) => setTagSearch(e.target.value)}
+                    className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-2 focus:ring-[var(--theme-primary)] focus:border-transparent"
+                  />
+                </div>
               </div>
             </div>
             <div className="p-6">
@@ -155,7 +170,10 @@ export default function StudentPractice() {
                       <div>
                         <p className="font-semibold text-gray-900">{a.practice?.name ?? 'Practice'}</p>
                         <p className="text-sm text-gray-500 mt-0.5">
-                          {a.submittedAt ? new Date(a.submittedAt).toLocaleString() : 'In progress'} · {a.totalQuestions} questions
+                          {a.submittedAt ? new Date(a.submittedAt).toLocaleString() : 'In progress'}
+                          {typeof a.answeredCount === 'number' && !a.submittedAt
+                            ? ` · ${a.answeredCount} / ${a.totalQuestions} answered`
+                            : ` · ${a.totalQuestions} questions`}
                           {a.score != null && (
                             <span className={`ml-1 font-medium ${a.score >= 70 ? 'text-emerald-600' : a.score >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
                               · {a.score}%

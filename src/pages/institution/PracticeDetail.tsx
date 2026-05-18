@@ -37,6 +37,16 @@ export default function PracticeDetail() {
   });
   const [creating, setCreating] = useState(false);
   const [bulkUploading, setBulkUploading] = useState(false);
+  const [bulkUploadReport, setBulkUploadReport] = useState<{
+    success?: boolean;
+    message?: string;
+    details?: string[];
+    rows?: { rowNumber: number; questionPreview: string; action: string; note?: string }[];
+    emptyRowsSkipped?: number;
+    linkedFromBank?: number;
+    duplicatedInBank?: number;
+    createdInBank?: number;
+  } | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -189,14 +199,28 @@ export default function PracticeDetail() {
     const file = e.target.files?.[0];
     if (!file || !id) return;
     setBulkUploading(true);
+    setBulkUploadReport(null);
     try {
-      const res = await practiceAPI.bulkUpload(id, file);
-      const data = res.data as { message?: string; count?: number; skipped?: number };
+      const data = await practiceAPI.bulkUpload(id, file);
+      setBulkUploadReport({
+        success: true,
+        message: data.message,
+        rows: data.rows,
+        emptyRowsSkipped: data.emptyRowsSkipped,
+        linkedFromBank: data.linkedFromBank,
+        duplicatedInBank: data.duplicatedInBank,
+        createdInBank: data.createdInBank,
+      });
       toast.success(data.message || `${data.count ?? 0} questions uploaded`);
-      setAddSource(null);
       await loadPractice();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to upload');
+      const payload = error.response?.data;
+      setBulkUploadReport({
+        success: false,
+        message: payload?.error || 'Failed to upload',
+        details: payload?.details,
+      });
+      toast.error(payload?.error || 'Failed to upload');
     } finally {
       setBulkUploading(false);
       e.target.value = '';
@@ -477,7 +501,7 @@ export default function PracticeDetail() {
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-1">Bulk upload</h3>
             <p className="text-sm text-gray-500 mb-4">
-              Use the practice template (no grade column): Question Text, Question Type, Option A–D, Correct Answer, Points. The practice class ({practice.classLabel}) is used as grade for all questions.
+              Use the practice template (no grade column): Question Text, Question Type, Option A–D, Correct Answer, Points. The practice class ({practice.classLabel}) is used as grade for all questions. If any row is invalid, nothing is added. Every valid row is added to this practice (existing bank matches are linked; duplicates get a new copy).
             </p>
             <button type="button" onClick={handleDownloadTemplate} className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 mb-4 block">
               Download template
@@ -487,8 +511,63 @@ export default function PracticeDetail() {
               <input type="file" accept=".xlsx,.xls,.csv" className="block w-full text-sm" onChange={handleBulkUpload} disabled={bulkUploading} />
             </label>
             {bulkUploading && <p className="text-sm text-gray-500 mt-2">Uploading…</p>}
+            {bulkUploadReport && (
+              <div
+                className={`mt-4 rounded-xl border p-4 text-sm max-h-64 overflow-y-auto ${
+                  bulkUploadReport.success
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                    : 'border-red-200 bg-red-50 text-red-900'
+                }`}
+              >
+                <p className="font-medium">{bulkUploadReport.message}</p>
+                {bulkUploadReport.success && (
+                  <ul className="mt-2 space-y-1 text-xs">
+                    {bulkUploadReport.emptyRowsSkipped ? (
+                      <li>{bulkUploadReport.emptyRowsSkipped} blank row(s) in the file were ignored.</li>
+                    ) : null}
+                    {bulkUploadReport.linkedFromBank ? (
+                      <li>{bulkUploadReport.linkedFromBank} linked from the question bank.</li>
+                    ) : null}
+                    {bulkUploadReport.duplicatedInBank ? (
+                      <li>{bulkUploadReport.duplicatedInBank} duplicated in the bank (same text already in practice or repeated in file).</li>
+                    ) : null}
+                    {(bulkUploadReport.createdInBank ?? 0) > 0 ? (
+                      <li>{bulkUploadReport.createdInBank} newly created in the bank.</li>
+                    ) : null}
+                  </ul>
+                )}
+                {bulkUploadReport.details && bulkUploadReport.details.length > 0 && (
+                  <ul className="mt-2 list-disc list-inside space-y-1 text-xs">
+                    {bulkUploadReport.details.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                )}
+                {bulkUploadReport.success && bulkUploadReport.rows && bulkUploadReport.rows.length > 0 && (
+                  <details className="mt-2 text-xs">
+                    <summary className="cursor-pointer font-medium">Per-row breakdown</summary>
+                    <ul className="mt-1 space-y-1">
+                      {bulkUploadReport.rows.map((r) => (
+                        <li key={`${r.rowNumber}-${r.action}`}>
+                          Row {r.rowNumber}: {r.action.replace(/_/g, ' ')} — {r.questionPreview}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            )}
             <div className="mt-4">
-              <button type="button" onClick={() => setAddSource(null)} className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Close</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddSource(null);
+                  setBulkUploadReport(null);
+                }}
+                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
