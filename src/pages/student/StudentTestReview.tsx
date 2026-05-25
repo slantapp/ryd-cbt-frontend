@@ -4,6 +4,7 @@ import { studentAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { ThemeConfig } from '../../types';
 import toast from 'react-hot-toast';
+import QuestionImage from '../../components/QuestionImage';
 
 const defaultTheme: ThemeConfig = {
   primaryColor: '#1d4ed8',
@@ -18,6 +19,7 @@ const defaultTheme: ThemeConfig = {
 interface Question {
   id: string;
   questionText: string;
+  imageUrl?: string | null;
   questionType: string;
   options?: any;
   points: number;
@@ -210,9 +212,10 @@ export default function StudentTestReview() {
                         </span>
                       )}
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">
                       {question.questionText}
                     </h3>
+                    <QuestionImage imageUrl={question.imageUrl} />
                   </div>
                 </div>
 

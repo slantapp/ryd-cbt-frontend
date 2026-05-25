@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { gradingAPI, testAPI } from '../../services/api';
 import toast from 'react-hot-toast';
+import QuestionImage from '../../components/QuestionImage';
 
 interface Test {
   id: string;
@@ -11,6 +12,7 @@ interface Test {
 interface Question {
   id: string;
   questionText: string;
+  imageUrl?: string | null;
   questionType: string;
   points: number;
   order: number;
@@ -352,6 +354,7 @@ export default function GradeByQuestion() {
                       )}
                     </div>
                     <p className="text-gray-900 font-medium">{question.questionText}</p>
+                    <QuestionImage imageUrl={question.imageUrl} className="max-w-xs h-auto rounded-lg border border-gray-200 mt-2" />
                     <p className="text-sm text-gray-500 mt-2">
                       {question.studentAnswersCount} student{question.studentAnswersCount !== 1 ? 's' : ''} answered
                     </p>
@@ -418,6 +421,7 @@ export default function GradeByQuestion() {
               <span className="text-xs text-gray-400">({selectedQuestion.points} points)</span>
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-3">{selectedQuestion.questionText}</h2>
+            <QuestionImage imageUrl={selectedQuestion.imageUrl} />
             {selectedQuestion.correctAnswer && (
               <div className="p-3 bg-blue-50 rounded border border-blue-200">
                 <p className="text-xs font-medium text-blue-900 mb-1">Reference Answer:</p>

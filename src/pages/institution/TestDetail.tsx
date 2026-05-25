@@ -5,6 +5,7 @@ import { Test, Question, Classroom, Institution, TestCustomField, StudentTest } 
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import QuestionImage from '../../components/QuestionImage';
 
 function resolveTestMaxAttempts(field: string): { maxAttempts: number; allowRetrial: boolean } {
   const t = (field || '').trim();
@@ -41,6 +42,7 @@ export default function TestDetail() {
   const [scoreTab, setScoreTab] = useState<'best' | 'multiple'>('best');
   const [questionForm, setQuestionForm] = useState({
     questionText: '',
+    imageUrl: '',
     questionType: 'multiple_choice',
     options: '{"A": "", "B": "", "C": ""}',
     correctAnswer: '',
@@ -467,6 +469,7 @@ export default function TestDetail() {
         questionType: questionForm.questionType,
         correctAnswer: questionForm.correctAnswer,
         points: questionForm.points,
+        imageUrl: questionForm.imageUrl.trim() || null,
       };
 
       // Only include options for question types that need it
@@ -490,6 +493,7 @@ export default function TestDetail() {
       setShowQuestionForm(false);
       setQuestionForm({
         questionText: '',
+        imageUrl: '',
         questionType: 'multiple_choice',
         options: '{"A": "", "B": "", "C": ""}',
         correctAnswer: '',
@@ -539,6 +543,7 @@ export default function TestDetail() {
     
     setQuestionForm({
       questionText: question.questionText,
+      imageUrl: question.imageUrl || '',
       questionType: question.questionType,
       options: optionsString,
       correctAnswer: question.correctAnswer || '',
@@ -556,6 +561,7 @@ export default function TestDetail() {
         questionType: questionForm.questionType,
         correctAnswer: questionForm.correctAnswer,
         points: questionForm.points,
+        imageUrl: questionForm.imageUrl.trim() || null,
       };
 
       // Only include options for question types that need it
@@ -579,6 +585,7 @@ export default function TestDetail() {
       setEditingQuestion(null);
       setQuestionForm({
         questionText: '',
+        imageUrl: '',
         questionType: 'multiple_choice',
         options: '{"A": "", "B": "", "C": ""}',
         correctAnswer: '',
@@ -1793,6 +1800,15 @@ export default function TestDetail() {
                 }
                 required
               />
+              <input
+                type="text"
+                className="input-field"
+                placeholder="Image URL or path (optional)"
+                value={questionForm.imageUrl}
+                onChange={(e) =>
+                  setQuestionForm({ ...questionForm, imageUrl: e.target.value })
+                }
+              />
               <select
                 className="input-field"
                 value={questionForm.questionType}
@@ -2138,6 +2154,7 @@ export default function TestDetail() {
                        'Short Answer'}
                     </span>
                   </div>
+                  <QuestionImage imageUrl={question.imageUrl} className="max-w-xs h-auto rounded-lg border border-gray-200 mt-2 mb-2" />
                   {question.options && (
                     <div className="mt-2 space-y-1">
                       {Object.entries(question.options).map(([key, value]) => (

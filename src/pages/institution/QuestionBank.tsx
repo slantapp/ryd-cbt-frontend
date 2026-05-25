@@ -4,6 +4,7 @@ import { questionAPI, subjectAPI, testAPI } from '../../services/api';
 import { Question, Test } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
+import QuestionImage from '../../components/QuestionImage';
 
 export default function QuestionBank() {
   const { account } = useAuthStore();
@@ -38,6 +39,7 @@ export default function QuestionBank() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({
     questionText: '',
+    imageUrl: '',
     questionType: 'multiple_choice' as 'multiple_choice' | 'multiple_select' | 'true_false' | 'short_answer',
     options: '{"A": "", "B": "", "C": ""}',
     correctAnswer: '',
@@ -61,6 +63,7 @@ export default function QuestionBank() {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     questionText: '',
+    imageUrl: '',
     questionType: 'multiple_choice' as 'multiple_choice' | 'multiple_select' | 'true_false' | 'short_answer',
     options: '{"A": "", "B": "", "C": ""}',
     correctAnswer: '',
@@ -114,6 +117,7 @@ export default function QuestionBank() {
 
       setEditForm({
         questionText: editingQuestion.questionText || '',
+        imageUrl: editingQuestion.imageUrl || '',
         questionType: editingQuestion.questionType || 'multiple_choice',
         options: optionsString,
         correctAnswer: editingQuestion.correctAnswer || '',
@@ -241,6 +245,7 @@ export default function QuestionBank() {
 
       await questionAPI.createInBank({
         questionText: createForm.questionText,
+        imageUrl: createForm.imageUrl.trim() || null,
         questionType: createForm.questionType,
         options: parsedOptions,
         correctAnswer: createForm.correctAnswer,
@@ -253,6 +258,7 @@ export default function QuestionBank() {
       setShowCreateModal(false);
       setCreateForm({
         questionText: '',
+        imageUrl: '',
         questionType: 'multiple_choice',
         options: '{"A": "", "B": "", "C": ""}',
         correctAnswer: '',
@@ -315,6 +321,7 @@ export default function QuestionBank() {
       // Update question
       await questionAPI.update(editingQuestion.id, {
         questionText: editForm.questionText,
+        imageUrl: editForm.imageUrl.trim() || null,
         questionType: editForm.questionType,
         options: parsedOptions,
         correctAnswer: editForm.correctAnswer,
@@ -327,6 +334,7 @@ export default function QuestionBank() {
       setEditingQuestion(null);
       setEditForm({
         questionText: '',
+        imageUrl: '',
         questionType: 'multiple_choice',
         options: '{"A": "", "B": "", "C": ""}',
         correctAnswer: '',
@@ -666,6 +674,7 @@ export default function QuestionBank() {
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900 mb-2">{question.questionText}</p>
+                  <QuestionImage imageUrl={question.imageUrl} className="max-w-xs h-auto rounded-lg border border-gray-200 mb-2" />
                   <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
                     <span>Type: {question.questionType}</span>
                     <span>Points: {question.points}</span>
@@ -752,6 +761,16 @@ export default function QuestionBank() {
                   value={editForm.questionText}
                   onChange={(e) => setEditForm({ ...editForm, questionText: e.target.value })}
                   required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Image URL or path (optional)</label>
+                <input
+                  type="text"
+                  className="input-field w-full"
+                  placeholder="https://… or questions/diagram.png"
+                  value={editForm.imageUrl}
+                  onChange={(e) => setEditForm({ ...editForm, imageUrl: e.target.value })}
                 />
               </div>
               <div>
@@ -907,6 +926,7 @@ export default function QuestionBank() {
                     setEditingQuestion(null);
                     setEditForm({
                       questionText: '',
+                      imageUrl: '',
                       questionType: 'multiple_choice',
                       options: '{"A": "", "B": "", "C": ""}',
                       correctAnswer: '',
@@ -1054,6 +1074,16 @@ export default function QuestionBank() {
                   value={createForm.questionText}
                   onChange={(e) => setCreateForm({ ...createForm, questionText: e.target.value })}
                   required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Image URL or path (optional)</label>
+                <input
+                  type="text"
+                  className="input-field w-full"
+                  placeholder="https://… or questions/diagram.png"
+                  value={createForm.imageUrl}
+                  onChange={(e) => setCreateForm({ ...createForm, imageUrl: e.target.value })}
                 />
               </div>
               <div>
@@ -1209,6 +1239,7 @@ export default function QuestionBank() {
                     setShowCreateModal(false);
                     setCreateForm({
                       questionText: '',
+                      imageUrl: '',
                       questionType: 'multiple_choice',
                       options: '{"A": "", "B": "", "C": ""}',
                       correctAnswer: '',
@@ -1235,7 +1266,7 @@ export default function QuestionBank() {
             <div className="p-6">
               <h3 className="text-xl font-semibold mb-4">Bulk Upload Questions to Bank</h3>
               <p className="text-gray-600 mb-4 text-sm">
-                Columns: Question Text, Question Type, Option A–D, Correct Answer, Points, Grade. The template includes a Question Type dropdown (Short Answer, Multiple Choice, Multiple Select, True/False). Correct Answer accepts letters, option text, or comma-separated answers for Multiple Select (spaces OK).
+                Columns: Question Text, Question Type, Option A–D, Correct Answer, Points, Grade, Answer Rationale, Topic Tag, Image (optional). The template includes a Question Type dropdown (Short Answer, Multiple Choice, Multiple Select, True/False). Correct Answer accepts letters, option text, or comma-separated answers for Multiple Select (spaces OK). Image: full https URL or relative path (use VITE_QUESTION_BASE_URL).
               </p>
               <div className="mb-4">
                 <button

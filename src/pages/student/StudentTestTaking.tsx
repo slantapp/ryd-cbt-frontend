@@ -4,6 +4,7 @@ import { publicAPI, studentAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { Test, Question, ThemeConfig } from '../../types';
 import toast from 'react-hot-toast';
+import QuestionImage from '../../components/QuestionImage';
 
 const defaultTheme: ThemeConfig = {
   primaryColor: '#0f172a', // Dark slate - matches backend default
@@ -861,9 +862,10 @@ export default function StudentTestTaking() {
                   </span>
                 </div>
               </div>
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 leading-snug mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 leading-snug mb-4">
                 {currentQuestion.questionText}
               </h2>
+              <QuestionImage imageUrl={currentQuestion.imageUrl} />
 
               {currentQuestion.questionType === 'multiple_choice' && currentQuestion.options && (
                 <div className="space-y-3">

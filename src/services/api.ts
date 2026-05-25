@@ -487,7 +487,7 @@ export const practiceAPI = {
     api.post(`/practices/${practiceId}/questions/from-bank`, { questionIds }),
   addQuestionsFromTest: (practiceId: string, testId: string, questionIds: string[]) =>
     api.post(`/practices/${practiceId}/questions/from-test`, { testId, questionIds }),
-  createQuestion: (practiceId: string, data: { questionText: string; questionType: string; options?: string; correctAnswer: string; points?: string; grade?: string }) =>
+  createQuestion: (practiceId: string, data: { questionText: string; questionType: string; options?: string; correctAnswer: string; points?: string; grade?: string; imageUrl?: string | null }) =>
     api.post(`/practices/${practiceId}/questions`, data).then((r) => r.data),
   bulkUpload: (practiceId: string, file: File) => {
     const formData = new FormData();

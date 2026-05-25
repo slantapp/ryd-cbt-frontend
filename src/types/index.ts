@@ -78,6 +78,7 @@ export interface Question {
   id: string;
   testId?: string | null;
   questionText: string;
+  imageUrl?: string | null;
   questionType: 'multiple_choice' | 'multiple_select' | 'true_false' | 'short_answer';
   options?: Record<string, string>;
   correctAnswer?: string | null;

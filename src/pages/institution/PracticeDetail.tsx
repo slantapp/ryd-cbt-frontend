@@ -4,6 +4,7 @@ import { practiceAPI, questionAPI, subjectAPI, testAPI } from '../../services/ap
 import { Practice as PracticeType, Question } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
+import QuestionImage from '../../components/QuestionImage';
 
 type AddSource = 'bank' | 'test' | 'create' | 'bulk' | null;
 
@@ -29,6 +30,7 @@ export default function PracticeDetail() {
   const [addingFromTest, setAddingFromTest] = useState(false);
   const [createForm, setCreateForm] = useState({
     questionText: '',
+    imageUrl: '',
     questionType: 'multiple_choice' as const,
     options: '{"A": "", "B": "", "C": ""}',
     correctAnswer: '',
@@ -178,6 +180,7 @@ export default function PracticeDetail() {
     try {
       await practiceAPI.createQuestion(id, {
         questionText: createForm.questionText,
+        imageUrl: createForm.imageUrl.trim() || null,
         questionType: createForm.questionType,
         options: createForm.options,
         correctAnswer: createForm.correctAnswer,
@@ -186,7 +189,7 @@ export default function PracticeDetail() {
       });
       toast.success('Question created and added to practice');
       setAddSource(null);
-      setCreateForm({ questionText: '', questionType: 'multiple_choice', options: '{"A": "", "B": "", "C": ""}', correctAnswer: '', points: '1.0', grade: '' });
+      setCreateForm({ questionText: '', imageUrl: '', questionType: 'multiple_choice', options: '{"A": "", "B": "", "C": ""}', correctAnswer: '', points: '1.0', grade: '' });
       await loadPractice();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to create question');
@@ -304,7 +307,7 @@ export default function PracticeDetail() {
           </button>
         </div>
         <p className="text-sm text-gray-500 mt-2">
-          Use the template for bulk upload. Columns: Question Text, Question Type, Option A–D, Correct Answer, Points (or legacy camelCase). Multiple select: comma-separated answers. The practice class is used as grade.
+          Use the template for bulk upload. Columns: Question Text, Question Type, Option A–D, Correct Answer, Points, Answer Rationale, Topic Tag, Image (optional). Multiple select: comma-separated answers. The practice class is used as grade.
         </p>
       </div>
 
@@ -460,6 +463,10 @@ export default function PracticeDetail() {
                 <textarea className="rounded-xl border border-gray-200 w-full px-3 py-2 focus:ring-2 focus:ring-[var(--theme-primary)] focus:border-transparent" rows={3} value={createForm.questionText} onChange={(e) => setCreateForm((f) => ({ ...f, questionText: e.target.value }))} required />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Image URL or path (optional)</label>
+                <input type="text" className="rounded-xl border border-gray-200 w-full px-3 py-2 focus:ring-2 focus:ring-[var(--theme-primary)] focus:border-transparent" placeholder="https://… or questions/diagram.png" value={createForm.imageUrl} onChange={(e) => setCreateForm((f) => ({ ...f, imageUrl: e.target.value }))} />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
                 <select className="rounded-xl border border-gray-200 w-full px-3 py-2 focus:ring-2 focus:ring-[var(--theme-primary)] focus:border-transparent" value={createForm.questionType} onChange={(e) => setCreateForm((f) => ({ ...f, questionType: e.target.value as any }))}>
                   <option value="multiple_choice">Multiple choice</option>
@@ -588,6 +595,7 @@ export default function PracticeDetail() {
                 <div className="min-w-0 flex-1">
                   <span className="text-gray-500 text-sm mr-2">{idx + 1}.</span>
                   <span className="text-gray-900">{pq.question?.questionText ?? '—'}</span>
+                  <QuestionImage imageUrl={pq.question?.imageUrl} className="max-w-xs h-auto rounded-lg border border-gray-200 mt-2" />
                 </div>
                 <button
                   type="button"

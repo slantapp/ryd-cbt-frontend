@@ -4,6 +4,7 @@ import { practiceAPI } from '../../services/api';
 import { Question } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
+import QuestionImage from '../../components/QuestionImage';
 
 function entriesFromQuestionOptions(options: unknown): [string, string][] {
   if (options == null || options === '') return [];
@@ -314,7 +315,8 @@ export default function StudentPracticeTake() {
       {/* Question card */}
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden mb-6">
         <div className="p-6 sm:p-8">
-          <p className="text-gray-900 font-medium text-lg leading-relaxed">{currentQuestion?.questionText}</p>
+          <p className="text-gray-900 font-medium text-lg leading-relaxed mb-3">{currentQuestion?.questionText}</p>
+          <QuestionImage imageUrl={currentQuestion?.imageUrl} />
           <div className="mt-4 flex items-center justify-between">
             <button
               type="button"

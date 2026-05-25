@@ -4,6 +4,7 @@ import { practiceAPI } from '../../services/api';
 import { PracticeAttempt } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
+import QuestionImage from '../../components/QuestionImage';
 
 function splitAnswerTokens(s: string | undefined | null): string[] {
   if (s == null || s === '') return [];
@@ -170,6 +171,7 @@ export default function StudentPracticeResult() {
               return (
                 <li key={a.id} className="p-4 rounded-xl border border-gray-100 bg-gray-50/30">
                   <p className="font-medium text-gray-900 mb-2">{i + 1}. {q?.questionText}</p>
+                  <QuestionImage imageUrl={q?.imageUrl} />
                   {q?.topicTag && (
                     <p className="text-xs text-gray-500 mb-2">Topic: {q.topicTag}</p>
                   )}

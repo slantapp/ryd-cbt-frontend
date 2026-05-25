@@ -1,49 +1,33 @@
-# Sample Questions Bulk Upload Template
+# Question Bulk Upload Template (v3)
 
-## Excel File Format
+Download the official Excel template from the app (**Download Excel Template** on a test, question bank, or practice).
 
-Create an Excel file (.xlsx or .xls) with the following columns:
+## Questions sheet columns
 
-| questionText | questionType | options | correctAnswer | points |
-|--------------|-------------|---------|---------------|--------|
-| What is 2+2? | multiple_choice | {"A": "3", "B": "4", "C": "5", "D": "6"} | B | 1.0 |
-| Is the sky blue? | true_false | null | true | 1.0 |
-| Explain photosynthesis | short_answer | null | (any answer accepted) | 2.0 |
+| Column | Required | Notes |
+|--------|----------|-------|
+| Question Text | Yes | |
+| Question Type | Yes | Short Answer, Multiple Choice, Multiple Select, True/False |
+| Option A–D | For MCQ/MSQ | Leave blank for True/False and Short Answer |
+| Correct Answer | Yes | Letters, matching option text, or comma-separated for Multiple Select |
+| Points | Yes | Number greater than 0 |
+| Answer Rationale | No | |
+| Topic Tag | No | |
+| Image | No | Full `https://` URL or relative path (see below) |
+| Grade | Bank only | Required per row when uploading to the question bank |
 
-## Column Descriptions
+## Image column (optional)
 
-- **questionText**: The question text (required)
-- **questionType**: Type of question - "multiple_choice", "true_false", or "short_answer" (required)
-- **options**: For multiple choice questions, JSON object with options like `{"A": "Option 1", "B": "Option 2", "C": "Option 3", "D": "Option 4"}`. Leave empty for true/false or short answer.
-- **correctAnswer**: The correct answer. For multiple choice, use the option key (A, B, C, D). For true/false, use "true" or "false". For short answer, any value (not used for grading).
-- **points**: Points for this question (default: 1.0)
+- Leave empty if the question has no image.
+- **Full URL:** `https://cdn.example.com/math/q1.png` — used as-is.
+- **Relative path:** `questions/diagram1.png` — shown using `VITE_QUESTION_BASE_URL` in the frontend `.env`.
 
-## Examples
+**Sample row in the downloaded template** (autumn leaves question):
 
-### Multiple Choice
-```
-questionText: "What is the capital of France?"
-questionType: "multiple_choice"
-options: {"A": "London", "B": "Berlin", "C": "Paris", "D": "Madrid"}
-correctAnswer: "C"
-points: 1.0
-```
+| Question Text | … | Image |
+|---------------|---|-------|
+| What season do the leaves in the picture suggest? | … | `https://rydlearning.com/images/banner/advert1.jpg` |
 
-### True/False
-```
-questionText: "The Earth is round."
-questionType: "true_false"
-options: (leave empty or null)
-correctAnswer: "true"
-points: 1.0
-```
+Use a direct image URL (`.jpg`, `.png`, etc.) for `<img>` display.
 
-### Short Answer
-```
-questionText: "Explain the water cycle."
-questionType: "short_answer"
-options: (leave empty or null)
-correctAnswer: (any value, not used for grading)
-points: 2.0
-```
-
+Legacy column names (`img`, `imageUrl`, camelCase) are still accepted on upload.

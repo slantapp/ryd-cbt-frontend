@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { gradingAPI } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
+import QuestionImage from '../../components/QuestionImage';
 
 interface Navigation {
   nextId: string | null;
@@ -20,6 +21,7 @@ interface StudentAnswer {
   question: {
     id: string;
     questionText: string;
+    imageUrl?: string | null;
     questionType: string;
     points: number;
     order: number;
@@ -319,6 +321,7 @@ export default function GradeStudentTest() {
                         )}
                       </div>
                       <p className="text-gray-900 font-medium mb-3">{answer.question.questionText}</p>
+                      <QuestionImage imageUrl={answer.question.imageUrl} />
                       {answer.question.correctAnswer && (
                         <div className="mb-3 p-3 bg-blue-50 rounded border border-blue-200">
                           <p className="text-xs font-medium text-blue-900 mb-1">Reference Answer:</p>
