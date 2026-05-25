@@ -26,6 +26,7 @@ export default function QuestionBank() {
     subjectId: '',
     grade: '',
     search: '',
+    topicTag: '',
   });
   const [showAddModal, setShowAddModal] = useState(false);
   const [addForm, setAddForm] = useState({
@@ -92,12 +93,12 @@ export default function QuestionBank() {
 
   useEffect(() => {
     loadQuestions();
-  }, [filters.subjectId, filters.grade, filters.search, pagination.page]);
+  }, [filters.subjectId, filters.grade, filters.search, filters.topicTag, pagination.page]);
 
   // Clear selection when page or filters change so "Select all" doesn't carry over
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [pagination.page, filters.subjectId, filters.grade, filters.search]);
+  }, [pagination.page, filters.subjectId, filters.grade, filters.search, filters.topicTag]);
 
   // Initialize edit form when editingQuestion changes
   useEffect(() => {
@@ -154,6 +155,7 @@ export default function QuestionBank() {
       if (filters.subjectId) params.subjectId = filters.subjectId;
       if (filters.grade) params.grade = filters.grade;
       if (filters.search?.trim()) params.search = filters.search.trim();
+      if (filters.topicTag?.trim()) params.topicTag = filters.topicTag.trim();
       const data = await questionAPI.getBankQuestions(params);
       const list = data?.questions ?? [];
       setQuestions(list);
@@ -539,7 +541,7 @@ export default function QuestionBank() {
 
       {/* Filters and Actions */}
       <div className="card mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Subject
@@ -569,7 +571,25 @@ export default function QuestionBank() {
               className="input-field"
               placeholder="e.g., Grade 1"
               value={filters.grade}
-              onChange={(e) => setFilters({ ...filters, grade: e.target.value })}
+              onChange={(e) => {
+                setFilters({ ...filters, grade: e.target.value });
+                setPagination((p) => ({ ...p, page: 1 }));
+              }}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Topic tag
+            </label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="e.g. Algebra"
+              value={filters.topicTag}
+              onChange={(e) => {
+                setFilters({ ...filters, topicTag: e.target.value });
+                setPagination((p) => ({ ...p, page: 1 }));
+              }}
             />
           </div>
           <div>
@@ -675,6 +695,9 @@ export default function QuestionBank() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900 mb-2">{question.questionText}</p>
                   <QuestionImage imageUrl={question.imageUrl} className="max-w-xs h-auto rounded-lg border border-gray-200 mb-2" />
+                  {question.topicTag && (
+                    <p className="text-xs text-gray-500 mb-1">Topic: {question.topicTag}</p>
+                  )}
                   <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
                     <span>Type: {question.questionType}</span>
                     <span>Points: {question.points}</span>

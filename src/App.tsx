@@ -266,6 +266,16 @@ function App() {
             }
           />
           <Route
+            path="/tests/:id/questions"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <TestDetail />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
             path="/tests/:id"
             element={
               <PrivateRoute>
@@ -511,6 +521,16 @@ function App() {
               <PrivateRoute>
                 <InstitutionLayout>
                   <Practice />
+                </InstitutionLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/practice/:id/questions"
+            element={
+              <PrivateRoute>
+                <InstitutionLayout>
+                  <PracticeDetail />
                 </InstitutionLayout>
               </PrivateRoute>
             }

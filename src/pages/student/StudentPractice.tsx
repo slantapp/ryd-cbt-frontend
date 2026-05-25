@@ -45,7 +45,11 @@ export default function StudentPractice() {
     setLoading(true);
     try {
       const [pList, aList] = await Promise.all([
-        practiceAPI.studentList({ class: filterClass || undefined, subject: filterSubject || undefined }),
+        practiceAPI.studentList({
+          class: filterClass || undefined,
+          subject: filterSubject || undefined,
+          tag: tagSearch.trim() || undefined,
+        }),
         practiceAPI.studentListAttempts(),
       ]);
       setPractices(Array.isArray(pList) ? pList : []);

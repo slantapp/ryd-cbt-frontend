@@ -211,7 +211,17 @@ export const questionAPI = {
   delete: (id: string) => api.delete(`/questions/${id}`),
   // Question Bank
   addToBank: (data: { questionId: string; subjectId: string; grade: string }) => api.post('/questions/bank/add', data),
-  createInBank: (data: { questionText: string; questionType: string; options?: any; correctAnswer: string; points: number; subjectId: string; grade: string }) => api.post('/questions/bank/create', data),
+  createInBank: (data: {
+    questionText: string;
+    questionType: string;
+    options?: any;
+    correctAnswer: string;
+    points: number;
+    subjectId: string;
+    grade: string;
+    imageUrl?: string | null;
+    topicTag?: string | null;
+  }) => api.post('/questions/bank/create', data),
   bulkUploadToBank: (subjectId: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -222,8 +232,14 @@ export const questionAPI = {
   },
   downloadBankTemplate: () =>
     api.get('/questions/bank/template', { responseType: 'blob', params: { t: Date.now() } }),
-  getBankQuestions: (params?: { subjectId?: string; grade?: string; search?: string; page?: number; limit?: number }) =>
-    api.get('/questions/bank', { params }).then((res) => res.data),
+  getBankQuestions: (params?: {
+    subjectId?: string;
+    grade?: string;
+    search?: string;
+    topicTag?: string;
+    page?: number;
+    limit?: number;
+  }) => api.get('/questions/bank', { params }).then((res) => res.data),
   bulkDeleteFromBank: (questionIds: string[]) => api.post('/questions/bank/bulk-delete', { questionIds }),
   addFromBankToTest: (data: { testId: string; questionIds: string[] }) => api.post('/questions/bank/add-to-test', data),
 };
@@ -487,7 +503,16 @@ export const practiceAPI = {
     api.post(`/practices/${practiceId}/questions/from-bank`, { questionIds }),
   addQuestionsFromTest: (practiceId: string, testId: string, questionIds: string[]) =>
     api.post(`/practices/${practiceId}/questions/from-test`, { testId, questionIds }),
-  createQuestion: (practiceId: string, data: { questionText: string; questionType: string; options?: string; correctAnswer: string; points?: string; grade?: string; imageUrl?: string | null }) =>
+  createQuestion: (practiceId: string, data: {
+    questionText: string;
+    questionType: string;
+    options?: string;
+    correctAnswer: string;
+    points?: string;
+    grade?: string;
+    imageUrl?: string | null;
+    topicTag?: string | null;
+  }) =>
     api.post(`/practices/${practiceId}/questions`, data).then((r) => r.data),
   bulkUpload: (practiceId: string, file: File) => {
     const formData = new FormData();

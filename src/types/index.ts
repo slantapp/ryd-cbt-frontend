@@ -40,6 +40,8 @@ export interface Test {
   title: string;
   description?: string;
   testGroup: string; // Assignment, Practice Banks, Quiz, Final Assessment
+  subjectId?: string | null;
+  testGroupId?: string | null;
   isTimed: boolean;
   duration?: number | null;
   dueDate?: string | null;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { testAPI, questionAPI, classroomAPI, teacherAPI, customFieldAPI, gradingAPI, studentAPI, subjectAPI, testGroupAPI } from '../../services/api';
 import { Test, Question, Classroom, Institution, TestCustomField, StudentTest } from '../../types';
 import { useAuthStore } from '../../store/authStore';
@@ -18,6 +18,9 @@ function resolveTestMaxAttempts(field: string): { maxAttempts: number; allowRetr
 export default function TestDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const onQuestionsPage = location.pathname.endsWith('/questions');
+  const [showTestSummary, setShowTestSummary] = useState(false);
   const { account } = useAuthStore();
   const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -90,9 +93,26 @@ export default function TestDetail() {
   const [questionBankFilters, setQuestionBankFilters] = useState({
     subjectId: '',
     grade: '',
+    topicTag: '',
   });
   const [selectedBankQuestions, setSelectedBankQuestions] = useState<Set<string>>(new Set());
   const [loadingBankQuestions, setLoadingBankQuestions] = useState(false);
+
+  useEffect(() => {
+    if (!showQuestionBankModal) return;
+    const delay =
+      questionBankFilters.grade.trim() || questionBankFilters.topicTag.trim() ? 350 : 0;
+    const t = setTimeout(() => {
+      loadQuestionBankQuestions();
+    }, delay);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    showQuestionBankModal,
+    questionBankFilters.subjectId,
+    questionBankFilters.grade,
+    questionBankFilters.topicTag,
+  ]);
 
   useEffect(() => {
     if (id) {
@@ -255,18 +275,16 @@ export default function TestDetail() {
     }
   };
 
-  const loadQuestionBankQuestions = async () => {
+  const loadQuestionBankQuestions = async (filtersOverride?: typeof questionBankFilters) => {
+    const f = filtersOverride ?? questionBankFilters;
     setLoadingBankQuestions(true);
     try {
-      const params: any = {};
-      if (questionBankFilters.subjectId) {
-        params.subjectId = questionBankFilters.subjectId;
-      }
-      if (questionBankFilters.grade) {
-        params.grade = questionBankFilters.grade;
-      }
-      const response = await questionAPI.getBankQuestions(params);
-      setQuestionBankQuestions(response.data || []);
+      const params: Record<string, string> = {};
+      if (f.subjectId) params.subjectId = f.subjectId;
+      if (f.grade?.trim()) params.grade = f.grade.trim();
+      if (f.topicTag?.trim()) params.topicTag = f.topicTag.trim();
+      const data = await questionAPI.getBankQuestions({ ...params, limit: 200 });
+      setQuestionBankQuestions(data?.questions ?? []);
     } catch (error: any) {
       console.error('Failed to load question bank questions:', error);
       toast.error(error.response?.data?.error || 'Failed to load question bank questions');
@@ -290,7 +308,7 @@ export default function TestDetail() {
       toast.success(`Added ${response.data.questions?.length || selectedBankQuestions.size} question(s) to test`);
       setShowQuestionBankModal(false);
       setSelectedBankQuestions(new Set());
-      setQuestionBankFilters({ subjectId: '', grade: '' });
+      setQuestionBankFilters({ subjectId: '', grade: '', topicTag: '' });
       await loadQuestions();
     } catch (error: any) {
       console.error('Failed to add questions from bank:', error);
@@ -762,6 +780,18 @@ export default function TestDetail() {
           >
             {showEditForm ? 'Cancel Edit' : 'Edit Test'}
           </button>
+          {!onQuestionsPage ? (
+            <Link
+              to={`/tests/${id}/questions`}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg"
+            >
+              Questions ({questions.length})
+            </Link>
+          ) : (
+            <Link to={`/tests/${id}`} className="btn-secondary">
+              ← Test details
+            </Link>
+          )}
           {account?.role === 'SCHOOL' && (
           <button
             onClick={() => setShowDeleteConfirm(true)}
@@ -1213,13 +1243,20 @@ export default function TestDetail() {
             </div>
           </form>
         </div>
-      ) : (
+      ) : !onQuestionsPage ? (
         <div className="card" key="test-details">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Test Summary</h2>
-            <span className="text-sm text-gray-500">Complete test information</span>
+            <button
+              type="button"
+              onClick={() => setShowTestSummary((v) => !v)}
+              className="btn-secondary text-sm"
+            >
+              {showTestSummary ? 'Hide summary' : 'Show summary'}
+            </button>
           </div>
-          
+          {showTestSummary && (
+          <>
           {/* Basic Information */}
           <div className="mb-6 pb-6 border-b border-gray-200">
             <h3 className="text-sm font-semibold text-gray-500 uppercase mb-4">Basic Information</h3>
@@ -1399,10 +1436,13 @@ export default function TestDetail() {
               </div>
             </div>
           )}
+          </>
+          )}
         </div>
-      )}
+      ) : null}
 
-      {/* Test Scores Section */}
+      {!onQuestionsPage && (
+      <>
       <div className="card">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">Test Scores</h2>
@@ -1730,7 +1770,11 @@ export default function TestDetail() {
           </div>
         )}
       </div>
+      </>
+      )}
 
+      {onQuestionsPage && (
+      <>
       <div className="card">
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start mb-4">
           <h2 className="text-xl font-semibold">Questions ({questions.length})</h2>
@@ -1747,8 +1791,9 @@ export default function TestDetail() {
               </button>
               <button
                 onClick={() => {
+                  setQuestionBankFilters({ subjectId: '', grade: '', topicTag: '' });
+                  setSelectedBankQuestions(new Set());
                   setShowQuestionBankModal(true);
-                  loadQuestionBankQuestions();
                 }}
                 className="btn-secondary text-sm"
               >
@@ -2204,11 +2249,13 @@ export default function TestDetail() {
           <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             <div className="p-6 border-b border-gray-200">
               <h3 className="text-xl font-semibold">Add Questions from Question Bank</h3>
-              <p className="text-sm text-gray-500 mt-1">Filter and select questions to add to this test</p>
+              <p className="text-sm text-gray-500 mt-1">
+                All bank questions are shown by default. Change filters to narrow the list (updates automatically).
+              </p>
             </div>
             
             <div className="p-6 border-b border-gray-200 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Subject
@@ -2242,14 +2289,26 @@ export default function TestDetail() {
                     }}
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Topic tag
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g. Algebra"
+                    value={questionBankFilters.topicTag}
+                    onChange={(e) => {
+                      setQuestionBankFilters({ ...questionBankFilters, topicTag: e.target.value });
+                    }}
+                  />
+                </div>
               </div>
-              <button
-                onClick={loadQuestionBankQuestions}
-                className="btn-primary text-sm"
-                disabled={loadingBankQuestions}
-              >
-                {loadingBankQuestions ? 'Loading...' : 'Filter Questions'}
-              </button>
+              <p className="text-sm text-gray-500">
+                {loadingBankQuestions
+                  ? 'Loading…'
+                  : `${questionBankQuestions.length} question(s)`}
+              </p>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6">
@@ -2314,7 +2373,7 @@ export default function TestDetail() {
                   onClick={() => {
                     setShowQuestionBankModal(false);
                     setSelectedBankQuestions(new Set());
-                    setQuestionBankFilters({ subjectId: '', grade: '' });
+                    setQuestionBankFilters({ subjectId: '', grade: '', topicTag: '' });
                   }}
                   className="btn-secondary"
                 >
@@ -2331,6 +2390,8 @@ export default function TestDetail() {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

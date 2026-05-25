@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { practiceAPI, questionAPI, subjectAPI, testAPI } from '../../services/api';
 import { Practice as PracticeType, Question } from '../../types';
 import { useAuthStore } from '../../store/authStore';
@@ -10,7 +10,9 @@ type AddSource = 'bank' | 'test' | 'create' | 'bulk' | null;
 
 export default function PracticeDetail() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
+  const onQuestionsPage = location.pathname.endsWith('/questions');
   const { account } = useAuthStore();
   const isSuperAdmin = account?.role === 'SUPER_ADMIN';
   const [practice, setPractice] = useState<PracticeType | null>(null);
@@ -22,7 +24,7 @@ export default function PracticeDetail() {
   const [subjects, setSubjects] = useState<{ id: string; name: string }[]>([]);
   const [bankQuestions, setBankQuestions] = useState<Question[]>([]);
   const [loadingBank, setLoadingBank] = useState(false);
-  const [bankFilters, setBankFilters] = useState({ subjectId: '', grade: '', search: '' });
+  const [bankFilters, setBankFilters] = useState({ subjectId: '', grade: '', search: '', topicTag: '' });
   const [selectedBankIds, setSelectedBankIds] = useState<Set<string>>(new Set());
   const [selectedTestIds, setSelectedTestIds] = useState<Set<string>>(new Set());
   const [selectedTestId, setSelectedTestId] = useState('');
@@ -36,6 +38,7 @@ export default function PracticeDetail() {
     correctAnswer: '',
     points: '1.0',
     grade: '',
+    topicTag: '',
   });
   const [creating, setCreating] = useState(false);
   const [bulkUploading, setBulkUploading] = useState(false);
@@ -85,17 +88,20 @@ export default function PracticeDetail() {
     }
   };
 
-  const loadBankQuestions = async () => {
+  const loadBankQuestions = async (filtersOverride?: typeof bankFilters) => {
+    const f = filtersOverride ?? bankFilters;
     setLoadingBank(true);
     try {
       const data = await questionAPI.getBankQuestions({
-        subjectId: bankFilters.subjectId || undefined,
-        grade: bankFilters.grade || undefined,
-        search: bankFilters.search?.trim() || undefined,
+        subjectId: f.subjectId || undefined,
+        grade: f.grade?.trim() || undefined,
+        search: f.search?.trim() || undefined,
+        topicTag: f.topicTag?.trim() || undefined,
         limit: 500,
       });
       setBankQuestions(data?.questions ?? []);
-    } catch {
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to load question bank');
       setBankQuestions([]);
     } finally {
       setLoadingBank(false);
@@ -108,9 +114,18 @@ export default function PracticeDetail() {
     }
   }, [addSource]);
 
+  // Auto-apply bank filters when any filter changes (debounced for text fields)
   useEffect(() => {
-    if (addSource === 'bank') loadBankQuestions();
-  }, [addSource]);
+    if (addSource !== 'bank') return;
+    const delay =
+      bankFilters.search.trim() || bankFilters.grade.trim() || bankFilters.topicTag.trim() ? 350 : 0;
+    const t = setTimeout(() => {
+      loadBankQuestions();
+    }, delay);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadBankQuestions uses latest bankFilters from closure
+  }, [addSource, bankFilters.subjectId, bankFilters.grade, bankFilters.topicTag, bankFilters.search]);
+
 
   const loadTestQuestions = async (testId: string) => {
     if (!testId) {
@@ -186,10 +201,11 @@ export default function PracticeDetail() {
         correctAnswer: createForm.correctAnswer,
         points: createForm.points,
         grade: createForm.grade || practice?.classLabel,
+        topicTag: createForm.topicTag.trim() || null,
       });
       toast.success('Question created and added to practice');
       setAddSource(null);
-      setCreateForm({ questionText: '', imageUrl: '', questionType: 'multiple_choice', options: '{"A": "", "B": "", "C": ""}', correctAnswer: '', points: '1.0', grade: '' });
+      setCreateForm({ questionText: '', imageUrl: '', questionType: 'multiple_choice', options: '{"A": "", "B": "", "C": ""}', correctAnswer: '', points: '1.0', grade: '', topicTag: '' });
       await loadPractice();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to create question');
@@ -271,6 +287,12 @@ export default function PracticeDetail() {
 
   const questions = practice.questions || [];
 
+  const openBankModal = () => {
+    setBankFilters({ subjectId: '', grade: '', search: '', topicTag: '' });
+    setSelectedBankIds(new Set());
+    setAddSource('bank');
+  };
+
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="mb-4">
@@ -285,12 +307,38 @@ export default function PracticeDetail() {
             {practice.subjectName} · {practice.classLabel} · {questions.length} question(s)
           </p>
         </div>
+        <div className="flex flex-wrap gap-2">
+          {!onQuestionsPage ? (
+            <Link to={`/practice/${id}/questions`} className="btn-primary text-sm">
+              Questions ({questions.length})
+            </Link>
+          ) : (
+            <Link to={`/practice/${id}`} className="btn-secondary text-sm">
+              ← Practice details
+            </Link>
+          )}
+        </div>
       </div>
 
+      {!onQuestionsPage && (
+        <div className="card">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Practice details</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Manage questions on a separate page. Use the Question Bank to find items by grade ({practice.classLabel}),
+            subject, or topic tag.
+          </p>
+          <Link to={`/practice/${id}/questions`} className="btn-primary text-sm inline-block">
+            Manage questions
+          </Link>
+        </div>
+      )}
+
+      {onQuestionsPage && (
+        <>
       <div className="card mb-6">
         <h2 className="text-lg font-semibold mb-3">Add questions</h2>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => setAddSource('bank')} className="btn-secondary text-sm">
+          <button type="button" onClick={openBankModal} className="btn-secondary text-sm">
             From Question Bank
           </button>
           <button type="button" onClick={() => setAddSource('test')} className="btn-secondary text-sm">
@@ -316,8 +364,10 @@ export default function PracticeDetail() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-1">Add from Question Bank</h3>
-            <p className="text-sm text-gray-500 mb-4">Filter and select questions to add.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+            <p className="text-sm text-gray-500 mb-4">
+              All bank questions are shown by default. Change subject, grade, or topic tag to narrow the list (filters apply automatically).
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Subject</label>
                 <select
@@ -342,6 +392,16 @@ export default function PracticeDetail() {
                 />
               </div>
               <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Topic tag</label>
+                <input
+                  type="text"
+                  className="input-field w-full text-sm"
+                  placeholder="e.g. Algebra"
+                  value={bankFilters.topicTag}
+                  onChange={(e) => setBankFilters((f) => ({ ...f, topicTag: e.target.value }))}
+                />
+              </div>
+              <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Search</label>
                 <input
                   type="text"
@@ -352,9 +412,9 @@ export default function PracticeDetail() {
                 />
               </div>
             </div>
-            <button type="button" onClick={loadBankQuestions} disabled={loadingBank} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 mb-3 disabled:opacity-50">
-              {loadingBank ? 'Loading…' : 'Apply filters'}
-            </button>
+            <p className="text-xs text-gray-500 mb-3">
+              {loadingBank ? 'Loading…' : `${bankQuestions.length} question(s)`}
+            </p>
             <div className="space-y-2 max-h-60 overflow-y-auto mb-4">
               {loadingBank && bankQuestions.length === 0 ? (
                 <p className="text-sm text-gray-500">Loading questions…</p>
@@ -375,12 +435,15 @@ export default function PracticeDetail() {
                         });
                       }}
                     />
-                    <span className="text-sm line-clamp-2">{q.questionText}</span>
+                    <span className="text-sm">
+                      <span className="line-clamp-2 block">{q.questionText}</span>
+                      {q.topicTag && <span className="text-xs text-gray-500">Topic: {q.topicTag}</span>}
+                    </span>
                   </label>
                 ))
               )}
             </div>
-            <p className="text-xs text-gray-500 mb-3">Showing up to 500 questions. Use filters and search to narrow.</p>
+            <p className="text-xs text-gray-500 mb-3">Showing up to 500 bank questions. Use filters to narrow.</p>
             <div className="flex gap-2 justify-end">
               <button type="button" onClick={() => { setAddSource(null); setSelectedBankIds(new Set()); }} className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
               <button type="button" onClick={handleAddFromBank} disabled={selectedBankIds.size === 0 || addingFromBank} className="rounded-xl px-4 py-2 text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: 'var(--theme-primary)' }}>
@@ -492,6 +555,10 @@ export default function PracticeDetail() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Grade (optional)</label>
                 <input className="rounded-xl border border-gray-200 w-full px-3 py-2 focus:ring-2 focus:ring-[var(--theme-primary)] focus:border-transparent" placeholder={practice.classLabel} value={createForm.grade} onChange={(e) => setCreateForm((f) => ({ ...f, grade: e.target.value }))} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Topic tag (optional)</label>
+                <input className="rounded-xl border border-gray-200 w-full px-3 py-2 focus:ring-2 focus:ring-[var(--theme-primary)] focus:border-transparent" placeholder="e.g. Algebra" value={createForm.topicTag} onChange={(e) => setCreateForm((f) => ({ ...f, topicTag: e.target.value }))} />
               </div>
               <div className="flex gap-2 justify-end">
                 <button type="button" onClick={() => setAddSource(null)} className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
@@ -611,6 +678,8 @@ export default function PracticeDetail() {
         )}
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }
