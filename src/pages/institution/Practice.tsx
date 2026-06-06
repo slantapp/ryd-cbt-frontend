@@ -16,6 +16,8 @@ export default function Practice() {
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [togglingVisibilityId, setTogglingVisibilityId] = useState<string | null>(null);
+  const [notifyForm, setNotifyForm] = useState({ title: '', message: '' });
+  const [sendingNotification, setSendingNotification] = useState(false);
 
   useEffect(() => {
     if (!isSuperAdmin) {
@@ -84,6 +86,28 @@ export default function Practice() {
     }
   };
 
+  const handleBroadcastNotification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!notifyForm.title.trim() || !notifyForm.message.trim()) {
+      toast.error('Title and message are required');
+      return;
+    }
+    if (!confirm('Send this notification to all practice students?')) return;
+    setSendingNotification(true);
+    try {
+      const result = await practiceAPI.broadcastNotification({
+        title: notifyForm.title.trim(),
+        message: notifyForm.message.trim(),
+      });
+      toast.success(result.message || `Notification sent to ${result.count ?? 0} students`);
+      setNotifyForm({ title: '', message: '' });
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to send notification');
+    } finally {
+      setSendingNotification(false);
+    }
+  };
+
   if (!isSuperAdmin) return null;
 
   const totalStudents = practices.reduce((s, p) => s + (p.studentsTaken ?? 0), 0);
@@ -119,6 +143,45 @@ export default function Practice() {
             </div>
           </div>
         )}
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+        <h2 className="text-lg font-bold text-gray-900">Notify practice students</h2>
+        <p className="text-sm text-gray-500 mt-1 mb-4">
+          Broadcast an announcement to all students on the RYD Practice app. They will see it in their notification bell.
+        </p>
+        <form onSubmit={handleBroadcastNotification} className="space-y-3 max-w-2xl">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+            <input
+              type="text"
+              className="input-field rounded-xl"
+              value={notifyForm.title}
+              onChange={(e) => setNotifyForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder="e.g. New practice tests available"
+              maxLength={120}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+            <textarea
+              className="input-field rounded-xl min-h-[96px] resize-y"
+              value={notifyForm.message}
+              onChange={(e) => setNotifyForm((f) => ({ ...f, message: e.target.value }))}
+              placeholder="Write your announcement for practice students…"
+              maxLength={500}
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={sendingNotification}
+            className="btn-primary rounded-xl disabled:opacity-50 px-5 py-2.5"
+          >
+            {sendingNotification ? 'Sending…' : 'Send notification'}
+          </button>
+        </form>
       </div>
 
       {loading ? (

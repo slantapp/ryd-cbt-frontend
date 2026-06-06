@@ -525,6 +525,8 @@ export const practiceAPI = {
     api.delete(`/practices/${practiceId}/questions/${questionId}`),
   downloadTemplate: () =>
     api.get('/practices/template', { responseType: 'blob', params: { t: Date.now() } }),
+  broadcastNotification: (data: { title: string; message: string }) =>
+    api.post('/practices/broadcast-notification', data).then((r) => r.data),
   // Student
   studentList: (params?: { class?: string; subject?: string; tag?: string }) =>
     api.get('/practices/student', { params }).then((r) => r.data),
