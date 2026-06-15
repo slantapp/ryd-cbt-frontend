@@ -98,6 +98,7 @@ export interface Practice {
   name: string;
   subjectName: string;
   classLabel: string;
+  rydPackageId?: number | null;
   isVisible?: boolean;
   createdById: string;
   createdAt: string;

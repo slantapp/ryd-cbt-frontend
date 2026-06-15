@@ -12,8 +12,13 @@ export default function Practice() {
   const [practices, setPractices] = useState<PracticeType[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createForm, setCreateForm] = useState({ name: '', subjectName: '', classLabel: '' });
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingPractice, setEditingPractice] = useState<PracticeType | null>(null);
+  const [rydPackages, setRydPackages] = useState<{ id: number; title: string; level: number | null }[]>([]);
+  const [createForm, setCreateForm] = useState({ name: '', subjectName: '', classLabel: '', rydPackageId: '' });
+  const [editForm, setEditForm] = useState({ name: '', subjectName: '', classLabel: '' });
   const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [togglingVisibilityId, setTogglingVisibilityId] = useState<string | null>(null);
   const [notifyForm, setNotifyForm] = useState({ title: '', message: '' });
@@ -25,7 +30,17 @@ export default function Practice() {
       return;
     }
     loadPractices();
+    loadRydPackages();
   }, [isSuperAdmin, navigate]);
+
+  const loadRydPackages = async () => {
+    try {
+      const data = await practiceAPI.listRydPackages();
+      setRydPackages(Array.isArray(data) ? data : []);
+    } catch {
+      setRydPackages([]);
+    }
+  };
 
   const loadPractices = async () => {
     setLoading(true);
@@ -47,15 +62,55 @@ export default function Practice() {
     }
     setCreating(true);
     try {
-      await practiceAPI.create(createForm);
+      await practiceAPI.create({
+        name: createForm.name,
+        subjectName: createForm.subjectName,
+        classLabel: createForm.classLabel,
+        rydPackageId: createForm.rydPackageId ? Number(createForm.rydPackageId) : null,
+      });
       toast.success('Practice created');
       setShowCreateModal(false);
-      setCreateForm({ name: '', subjectName: '', classLabel: '' });
+      setCreateForm({ name: '', subjectName: '', classLabel: '', rydPackageId: '' });
       await loadPractices();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to create practice');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const openEditModal = (p: PracticeType) => {
+    setEditingPractice(p);
+    setEditForm({
+      name: p.name,
+      subjectName: p.subjectName,
+      classLabel: p.classLabel,
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPractice) return;
+    if (!editForm.name.trim() || !editForm.subjectName.trim() || !editForm.classLabel.trim()) {
+      toast.error('Name, subject name, and class are required');
+      return;
+    }
+    setUpdating(true);
+    try {
+      await practiceAPI.update(editingPractice.id, {
+        name: editForm.name.trim(),
+        subjectName: editForm.subjectName.trim(),
+        classLabel: editForm.classLabel.trim(),
+      });
+      toast.success('Practice updated');
+      setShowEditModal(false);
+      setEditingPractice(null);
+      await loadPractices();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to update practice');
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -211,6 +266,7 @@ export default function Practice() {
                   <th className="px-5 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
                   <th className="px-5 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Subject</th>
                   <th className="px-5 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Class</th>
+                  <th className="px-5 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">RYD Package</th>
                   <th className="px-5 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Questions</th>
                   <th className="px-5 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Taken</th>
                   <th className="px-5 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Visibility</th>
@@ -225,6 +281,11 @@ export default function Practice() {
                     </td>
                     <td className="px-5 py-4 text-gray-600">{p.subjectName}</td>
                     <td className="px-5 py-4 text-gray-600">{p.classLabel}</td>
+                    <td className="px-5 py-4 text-gray-600">
+                      {p.rydPackageId
+                        ? (rydPackages.find((pkg) => pkg.id === p.rydPackageId)?.title || `Package #${p.rydPackageId}`)
+                        : '—'}
+                    </td>
                     <td className="px-5 py-4 text-gray-600">{p._count?.questions ?? 0}</td>
                     <td className="px-5 py-4 text-gray-600">{p.studentsTaken ?? 0}</td>
                     <td className="px-5 py-4">
@@ -234,6 +295,13 @@ export default function Practice() {
                     </td>
                     <td className="px-5 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(p)}
+                          className="text-sm font-medium text-gray-700 hover:text-gray-900 px-2 py-1.5 rounded-lg hover:bg-gray-100"
+                        >
+                          Edit
+                        </button>
                         <button
                           type="button"
                           onClick={() => navigate(`/practice/${p.id}`)}
@@ -307,6 +375,24 @@ export default function Practice() {
                   required
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">RYD package (optional)</label>
+                <select
+                  className="input-field rounded-xl"
+                  value={createForm.rydPackageId}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, rydPackageId: e.target.value }))}
+                >
+                  <option value="">No package — open catalog practice</option>
+                  {rydPackages.map((pkg) => (
+                    <option key={pkg.id} value={pkg.id}>
+                      {pkg.title}{pkg.level != null ? ` (Level ${pkg.level})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Parents on this package will see Take Practice on their program card.
+                </p>
+              </div>
               <div className="flex gap-3 justify-end pt-4">
                 <button
                   type="button"
@@ -317,6 +403,65 @@ export default function Practice() {
                 </button>
                 <button type="submit" disabled={creating} className="btn-primary rounded-xl disabled:opacity-50 px-5 py-2.5">
                   {creating ? 'Creating…' : 'Create'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && editingPractice && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-100">
+            <h2 className="text-xl font-bold text-gray-900 mb-1">Edit Practice</h2>
+            <p className="text-sm text-gray-500 mb-6">Update the name, subject, or class shown to students.</p>
+            <form onSubmit={handleUpdate} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Name</label>
+                <input
+                  type="text"
+                  className="input-field rounded-xl"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="e.g. Mathematics SS1 Practice"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Subject name</label>
+                <input
+                  type="text"
+                  className="input-field rounded-xl"
+                  value={editForm.subjectName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, subjectName: e.target.value }))}
+                  placeholder="e.g. Mathematics"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Class</label>
+                <input
+                  type="text"
+                  className="input-field rounded-xl"
+                  value={editForm.classLabel}
+                  onChange={(e) => setEditForm((f) => ({ ...f, classLabel: e.target.value }))}
+                  placeholder="e.g. SS1, JSS2"
+                  required
+                />
+              </div>
+              <div className="flex gap-3 justify-end pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingPractice(null);
+                  }}
+                  className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button type="submit" disabled={updating} className="btn-primary rounded-xl disabled:opacity-50 px-5 py-2.5">
+                  {updating ? 'Saving…' : 'Save changes'}
                 </button>
               </div>
             </form>

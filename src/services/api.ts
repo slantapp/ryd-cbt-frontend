@@ -493,10 +493,11 @@ export const impersonationAPI = {
 // Practice (SUPER_ADMIN create/manage; students take)
 export const practiceAPI = {
   list: () => api.get('/practices').then((r) => r.data),
-  create: (data: { name: string; subjectName: string; classLabel: string }) =>
+  listRydPackages: () => api.get('/practices/ryd-packages').then((r) => r.data),
+  create: (data: { name: string; subjectName: string; classLabel: string; rydPackageId?: number | null }) =>
     api.post('/practices', data).then((r) => r.data),
   getOne: (id: string) => api.get(`/practices/${id}`).then((r) => r.data),
-  update: (id: string, data: { name?: string; subjectName?: string; classLabel?: string; isVisible?: boolean }) =>
+  update: (id: string, data: { name?: string; subjectName?: string; classLabel?: string; isVisible?: boolean; rydPackageId?: number | null }) =>
     api.put(`/practices/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/practices/${id}`),
   addQuestionsFromBank: (practiceId: string, questionIds: string[]) =>

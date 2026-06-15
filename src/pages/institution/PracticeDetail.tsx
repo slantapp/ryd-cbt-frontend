@@ -53,6 +53,9 @@ export default function PracticeDetail() {
     createdInBank?: number;
   } | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', subjectName: '', classLabel: '' });
+  const [updatingDetails, setUpdatingDetails] = useState(false);
 
   useEffect(() => {
     if (!isSuperAdmin) {
@@ -71,6 +74,11 @@ export default function PracticeDetail() {
     try {
       const data = await practiceAPI.getOne(id);
       setPractice(data);
+      setEditForm({
+        name: data.name,
+        subjectName: data.subjectName,
+        classLabel: data.classLabel,
+      });
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to load practice');
       navigate('/practice');
@@ -293,6 +301,40 @@ export default function PracticeDetail() {
     setAddSource('bank');
   };
 
+  const startEditingDetails = () => {
+    if (!practice) return;
+    setEditForm({
+      name: practice.name,
+      subjectName: practice.subjectName,
+      classLabel: practice.classLabel,
+    });
+    setIsEditingDetails(true);
+  };
+
+  const handleUpdateDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!practice) return;
+    if (!editForm.name.trim() || !editForm.subjectName.trim() || !editForm.classLabel.trim()) {
+      toast.error('Name, subject name, and class are required');
+      return;
+    }
+    setUpdatingDetails(true);
+    try {
+      const updated = await practiceAPI.update(practice.id, {
+        name: editForm.name.trim(),
+        subjectName: editForm.subjectName.trim(),
+        classLabel: editForm.classLabel.trim(),
+      });
+      setPractice((prev) => (prev ? { ...prev, ...updated } : updated));
+      setIsEditingDetails(false);
+      toast.success('Practice details updated');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to update practice');
+    } finally {
+      setUpdatingDetails(false);
+    }
+  };
+
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="mb-4">
@@ -308,6 +350,11 @@ export default function PracticeDetail() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {!isEditingDetails ? (
+            <button type="button" onClick={startEditingDetails} className="btn-secondary text-sm">
+              Edit details
+            </button>
+          ) : null}
           {!onQuestionsPage ? (
             <Link to={`/practice/${id}/questions`} className="btn-primary text-sm">
               Questions ({questions.length})
@@ -323,13 +370,85 @@ export default function PracticeDetail() {
       {!onQuestionsPage && (
         <div className="card">
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Practice details</h2>
-          <p className="text-sm text-gray-600 mb-4">
-            Manage questions on a separate page. Use the Question Bank to find items by grade ({practice.classLabel}),
-            subject, or topic tag.
-          </p>
-          <Link to={`/practice/${id}/questions`} className="btn-primary text-sm inline-block">
-            Manage questions
-          </Link>
+          {isEditingDetails ? (
+            <form onSubmit={handleUpdateDetails} className="space-y-4 max-w-xl">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <input
+                  type="text"
+                  className="input-field rounded-xl w-full"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Subject name</label>
+                <input
+                  type="text"
+                  className="input-field rounded-xl w-full"
+                  value={editForm.subjectName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, subjectName: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Class</label>
+                <input
+                  type="text"
+                  className="input-field rounded-xl w-full"
+                  value={editForm.classLabel}
+                  onChange={(e) => setEditForm((f) => ({ ...f, classLabel: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="submit" disabled={updatingDetails} className="btn-primary text-sm disabled:opacity-50">
+                  {updatingDetails ? 'Saving…' : 'Save changes'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditingDetails(false);
+                    if (practice) {
+                      setEditForm({
+                        name: practice.name,
+                        subjectName: practice.subjectName,
+                        classLabel: practice.classLabel,
+                      });
+                    }
+                  }}
+                  className="btn-secondary text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm">
+                <div>
+                  <dt className="text-gray-500">Name</dt>
+                  <dd className="font-medium text-gray-900 mt-0.5">{practice.name}</dd>
+                </div>
+                <div>
+                  <dt className="text-gray-500">Subject</dt>
+                  <dd className="font-medium text-gray-900 mt-0.5">{practice.subjectName}</dd>
+                </div>
+                <div>
+                  <dt className="text-gray-500">Class</dt>
+                  <dd className="font-medium text-gray-900 mt-0.5">{practice.classLabel}</dd>
+                </div>
+              </dl>
+              <p className="text-sm text-gray-600 mb-4">
+                Manage questions on a separate page. Use the Question Bank to find items by grade ({practice.classLabel}),
+                subject, or topic tag.
+              </p>
+              <Link to={`/practice/${id}/questions`} className="btn-primary text-sm inline-block">
+                Manage questions
+              </Link>
+            </>
+          )}
         </div>
       )}
 

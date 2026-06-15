@@ -58,16 +58,16 @@ export default function Tests() {
   const isSuperAdmin = account?.role === 'SUPER_ADMIN';
 
   useEffect(() => {
-    // Check if we should show the form based on URL parameter
     const createParam = searchParams.get('create');
     if (createParam === 'true') {
-      setShowForm(true);
-      // Remove the query parameter from URL
+      if (!isSuperAdmin) {
+        setShowForm(true);
+      }
       const newSearchParams = new URLSearchParams(searchParams);
       newSearchParams.delete('create');
       setSearchParams(newSearchParams, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, isSuperAdmin]);
 
   // Scroll to form when it becomes visible
   useEffect(() => {
@@ -319,17 +319,23 @@ export default function Tests() {
           <div className="flex justify-between items-start">
             <div>
               <h1 className="text-4xl font-bold mb-2">Tests</h1>
-              <p className="text-white/80 text-lg">Manage and create your assessment tests</p>
+              <p className="text-white/80 text-lg">
+                {isSuperAdmin
+                  ? 'View all assessment tests across schools'
+                  : 'Manage and create your assessment tests'}
+              </p>
             </div>
-            <div className="flex space-x-3">
-              <button 
-                onClick={() => setShowForm(!showForm)} 
-                className="bg-white font-semibold py-2.5 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl"
-                style={{ color: theme?.primaryColor || '#A8518A' }}
-              >
-                {showForm ? 'Cancel' : '+ Create New Test'}
-              </button>
-            </div>
+            {!isSuperAdmin && (
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowForm(!showForm)}
+                  className="bg-white font-semibold py-2.5 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl"
+                  style={{ color: theme?.primaryColor || '#A8518A' }}
+                >
+                  {showForm ? 'Cancel' : '+ Create New Test'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -384,7 +390,7 @@ export default function Tests() {
       </div>
 
       {/* Create Form */}
-      {showForm && (
+      {showForm && !isSuperAdmin && (
         <div id="test-create-form" className="card border-2 border-primary-200 shadow-xl">
           <div className="flex items-center space-x-3 mb-6">
             <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
@@ -577,9 +583,40 @@ export default function Tests() {
               <button
                 type="button"
                 onClick={() => setShowMoreTestOptions((v) => !v)}
-                className="text-sm font-medium text-primary hover:text-primary-700 underline-offset-2 hover:underline"
+                className="w-full rounded-xl border-2 p-4 sm:p-5 text-left transition-all hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                style={{
+                  borderColor: `${theme?.primaryColor || '#A8518A'}55`,
+                  backgroundColor: showMoreTestOptions
+                    ? `${theme?.primaryColor || '#A8518A'}12`
+                    : `${theme?.primaryColor || '#A8518A'}08`,
+                }}
+                aria-expanded={showMoreTestOptions}
               >
-                {showMoreTestOptions ? 'Hide optional details' : 'Show more (teacher, group, description, due date, max attempts)'}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="text-base font-semibold text-gray-900">
+                        {showMoreTestOptions ? 'Hide additional details' : 'Add more test details'}
+                      </span>
+                      <span
+                        className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
+                        style={{ backgroundColor: theme?.primaryColor || '#A8518A' }}
+                      >
+                        Optional
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Teacher assignment, test group, description, due date, and max attempts
+                    </p>
+                  </div>
+                  <span
+                    className={`mt-1 shrink-0 text-xl font-bold transition-transform ${showMoreTestOptions ? 'rotate-180' : ''}`}
+                    style={{ color: theme?.primaryColor || '#A8518A' }}
+                    aria-hidden
+                  >
+                    ▼
+                  </span>
+                </div>
               </button>
 
               {showMoreTestOptions && (
@@ -690,132 +727,6 @@ export default function Tests() {
               )}
             </div>
 
-            {/* Test Summary Section */}
-            <div className="border-t border-gray-200 pt-6 mt-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Test Summary</h3>
-                <span className="text-xs text-gray-500">Review all your test details</span>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-6 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-xs font-semibold text-gray-500 uppercase">Title</span>
-                    <p className="text-sm text-gray-900 mt-1">{formData.title || <span className="text-gray-400 italic">Not set</span>}</p>
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-gray-500 uppercase">Description</span>
-                    <p className="text-sm text-gray-900 mt-1">{formData.description || <span className="text-gray-400 italic">No description</span>}</p>
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-gray-500 uppercase">Classes</span>
-                    <p className="text-sm text-gray-900 mt-1">
-                      {formData.classroomIds.length > 0 
-                        ? `${formData.classroomIds.length} class${formData.classroomIds.length !== 1 ? 'es' : ''} selected`
-                        : <span className="text-red-500 italic">Required</span>}
-                    </p>
-                    {formData.classroomIds.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {formData.classroomIds.map(id => {
-                          const classroom = getAvailableClassrooms().find(c => c.id === id);
-                          return classroom ? (
-                            <span key={id} className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-800">
-                              {classroom.name}
-                            </span>
-                          ) : null;
-                        })}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-gray-500 uppercase">Test Group</span>
-                    <p className="text-sm text-gray-900 mt-1">
-                      {formData.testGroupId 
-                        ? testGroups.find(tg => tg.id === formData.testGroupId)?.name || 'Selected'
-                        : <span className="text-gray-400 italic">Not set</span>}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-gray-500 uppercase">Subject</span>
-                    <p className="text-sm text-gray-900 mt-1">
-                      {formData.subjectId 
-                        ? subjects.find(s => s.id === formData.subjectId)?.name || 'Selected'
-                        : <span className="text-gray-400 italic">Not set</span>}
-                    </p>
-                  </div>
-                  {account?.role === 'SCHOOL' && (
-                    <div>
-                      <span className="text-xs font-semibold text-gray-500 uppercase">Assigned Teacher</span>
-                      <p className="text-sm text-gray-900 mt-1">
-                        {formData.teacherId 
-                          ? teachers.find(t => t.id === formData.teacherId)?.name || 'Selected'
-                          : <span className="text-gray-400 italic">School-owned</span>}
-                      </p>
-                    </div>
-                  )}
-                  <div>
-                    <span className="text-xs font-semibold text-gray-500 uppercase">Timing</span>
-                    <p className="text-sm text-gray-900 mt-1">
-                      {formData.isTimed 
-                        ? `${formData.duration || 'Not set'} minutes`
-                        : <span className="text-gray-400 italic">Untimed</span>}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-gray-500 uppercase">Due Date</span>
-                    <p className="text-sm text-gray-900 mt-1">
-                      {formData.dueDate 
-                        ? formatDueDate(formData.dueDate)
-                        : <span className="text-gray-400 italic">No due date</span>}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-gray-500 uppercase">Passing Score</span>
-                    <p className="text-sm text-gray-900 mt-1">
-                      {formData.passingScore 
-                        ? `${formData.passingScore}%`
-                        : <span className="text-gray-400 italic">Not set</span>}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-gray-500 uppercase">Max Attempts</span>
-                    <p className="text-sm text-gray-900 mt-1">
-                      {resolveTestMaxAttempts(formData.maxAttempts).maxAttempts}
-                      {resolveTestMaxAttempts(formData.maxAttempts).maxAttempts > 1 && (
-                        <span className="text-gray-500 text-xs ml-1">(retakes allowed)</span>
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-gray-500 uppercase">Score Visibility</span>
-                    <p className="text-sm text-gray-900 mt-1">
-                      {formData.scoreVisibility ? (
-                        <span className="text-green-600 font-medium">✓ Show to students</span>
-                      ) : (
-                        <span className="text-orange-600 font-medium">✗ Hide from students</span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-                {customFields.length > 0 && Object.keys(customFieldValues).length > 0 && (
-                  <div className="border-t border-gray-200 pt-4 mt-4">
-                    <span className="text-xs font-semibold text-gray-500 uppercase block mb-2">Custom Fields</span>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {customFields.map(field => {
-                        const value = customFieldValues[field.id];
-                        if (!value || value.trim() === '') return null;
-                        return (
-                          <div key={field.id}>
-                            <span className="text-xs font-semibold text-gray-500 uppercase">{field.fieldName}</span>
-                            <p className="text-sm text-gray-900 mt-1">{value}</p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
             <div className="flex space-x-3 pt-4 border-t border-gray-200">
               <button
                 type="submit"
@@ -899,10 +810,16 @@ export default function Tests() {
         <div className="card text-center py-16 border-2 border-dashed border-gray-300">
           <div className="text-6xl mb-4">📝</div>
           <h3 className="text-xl font-semibold text-gray-900 mb-2">No tests yet</h3>
-          <p className="text-gray-500 mb-6">Get started by creating your first test</p>
-          <button onClick={() => setShowForm(true)} className="btn-primary">
-            Create Your First Test
-          </button>
+          {isSuperAdmin ? (
+            <p className="text-gray-500">No tests have been created across schools yet.</p>
+          ) : (
+            <>
+              <p className="text-gray-500 mb-6">Get started by creating your first test</p>
+              <button onClick={() => setShowForm(true)} className="btn-primary">
+                Create Your First Test
+              </button>
+            </>
+          )}
         </div>
       ) : filteredTests.length === 0 ? (
         <div className="card text-center py-16 border-2 border-dashed border-gray-300">
