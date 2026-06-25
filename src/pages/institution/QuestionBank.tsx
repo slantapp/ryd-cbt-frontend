@@ -5,6 +5,7 @@ import { Question, Test } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import QuestionImage from '../../components/QuestionImage';
+import SearchableSubjectSelect, { SubjectOption } from '../../components/SearchableSubjectSelect';
 
 export default function QuestionBank() {
   const { account } = useAuthStore();
@@ -18,7 +19,7 @@ export default function QuestionBank() {
     }
   }, [account, isSuperAdmin, navigate]);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [subjects, setSubjects] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const [tests, setTests] = useState<Test[]>([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
@@ -172,11 +173,18 @@ export default function QuestionBank() {
 
   const loadSubjects = async () => {
     try {
-      const response = await subjectAPI.getAll();
+      const response = await subjectAPI.getCatalog();
       setSubjects(response.data || []);
     } catch (error) {
       console.error('Failed to load subjects');
     }
+  };
+
+  const handleCreateSubject = async (name: string): Promise<SubjectOption> => {
+    const response = await subjectAPI.create({ name });
+    const subject = response.data as SubjectOption;
+    setSubjects((prev) => [...prev, subject].sort((a, b) => a.name.localeCompare(b.name)));
+    return subject;
   };
 
   const loadTests = async () => {
@@ -546,21 +554,19 @@ export default function QuestionBank() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Subject
             </label>
-            <select
-              className="input-field"
+            <SearchableSubjectSelect
+              subjects={subjects}
               value={filters.subjectId}
-              onChange={(e) => {
-                setFilters({ ...filters, subjectId: e.target.value });
+              onChange={(subjectId) => {
+                setFilters({ ...filters, subjectId });
                 setPagination((p) => ({ ...p, page: 1 }));
               }}
-            >
-              <option value="">All Subjects</option>
-              {subjects.map((subject) => (
-                <option key={subject.id} value={subject.id}>
-                  {subject.name}
-                </option>
-              ))}
-            </select>
+              placeholder="All subjects"
+              allowEmpty
+              emptyLabel="All subjects"
+              allowCreate={isSuperAdmin}
+              onCreateSubject={isSuperAdmin ? handleCreateSubject : undefined}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -908,19 +914,15 @@ export default function QuestionBank() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Subject <span className="text-red-500">*</span>
                 </label>
-                <select
-                  className="input-field"
+                <SearchableSubjectSelect
+                  subjects={subjects}
                   value={editForm.subjectId}
-                  onChange={(e) => setEditForm({ ...editForm, subjectId: e.target.value })}
+                  onChange={(subjectId) => setEditForm({ ...editForm, subjectId })}
+                  placeholder="Select a subject"
+                  allowCreate={isSuperAdmin}
+                  onCreateSubject={isSuperAdmin ? handleCreateSubject : undefined}
                   required
-                >
-                  <option value="">Select a subject</option>
-                  {subjects.map((subject) => (
-                    <option key={subject.id} value={subject.id}>
-                      {subject.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1028,19 +1030,15 @@ export default function QuestionBank() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Subject <span className="text-red-500">*</span>
                 </label>
-                <select
-                  className="input-field"
+                <SearchableSubjectSelect
+                  subjects={subjects}
                   value={addForm.subjectId}
-                  onChange={(e) => setAddForm({ ...addForm, subjectId: e.target.value })}
+                  onChange={(subjectId) => setAddForm({ ...addForm, subjectId })}
+                  placeholder="Select a subject"
+                  allowCreate={isSuperAdmin}
+                  onCreateSubject={isSuperAdmin ? handleCreateSubject : undefined}
                   required
-                >
-                  <option value="">Select a subject</option>
-                  {subjects.map((subject) => (
-                    <option key={subject.id} value={subject.id}>
-                      {subject.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1221,19 +1219,15 @@ export default function QuestionBank() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Subject <span className="text-red-500">*</span>
                 </label>
-                <select
-                  className="input-field"
+                <SearchableSubjectSelect
+                  subjects={subjects}
                   value={createForm.subjectId}
-                  onChange={(e) => setCreateForm({ ...createForm, subjectId: e.target.value })}
+                  onChange={(subjectId) => setCreateForm({ ...createForm, subjectId })}
+                  placeholder="Select a subject"
+                  allowCreate={isSuperAdmin}
+                  onCreateSubject={isSuperAdmin ? handleCreateSubject : undefined}
                   required
-                >
-                  <option value="">Select a subject</option>
-                  {subjects.map((subject) => (
-                    <option key={subject.id} value={subject.id}>
-                      {subject.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1305,19 +1299,15 @@ export default function QuestionBank() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Subject <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    className="input-field"
+                  <SearchableSubjectSelect
+                    subjects={subjects}
                     value={bulkUploadForm.subjectId}
-                    onChange={(e) => setBulkUploadForm({ ...bulkUploadForm, subjectId: e.target.value })}
+                    onChange={(subjectId) => setBulkUploadForm({ ...bulkUploadForm, subjectId })}
+                    placeholder="Select a subject"
+                    allowCreate={isSuperAdmin}
+                    onCreateSubject={isSuperAdmin ? handleCreateSubject : undefined}
                     required
-                  >
-                    <option value="">Select a subject</option>
-                    {subjects.map((subject) => (
-                      <option key={subject.id} value={subject.id}>
-                        {subject.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

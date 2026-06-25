@@ -19,7 +19,6 @@ export default function TestDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const onQuestionsPage = location.pathname.endsWith('/questions');
   const [showTestSummary, setShowTestSummary] = useState(false);
   const { account } = useAuthStore();
   const [test, setTest] = useState<Test | null>(null);
@@ -93,15 +92,21 @@ export default function TestDetail() {
   const [questionBankFilters, setQuestionBankFilters] = useState({
     subjectId: '',
     grade: '',
-    topicTag: '',
+    search: '',
   });
   const [selectedBankQuestions, setSelectedBankQuestions] = useState<Set<string>>(new Set());
   const [loadingBankQuestions, setLoadingBankQuestions] = useState(false);
 
   useEffect(() => {
+    if (id && location.pathname.endsWith('/questions')) {
+      navigate(`/tests/${id}`, { replace: true });
+    }
+  }, [id, location.pathname, navigate]);
+
+  useEffect(() => {
     if (!showQuestionBankModal) return;
     const delay =
-      questionBankFilters.grade.trim() || questionBankFilters.topicTag.trim() ? 350 : 0;
+      questionBankFilters.grade.trim() || questionBankFilters.search.trim() ? 350 : 0;
     const t = setTimeout(() => {
       loadQuestionBankQuestions();
     }, delay);
@@ -111,7 +116,7 @@ export default function TestDetail() {
     showQuestionBankModal,
     questionBankFilters.subjectId,
     questionBankFilters.grade,
-    questionBankFilters.topicTag,
+    questionBankFilters.search,
   ]);
 
   useEffect(() => {
@@ -282,7 +287,7 @@ export default function TestDetail() {
       const params: Record<string, string> = {};
       if (f.subjectId) params.subjectId = f.subjectId;
       if (f.grade?.trim()) params.grade = f.grade.trim();
-      if (f.topicTag?.trim()) params.topicTag = f.topicTag.trim();
+      if (f.search?.trim()) params.search = f.search.trim();
       const data = await questionAPI.getBankQuestions({ ...params, limit: 200 });
       setQuestionBankQuestions(data?.questions ?? []);
     } catch (error: any) {
@@ -308,7 +313,7 @@ export default function TestDetail() {
       toast.success(`Added ${response.data.questions?.length || selectedBankQuestions.size} question(s) to test`);
       setShowQuestionBankModal(false);
       setSelectedBankQuestions(new Set());
-      setQuestionBankFilters({ subjectId: '', grade: '', topicTag: '' });
+      setQuestionBankFilters({ subjectId: '', grade: '', search: '' });
       await loadQuestions();
     } catch (error: any) {
       console.error('Failed to add questions from bank:', error);
@@ -508,22 +513,7 @@ export default function TestDetail() {
 
       await questionAPI.create(questionData);
       toast.success('Question created');
-      setShowQuestionForm(false);
-      setQuestionForm({
-        questionText: '',
-        imageUrl: '',
-        questionType: 'multiple_choice',
-        options: '{"A": "", "B": "", "C": ""}',
-        correctAnswer: '',
-        points: '1.0',
-      });
-      setOptionInputs({
-        A: '',
-        B: '',
-        C: '',
-        D: '',
-        E: '',
-      });
+      resetQuestionForm();
       loadQuestions();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to create question');
@@ -570,6 +560,26 @@ export default function TestDetail() {
     setShowQuestionForm(true);
   };
 
+  const resetQuestionForm = () => {
+    setEditingQuestion(null);
+    setShowQuestionForm(false);
+    setQuestionForm({
+      questionText: '',
+      imageUrl: '',
+      questionType: 'multiple_choice',
+      options: '{"A": "", "B": "", "C": ""}',
+      correctAnswer: '',
+      points: '1.0',
+    });
+    setOptionInputs({
+      A: '',
+      B: '',
+      C: '',
+      D: '',
+      E: '',
+    });
+  };
+
   const handleUpdateQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingQuestion) return;
@@ -599,23 +609,7 @@ export default function TestDetail() {
 
       await questionAPI.update(editingQuestion.id, questionData);
       toast.success('Question updated');
-      setShowQuestionForm(false);
-      setEditingQuestion(null);
-      setQuestionForm({
-        questionText: '',
-        imageUrl: '',
-        questionType: 'multiple_choice',
-        options: '{"A": "", "B": "", "C": ""}',
-        correctAnswer: '',
-        points: '1.0',
-      });
-      setOptionInputs({
-        A: '',
-        B: '',
-        C: '',
-        D: '',
-        E: '',
-      });
+      resetQuestionForm();
       loadQuestions();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to update question');
@@ -780,18 +774,6 @@ export default function TestDetail() {
           >
             {showEditForm ? 'Cancel Edit' : 'Edit Test'}
           </button>
-          {!onQuestionsPage ? (
-            <Link
-              to={`/tests/${id}/questions`}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg"
-            >
-              Questions ({questions.length})
-            </Link>
-          ) : (
-            <Link to={`/tests/${id}`} className="btn-secondary">
-              ← Test details
-            </Link>
-          )}
           {account?.role === 'SCHOOL' && (
           <button
             onClick={() => setShowDeleteConfirm(true)}
@@ -1243,7 +1225,7 @@ export default function TestDetail() {
             </div>
           </form>
         </div>
-      ) : !onQuestionsPage ? (
+      ) : (
         <div className="card" key="test-details">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Test Summary</h2>
@@ -1439,9 +1421,9 @@ export default function TestDetail() {
           </>
           )}
         </div>
-      ) : null}
+      )}
 
-      {!onQuestionsPage && (
+      {!showEditForm && (
       <>
       <div className="card">
         <div className="flex justify-between items-center mb-4">
@@ -1773,25 +1755,30 @@ export default function TestDetail() {
       </>
       )}
 
-      {onQuestionsPage && (
+      {!showEditForm && (
       <>
-      <div className="card">
+      <div className="card" id="test-questions">
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start mb-4">
           <h2 className="text-xl font-semibold">Questions ({questions.length})</h2>
           <div className="flex flex-col items-stretch sm:items-end gap-2">
             <div className="flex flex-wrap gap-2">
               <button
+                type="button"
                 onClick={() => {
-                  setEditingQuestion(null);
-                  setShowQuestionForm(!showQuestionForm);
+                  if (showQuestionForm) {
+                    resetQuestionForm();
+                  } else {
+                    setEditingQuestion(null);
+                    setShowQuestionForm(true);
+                  }
                 }}
                 className="btn-secondary text-sm"
               >
-                {showQuestionForm ? 'Cancel' : 'Add Question'}
+                {showQuestionForm ? 'Cancel' : 'Add New Question'}
               </button>
               <button
                 onClick={() => {
-                  setQuestionBankFilters({ subjectId: '', grade: '', topicTag: '' });
+                  setQuestionBankFilters({ subjectId: '', grade: '', search: '' });
                   setSelectedBankQuestions(new Set());
                   setShowQuestionBankModal(true);
                 }}
@@ -1828,10 +1815,10 @@ export default function TestDetail() {
         </div>
 
         {showQuestionForm && (
-          <form
-            onSubmit={editingQuestion ? handleUpdateQuestion : handleCreateQuestion}
-            className="mb-6 p-4 bg-gray-50 rounded-lg"
-          >
+        <form
+          onSubmit={editingQuestion ? handleUpdateQuestion : handleCreateQuestion}
+          className="mb-6 p-4 bg-gray-50 rounded-lg"
+        >
             <h3 className="font-semibold mb-4">
               {editingQuestion ? 'Edit Question' : 'Add New Question'}
             </h3>
@@ -2058,13 +2045,10 @@ export default function TestDetail() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowQuestionForm(false);
-                    setEditingQuestion(null);
-                  }}
+                  onClick={resetQuestionForm}
                   className="btn-secondary"
                 >
-                  Cancel
+                  {editingQuestion ? 'Cancel edit' : 'Clear form'}
                 </button>
               </div>
             </div>
@@ -2291,15 +2275,15 @@ export default function TestDetail() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Topic tag
+                    Search
                   </label>
                   <input
                     type="text"
                     className="input-field"
-                    placeholder="e.g. Algebra"
-                    value={questionBankFilters.topicTag}
+                    placeholder="Question or topic tag"
+                    value={questionBankFilters.search}
                     onChange={(e) => {
-                      setQuestionBankFilters({ ...questionBankFilters, topicTag: e.target.value });
+                      setQuestionBankFilters({ ...questionBankFilters, search: e.target.value });
                     }}
                   />
                 </div>
@@ -2373,7 +2357,7 @@ export default function TestDetail() {
                   onClick={() => {
                     setShowQuestionBankModal(false);
                     setSelectedBankQuestions(new Set());
-                    setQuestionBankFilters({ subjectId: '', grade: '', topicTag: '' });
+                    setQuestionBankFilters({ subjectId: '', grade: '', search: '' });
                   }}
                   className="btn-secondary"
                 >

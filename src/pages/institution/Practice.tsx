@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { practiceAPI } from '../../services/api';
+import { practiceAPI, subjectAPI } from '../../services/api';
 import { Practice as PracticeType } from '../../types';
 import { useAuthStore } from '../../store/authStore';
+import SearchableSubjectSelect, { SubjectOption } from '../../components/SearchableSubjectSelect';
 import toast from 'react-hot-toast';
 
 export default function Practice() {
@@ -23,6 +24,8 @@ export default function Practice() {
   const [togglingVisibilityId, setTogglingVisibilityId] = useState<string | null>(null);
   const [notifyForm, setNotifyForm] = useState({ title: '', message: '' });
   const [sendingNotification, setSendingNotification] = useState(false);
+  const [showNotifyModal, setShowNotifyModal] = useState(false);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
 
   useEffect(() => {
     if (!isSuperAdmin) {
@@ -31,7 +34,24 @@ export default function Practice() {
     }
     loadPractices();
     loadRydPackages();
+    loadSubjects();
   }, [isSuperAdmin, navigate]);
+
+  const loadSubjects = async () => {
+    try {
+      const response = await subjectAPI.getCatalog();
+      setSubjects(response.data || []);
+    } catch {
+      setSubjects([]);
+    }
+  };
+
+  const handleCreateSubject = async (name: string): Promise<SubjectOption> => {
+    const response = await subjectAPI.create({ name });
+    const subject = response.data as SubjectOption;
+    setSubjects((prev) => [...prev, subject].sort((a, b) => a.name.localeCompare(b.name)));
+    return subject;
+  };
 
   const loadRydPackages = async () => {
     try {
@@ -156,6 +176,7 @@ export default function Practice() {
       });
       toast.success(result.message || `Notification sent to ${result.count ?? 0} students`);
       setNotifyForm({ title: '', message: '' });
+      setShowNotifyModal(false);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to send notification');
     } finally {
@@ -201,42 +222,21 @@ export default function Practice() {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
-        <h2 className="text-lg font-bold text-gray-900">Notify practice students</h2>
-        <p className="text-sm text-gray-500 mt-1 mb-4">
-          Broadcast an announcement to all students on the RYD Practice app. They will see it in their notification bell.
-        </p>
-        <form onSubmit={handleBroadcastNotification} className="space-y-3 max-w-2xl">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-            <input
-              type="text"
-              className="input-field rounded-xl"
-              value={notifyForm.title}
-              onChange={(e) => setNotifyForm((f) => ({ ...f, title: e.target.value }))}
-              placeholder="e.g. New practice tests available"
-              maxLength={120}
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
-            <textarea
-              className="input-field rounded-xl min-h-[96px] resize-y"
-              value={notifyForm.message}
-              onChange={(e) => setNotifyForm((f) => ({ ...f, message: e.target.value }))}
-              placeholder="Write your announcement for practice students…"
-              maxLength={500}
-              required
-            />
+            <h2 className="text-lg font-bold text-gray-900">Notify practice students</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Broadcast an announcement to all students on the RYD Practice app.
+            </p>
           </div>
           <button
-            type="submit"
-            disabled={sendingNotification}
-            className="btn-primary rounded-xl disabled:opacity-50 px-5 py-2.5"
+            type="button"
+            onClick={() => setShowNotifyModal(true)}
+            className="shrink-0 btn-primary rounded-xl px-5 py-2.5"
           >
-            {sendingNotification ? 'Sending…' : 'Send notification'}
+            Send notification
           </button>
-        </form>
+        </div>
       </div>
 
       {loading ? (
@@ -354,13 +354,15 @@ export default function Practice() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Subject name</label>
-                <input
-                  type="text"
-                  className="input-field rounded-xl"
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Subject</label>
+                <SearchableSubjectSelect
+                  subjects={subjects}
                   value={createForm.subjectName}
-                  onChange={(e) => setCreateForm((f) => ({ ...f, subjectName: e.target.value }))}
-                  placeholder="e.g. Mathematics"
+                  onChange={(name) => setCreateForm((f) => ({ ...f, subjectName: name }))}
+                  valueMode="name"
+                  placeholder="Select subject"
+                  allowCreate
+                  onCreateSubject={handleCreateSubject}
                   required
                 />
               </div>
@@ -428,13 +430,15 @@ export default function Practice() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Subject name</label>
-                <input
-                  type="text"
-                  className="input-field rounded-xl"
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Subject</label>
+                <SearchableSubjectSelect
+                  subjects={subjects}
                   value={editForm.subjectName}
-                  onChange={(e) => setEditForm((f) => ({ ...f, subjectName: e.target.value }))}
-                  placeholder="e.g. Mathematics"
+                  onChange={(name) => setEditForm((f) => ({ ...f, subjectName: name }))}
+                  valueMode="name"
+                  placeholder="Select subject"
+                  allowCreate
+                  onCreateSubject={handleCreateSubject}
                   required
                 />
               </div>
@@ -462,6 +466,61 @@ export default function Practice() {
                 </button>
                 <button type="submit" disabled={updating} className="btn-primary rounded-xl disabled:opacity-50 px-5 py-2.5">
                   {updating ? 'Saving…' : 'Save changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showNotifyModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-100">
+            <h2 className="text-xl font-bold text-gray-900 mb-1">Notify practice students</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Students will see this in their notification bell on the RYD Practice app.
+            </p>
+            <form onSubmit={handleBroadcastNotification} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Title</label>
+                <input
+                  type="text"
+                  className="input-field rounded-xl"
+                  value={notifyForm.title}
+                  onChange={(e) => setNotifyForm((f) => ({ ...f, title: e.target.value }))}
+                  placeholder="e.g. New practice tests available"
+                  maxLength={120}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Message</label>
+                <textarea
+                  className="input-field rounded-xl min-h-[96px] resize-y"
+                  value={notifyForm.message}
+                  onChange={(e) => setNotifyForm((f) => ({ ...f, message: e.target.value }))}
+                  placeholder="Write your announcement for practice students…"
+                  maxLength={500}
+                  required
+                />
+              </div>
+              <div className="flex gap-3 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNotifyModal(false);
+                    setNotifyForm({ title: '', message: '' });
+                  }}
+                  className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={sendingNotification}
+                  className="btn-primary rounded-xl disabled:opacity-50 px-5 py-2.5"
+                >
+                  {sendingNotification ? 'Sending…' : 'Send notification'}
                 </button>
               </div>
             </form>

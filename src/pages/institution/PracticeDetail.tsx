@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { practiceAPI, questionAPI, subjectAPI, testAPI } from '../../services/api';
 import { Practice as PracticeType, Question } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import QuestionImage from '../../components/QuestionImage';
+import SearchableSubjectSelect, { SubjectOption } from '../../components/SearchableSubjectSelect';
 
 type AddSource = 'bank' | 'test' | 'create' | 'bulk' | null;
 
 export default function PracticeDetail() {
   const { id } = useParams<{ id: string }>();
-  const location = useLocation();
   const navigate = useNavigate();
-  const onQuestionsPage = location.pathname.endsWith('/questions');
   const { account } = useAuthStore();
   const isSuperAdmin = account?.role === 'SUPER_ADMIN';
   const [practice, setPractice] = useState<PracticeType | null>(null);
@@ -21,7 +20,7 @@ export default function PracticeDetail() {
   const [tests, setTests] = useState<any[]>([]);
   const [testQuestions, setTestQuestions] = useState<Question[]>([]);
   const [loadingTestQuestions, setLoadingTestQuestions] = useState(false);
-  const [subjects, setSubjects] = useState<{ id: string; name: string }[]>([]);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const [bankQuestions, setBankQuestions] = useState<Question[]>([]);
   const [loadingBank, setLoadingBank] = useState(false);
   const [bankFilters, setBankFilters] = useState({ subjectId: '', grade: '', search: '', topicTag: '' });
@@ -62,11 +61,32 @@ export default function PracticeDetail() {
       navigate('/dashboard', { replace: true });
       return;
     }
+    if (id && window.location.pathname.endsWith('/questions')) {
+      navigate(`/practice/${id}`, { replace: true });
+      return;
+    }
     if (id) {
       loadPractice();
       loadTests();
+      loadSubjects();
     }
   }, [id, isSuperAdmin, navigate]);
+
+  const loadSubjects = async () => {
+    try {
+      const response = await subjectAPI.getCatalog();
+      setSubjects(response.data || []);
+    } catch {
+      setSubjects([]);
+    }
+  };
+
+  const handleCreateSubject = async (name: string): Promise<SubjectOption> => {
+    const response = await subjectAPI.create({ name });
+    const subject = response.data as SubjectOption;
+    setSubjects((prev) => [...prev, subject].sort((a, b) => a.name.localeCompare(b.name)));
+    return subject;
+  };
 
   const loadPractice = async () => {
     if (!id) return;
@@ -117,10 +137,10 @@ export default function PracticeDetail() {
   };
 
   useEffect(() => {
-    if (addSource === 'bank') {
-      subjectAPI.getAll().then((r) => setSubjects(r.data || [])).catch(() => setSubjects([]));
+    if (addSource === 'bank' && subjects.length === 0) {
+      loadSubjects();
     }
-  }, [addSource]);
+  }, [addSource, subjects.length]);
 
   // Auto-apply bank filters when any filter changes (debounced for text fields)
   useEffect(() => {
@@ -355,21 +375,11 @@ export default function PracticeDetail() {
               Edit details
             </button>
           ) : null}
-          {!onQuestionsPage ? (
-            <Link to={`/practice/${id}/questions`} className="btn-primary text-sm">
-              Questions ({questions.length})
-            </Link>
-          ) : (
-            <Link to={`/practice/${id}`} className="btn-secondary text-sm">
-              ← Practice details
-            </Link>
-          )}
         </div>
       </div>
 
-      {!onQuestionsPage && (
-        <div className="card">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Practice details</h2>
+      <div className="card mb-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">Practice details</h2>
           {isEditingDetails ? (
             <form onSubmit={handleUpdateDetails} className="space-y-4 max-w-xl">
               <div>
@@ -383,12 +393,15 @@ export default function PracticeDetail() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Subject name</label>
-                <input
-                  type="text"
-                  className="input-field rounded-xl w-full"
+                <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                <SearchableSubjectSelect
+                  subjects={subjects}
                   value={editForm.subjectName}
-                  onChange={(e) => setEditForm((f) => ({ ...f, subjectName: e.target.value }))}
+                  onChange={(name) => setEditForm((f) => ({ ...f, subjectName: name }))}
+                  valueMode="name"
+                  placeholder="Select subject"
+                  allowCreate
+                  onCreateSubject={handleCreateSubject}
                   required
                 />
               </div>
@@ -440,20 +453,10 @@ export default function PracticeDetail() {
                   <dd className="font-medium text-gray-900 mt-0.5">{practice.classLabel}</dd>
                 </div>
               </dl>
-              <p className="text-sm text-gray-600 mb-4">
-                Manage questions on a separate page. Use the Question Bank to find items by grade ({practice.classLabel}),
-                subject, or topic tag.
-              </p>
-              <Link to={`/practice/${id}/questions`} className="btn-primary text-sm inline-block">
-                Manage questions
-              </Link>
             </>
           )}
-        </div>
-      )}
+      </div>
 
-      {onQuestionsPage && (
-        <>
       <div className="card mb-6">
         <h2 className="text-lg font-semibold mb-3">Add questions</h2>
         <div className="flex flex-wrap items-center gap-2">
@@ -489,16 +492,17 @@ export default function PracticeDetail() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Subject</label>
-                <select
-                  className="input-field w-full text-sm"
+                <SearchableSubjectSelect
+                  subjects={subjects}
                   value={bankFilters.subjectId}
-                  onChange={(e) => setBankFilters((f) => ({ ...f, subjectId: e.target.value }))}
-                >
-                  <option value="">All</option>
-                  {subjects.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
+                  onChange={(subjectId) => setBankFilters((f) => ({ ...f, subjectId }))}
+                  placeholder="All subjects"
+                  allowEmpty
+                  emptyLabel="All"
+                  allowCreate
+                  onCreateSubject={handleCreateSubject}
+                  className="text-sm"
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Grade</label>
@@ -797,8 +801,6 @@ export default function PracticeDetail() {
         )}
         </div>
       </div>
-        </>
-      )}
     </div>
   );
 }

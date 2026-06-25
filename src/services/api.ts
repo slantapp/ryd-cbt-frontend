@@ -411,7 +411,11 @@ export const testGroupAPI = {
 
 // Subjects
 export const subjectAPI = {
-  getAll: (params?: { schoolId?: string }) => api.get('/subjects', { params }),
+  getAll: (params?: { schoolId?: string; catalog?: boolean }) =>
+    api.get('/subjects', {
+      params: params?.catalog ? { ...params, catalog: 'true' } : params,
+    }),
+  getCatalog: () => api.get('/subjects', { params: { catalog: 'true' } }),
   getOne: (id: string) => api.get(`/subjects/${id}`),
   create: (data: { name: string; description?: string }) => api.post('/subjects', data),
   update: (id: string, data: { name?: string; description?: string; isActive?: boolean }) =>
