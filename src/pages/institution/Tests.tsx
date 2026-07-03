@@ -49,7 +49,7 @@ export default function Tests() {
     dueDate: '',
     passingScore: '',
     maxAttempts: '',
-    scoreVisibility: false,
+    scoreVisibility: true,
     classroomIds: [] as string[],
     teacherId: '',
   });
@@ -260,7 +260,7 @@ export default function Tests() {
         dueDate: '',
         passingScore: '',
         maxAttempts: '',
-        scoreVisibility: false,
+        scoreVisibility: true,
         classroomIds: [],
         teacherId: '',
       });
