@@ -179,6 +179,11 @@ export interface Classroom {
   description?: string;
   academicSession?: string;
   isActive: boolean;
+  metadata?: {
+    rydSubCategoryId?: number | null;
+    rydCategoryId?: number | null;
+    rydParentTitle?: string | null;
+  } | null;
   assignments?: TeacherAssignment[];
 }
 

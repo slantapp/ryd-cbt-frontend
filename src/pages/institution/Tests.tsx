@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { testAPI, classroomAPI, teacherAPI, customFieldAPI, testGroupAPI, subjectAPI, themeAPI } from '../../services/api';
 import { Test, Classroom, Institution, TestCustomField } from '../../types';
+import { isSubSchoolClassroom } from '../../utils/classroomLabel';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 
@@ -412,6 +413,9 @@ export default function Tests() {
                     <span className="text-xs text-gray-500 ml-2">(Your assigned classes)</span>
                   )}
                 </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Categories and their sub schools can both be selected.
+                </p>
                 {getAvailableClassrooms().length === 0 ? (
                   <div>
                     <div className="input-field bg-gray-50 cursor-not-allowed">
@@ -454,6 +458,11 @@ export default function Tests() {
                           <span className="text-gray-900">
                             {classroom.name}
                             {classroom.academicSession && ` - ${classroom.academicSession}`}
+                            {isSubSchoolClassroom(classroom) && (
+                              <span className="ml-2 text-xs font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                Sub school
+                              </span>
+                            )}
                           </span>
                         </label>
                       ))}
@@ -774,7 +783,7 @@ export default function Tests() {
                 <option value="">All Classes</option>
                 {classrooms.map((classroom) => (
                   <option key={classroom.id} value={classroom.id}>
-                    {classroom.name}
+                    {classroom.name}{isSubSchoolClassroom(classroom) ? ' (sub school)' : ''}
                   </option>
                 ))}
               </select>

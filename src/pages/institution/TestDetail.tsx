@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { testAPI, questionAPI, classroomAPI, teacherAPI, customFieldAPI, gradingAPI, studentAPI, subjectAPI, testGroupAPI } from '../../services/api';
 import { Test, Question, Classroom, Institution, TestCustomField, StudentTest } from '../../types';
+import { isSubSchoolClassroom } from '../../utils/classroomLabel';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -854,7 +855,14 @@ export default function TestDetail() {
                               }}
                               className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
                             />
-                            <span className="text-sm text-gray-700">{classroom.name}</span>
+                            <span className="text-sm text-gray-700">
+                              {classroom.name}
+                              {isSubSchoolClassroom(classroom) && (
+                                <span className="ml-2 text-xs font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                  Sub school
+                                </span>
+                              )}
+                            </span>
                             {classroom.academicSession && (
                               <span className="text-xs text-gray-500">({classroom.academicSession})</span>
                             )}
